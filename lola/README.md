@@ -37,6 +37,42 @@ never holds a key.
 
 ---
 
+## The conversation loop (Phase 2)
+
+Type a message → the tutor replies in Tagalog **and** returns a structured coaching
+block → the client renders them as two separate surfaces.
+
+| Endpoint | Purpose |
+| -------- | ------- |
+| `POST /sessions` | Start a session (optional `{ scenario, level, baseLanguage }`) |
+| `GET /sessions/:id` | Fetch the full transcript (resume) |
+| `POST /sessions/:id/messages` | Send `{ text }` → `{ reply, coaching, level, utterance }` |
+| `GET /prompts/tutor` | List prompt versions + the active one |
+| `POST /prompts/tutor/versions` | Create + activate a new prompt version `{ content, notes }` |
+| `POST /prompts/tutor/active` | Switch the active version `{ id }` |
+
+- **Conversation engine** (`server/src/conversation/`) renders the active system
+  prompt with the live scenario + learner state, calls Claude (`claude-sonnet-4-6`),
+  splits the reply from the coaching, and **adapts the learner's level every turn**.
+- **Authorable, versioned prompt** lives in `server/prompts/tutor/` (`vN.md` +
+  `manifest.json`), read fresh per request — edit a file or POST a new version and the
+  next turn uses it, **no redeploy**. This is where most product quality lives.
+- **Coaching JSON** is delimited by a sentinel and parsed defensively: malformed or
+  missing coaching degrades to "show just the reply" and never crashes the turn
+  (see `coaching.ts` + its tests).
+- **Persistence** is swappable behind `SessionStore`: a local file store (dev default,
+  zero credentials) or Supabase Postgres (`store/schema.sql`) when configured.
+
+```bash
+# Try the loop on stubs (no API key needed):
+SID=$(curl -s -X POST localhost:4000/sessions -d '{}' -H 'content-type: application/json' \
+  | node -e 'process.stdin.on("data",d=>console.log(JSON.parse(d).session.id))')
+curl -s -X POST localhost:4000/sessions/$SID/messages \
+  -H 'content-type: application/json' -d '{"text":"Kumusta po kayo, Lola?"}'
+```
+
+Set `LOLA_LIVE_PROVIDERS=1` + `ANTHROPIC_API_KEY` to run the real tutor.
+
 ## Architecture
 
 ```
@@ -116,6 +152,8 @@ EXPO_PUBLIC_API_URL=http://localhost:4000 npm run start
 | `OPENAI_API_KEY`      | server | Whisper STT                                        |
 | `ELEVENLABS_API_KEY`  | server | ElevenLabs TTS                                     |
 | `LOLA_TTS_VOICE_ID`   | server | Default Tagalog/multilingual voice                 |
+| `SUPABASE_URL`        | server | Supabase project URL (enables Postgres persistence) |
+| `SUPABASE_SERVICE_ROLE_KEY` | server | Service-role key — server-side only          |
 | `EXPO_PUBLIC_API_URL` | mobile | Server base URL (public; never a secret)           |
 
 Secrets live **only** on the server. `.env` is git-ignored.
@@ -138,7 +176,9 @@ Nothing else in the app references a vendor.
 
 - [x] **Phase 1 — Foundation.** Scaffold, env/secrets, adapter interfaces + one
       stub each, health check. Runnable, no real calls.
-- [ ] Phase 2 — Conversation loop (text, real Claude) + versioned system prompt.
+- [x] **Phase 2 — Conversation loop (text).** Real Claude adapter, versioned/authorable
+      tutor prompt, structured coaching JSON (parsed safely), persisted transcripts,
+      mobile conversation screen.
 - [ ] Phase 3 — Voice in/out (Whisper + ElevenLabs).
 - [ ] Phase 4 — Pronunciation scoring + weak-phoneme tracking.
 - [ ] Phase 5 — Scenarios + "Talk to your family" prep mode.

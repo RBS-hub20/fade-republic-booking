@@ -27,24 +27,24 @@ describe("buildHealth", () => {
 });
 
 describe("app router", () => {
-  it("serves /health", () => {
+  it("serves /health", async () => {
     const app = createApp();
-    const res = app.handle("GET", "/health");
+    const res = await app.handle("GET", "/health");
     expect(res.status).toBe(200);
   });
 
-  it("serves /api/health (Vercel path) identically", () => {
+  it("serves /api/health (Vercel path) identically", async () => {
     const app = createApp();
-    expect(app.handle("GET", "/api/health").status).toBe(200);
+    expect((await app.handle("GET", "/api/health")).status).toBe(200);
   });
 
-  it("normalizes query strings and trailing slashes", () => {
+  it("normalizes query strings and trailing slashes", async () => {
     const app = createApp();
-    expect(app.handle("GET", "/health/?foo=1").status).toBe(200);
+    expect((await app.handle("GET", "/health/?foo=1")).status).toBe(200);
   });
 
-  it("404s unknown routes", () => {
+  it("404s unknown routes", async () => {
     const app = createApp();
-    expect(app.handle("GET", "/nope").status).toBe(404);
+    expect((await app.handle("GET", "/nope")).status).toBe(404);
   });
 });

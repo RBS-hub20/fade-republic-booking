@@ -31,3 +31,58 @@ export interface HealthResponse {
   providers: ProviderHealth[];
   language: LanguageProfile;
 }
+
+/* ── Conversation ── */
+
+export type LearnerLevel = "beginner" | "building" | "conversational" | "fluent";
+
+export interface Scenario {
+  id: string;
+  title: string;
+  description: string;
+  persona: string;
+}
+
+export interface Correction {
+  original: string;
+  better: string;
+  note: string;
+}
+
+export interface NewPhrase {
+  phrase: string;
+  meaning: string;
+}
+
+export interface Coaching {
+  corrections: Correction[];
+  pronunciation: string | null;
+  register: string | null;
+  newPhrase: NewPhrase | null;
+  level: LearnerLevel;
+  encouragement: string | null;
+}
+
+export interface Utterance {
+  id: string;
+  role: "learner" | "tutor";
+  text: string;
+  coaching?: Coaching | null;
+  createdAt: string;
+}
+
+export interface Session {
+  id: string;
+  scenario: Scenario;
+  learnerState: { level: LearnerLevel; baseLanguage: string; weakSpots: string[] };
+  utterances: Utterance[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SendMessageResponse {
+  reply: string;
+  coaching: Coaching | null;
+  level: LearnerLevel;
+  utterance: Utterance;
+}

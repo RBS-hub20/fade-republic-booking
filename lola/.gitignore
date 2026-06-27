@@ -4,6 +4,9 @@ dist/
 .env.local
 *.tsbuildinfo
 
+# Local file-backed session store (dev)
+.data/
+
 # Expo / RN
 .expo/
 .expo-shared/

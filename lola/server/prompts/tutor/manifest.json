@@ -1,0 +1,11 @@
+{
+  "active": "v1",
+  "versions": [
+    {
+      "id": "v1",
+      "label": "Initial Lola tutor — warm Tagalog/Taglish",
+      "notes": "First version: warm heritage tone, turn-by-turn level adaptation, sentinel-delimited coaching JSON.",
+      "createdAt": "2026-06-27T00:00:00.000Z"
+    }
+  ]
+}

@@ -3,6 +3,7 @@ import type {
   LLMCompletionResult,
   LLMProvider,
 } from "@lola/shared";
+import { COACHING_SENTINEL } from "../../conversation/coaching.js";
 
 /**
  * Stub LLM adapter. Returns well-typed, deterministic fake data so the full
@@ -20,22 +21,20 @@ export class StubLLMProvider implements LLMProvider {
     const echo = lastUser?.content?.slice(0, 80) ?? "";
 
     const reply = "Ay, ang galing mo! Kumusta ka? Salamat sa pagsasanay.";
+    // Mirrors the real tutor contract (sentinel-delimited coaching JSON) so the
+    // full loop — including coaching rendering — is exercisable without an API key.
     const coaching = {
       corrections: echo
-        ? [
-            {
-              heard: echo,
-              suggestion: echo,
-              why: "(stub) Looks natural — keep going.",
-            },
-          ]
+        ? [{ original: echo, better: echo, note: "(stub) Looks natural — keep going." }]
         : [],
-      pronunciationNote: "(stub) Your vowels are landing clearly.",
+      pronunciation: "(stub) Your vowels are landing clearly.",
+      register: null,
       newPhrase: { phrase: "Mahal kita", meaning: "I love you" },
-      level: "scaffolding",
+      level: "building",
+      encouragement: "(stub) Tuloy lang!",
     };
 
-    const text = `${reply}\n${JSON.stringify(coaching)}`;
+    const text = `${reply}\n${COACHING_SENTINEL}\n${JSON.stringify(coaching)}`;
     return {
       text,
       model: req.model ?? "stub-tutor-1",

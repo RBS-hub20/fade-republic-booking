@@ -1,6 +1,7 @@
 import type { ProviderSet } from "@lola/shared";
 import type { AppConfig } from "../config/env.js";
 import { StubLLMProvider } from "./llm/stub.js";
+import { ClaudeLLMProvider } from "./llm/claude.js";
 import { StubSTTProvider } from "./stt/stub.js";
 import { StubTTSProvider } from "./tts/stub.js";
 
@@ -30,7 +31,10 @@ function notYet(kind: string, vendor: string): void {
 }
 
 function buildLLM(config: AppConfig): ProviderSet["llm"] {
-  if (config.providers.llm.mode === "live") notYet("LLM", config.providers.llm.vendor);
+  const llm = config.providers.llm;
+  if (llm.mode === "live" && llm.apiKey) {
+    return new ClaudeLLMProvider(llm.apiKey, llm.model);
+  }
   return new StubLLMProvider();
 }
 

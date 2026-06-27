@@ -8,7 +8,11 @@
  *    adapter exists for that phase. Phase 1 ships stubs only.
  */
 
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { LanguageProfile, ProviderMode } from "@lola/shared";
+
+const HERE = dirname(fileURLToPath(import.meta.url));
 
 export type LLMVendor = "claude" | "stub";
 export type STTVendor = "whisper" | "stub";
@@ -25,18 +29,34 @@ export interface ProviderConfig {
   };
 }
 
+export interface PathConfig {
+  /** Where the file-backed session store writes transcripts. */
+  dataDir: string;
+  /** Directory holding the versioned tutor prompt + manifest. */
+  promptsDir: string;
+}
+
+export interface SupabaseConfig {
+  url: string;
+  serviceKey: string;
+}
+
 export interface AppConfig {
   service: string;
   version: string;
   port: number;
   nodeEnv: string;
   /**
-   * Phase 1 is stub-only. Flip to false (or set LOLA_LIVE_PROVIDERS=1) once the
-   * live adapters land in Phase 2+. Until then we never attempt real calls.
+   * Global stub switch. When true, providers run as stubs regardless of keys.
+   * Default true so the project runs with no credentials; set
+   * LOLA_LIVE_PROVIDERS=1 to use the real Claude/STT/TTS adapters.
    */
   stubOnly: boolean;
   providers: ProviderConfig;
   language: LanguageProfile;
+  paths: PathConfig;
+  /** Present only when Supabase credentials are configured. */
+  supabase?: SupabaseConfig;
 }
 
 const VERSION = "0.1.0";
@@ -79,6 +99,11 @@ export function loadConfig(): AppConfig {
   const openaiKey = readKey("OPENAI_API_KEY");
   const elevenKey = readKey("ELEVENLABS_API_KEY");
 
+  const supabaseUrl = readKey("SUPABASE_URL");
+  const supabaseKey = readKey("SUPABASE_SERVICE_ROLE_KEY");
+  const supabase =
+    supabaseUrl && supabaseKey ? { url: supabaseUrl, serviceKey: supabaseKey } : undefined;
+
   return {
     service: "lola-server",
     version: VERSION,
@@ -105,5 +130,10 @@ export function loadConfig(): AppConfig {
       },
     },
     language: LANGUAGE,
+    paths: {
+      dataDir: process.env.LOLA_DATA_DIR ?? join(HERE, "../../.data"),
+      promptsDir: process.env.LOLA_PROMPTS_DIR ?? join(HERE, "../../prompts/tutor"),
+    },
+    supabase,
   };
 }
