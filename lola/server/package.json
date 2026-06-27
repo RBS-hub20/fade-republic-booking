@@ -1,0 +1,24 @@
+{
+  "name": "@lola/server",
+  "version": "0.1.0",
+  "description": "Lola orchestration layer — provider adapters, conversation engine, API.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/dev-server.ts",
+    "start": "node dist/dev-server.js",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@lola/shared": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "tsx": "^4.16.0",
+    "typescript": "^5.5.4",
+    "vitest": "^2.0.5"
+  }
+}
