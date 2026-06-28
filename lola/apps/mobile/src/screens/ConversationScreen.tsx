@@ -10,7 +10,21 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { apiBaseUrl, createSession, sendMessage } from "../api/client";
+import type { Audio } from "expo-av";
+import {
+  apiBaseUrl,
+  createSession,
+  NoSpeechError,
+  sendMessage,
+  sendVoiceTurn,
+} from "../api/client";
+import {
+  playBase64Audio,
+  requestMicPermission,
+  startRecording,
+  stopRecording,
+} from "../audio/voice";
+import { VoiceButton, type VoicePhase } from "../components/VoiceButton";
 import type { Coaching, LearnerLevel, Session } from "../types";
 import { palette, radius, space, type } from "../theme/theme";
 
@@ -37,7 +51,14 @@ export function ConversationScreen() {
   const [draft, setDraft] = useState("");
   const [thinking, setThinking] = useState(false);
   const [level, setLevel] = useState<LearnerLevel>("building");
+  const [voicePhase, setVoicePhase] = useState<VoicePhase>("idle");
+  const [notice, setNotice] = useState<string | null>(null);
+  const recordingRef = useRef<Audio.Recording | null>(null);
   const scrollRef = useRef<ScrollView>(null);
+
+  const scrollDown = useCallback(() => {
+    requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }));
+  }, []);
 
   const connect = useCallback(async () => {
     setPhase({ kind: "connecting" });
@@ -89,6 +110,64 @@ export function ConversationScreen() {
       requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }));
     }
   }, [phase, draft, thinking]);
+
+  const onMicPress = useCallback(async () => {
+    if (phase.kind !== "ready") return;
+    setNotice(null);
+
+    // Tap while recording → stop and run the spoken turn.
+    if (voicePhase === "recording") {
+      const recording = recordingRef.current;
+      recordingRef.current = null;
+      if (!recording) {
+        setVoicePhase("idle");
+        return;
+      }
+      setVoicePhase("thinking");
+      scrollDown();
+      try {
+        const audio = await stopRecording(recording);
+        const res = await sendVoiceTurn(phase.session.id, audio.base64, audio.mimeType);
+        setLevel(res.level);
+        setTurns((prev) => [
+          ...prev,
+          { id: `vl-${res.utterance.id}`, role: "learner", text: res.transcript },
+          { id: res.utterance.id, role: "tutor", text: res.reply, coaching: res.coaching },
+        ]);
+        scrollDown();
+        setVoicePhase("speaking");
+        await playBase64Audio(res.audioBase64);
+      } catch (err) {
+        if (err instanceof NoSpeechError) {
+          setNotice("I couldn’t hear any words — try again, a little closer to the mic.");
+        } else {
+          setNotice("Something went wrong with that turn. Try again?");
+        }
+      } finally {
+        setVoicePhase("idle");
+        scrollDown();
+      }
+      return;
+    }
+
+    // Tap while idle → start recording.
+    if (voicePhase === "idle") {
+      const granted = await requestMicPermission();
+      if (!granted) {
+        setNotice("Lola needs microphone access to hear you. Enable it in Settings.");
+        return;
+      }
+      try {
+        recordingRef.current = await startRecording();
+        setVoicePhase("recording");
+      } catch {
+        setNotice("Couldn’t start recording. Check microphone permissions.");
+        setVoicePhase("idle");
+      }
+    }
+  }, [phase, voicePhase, scrollDown]);
+
+  const voiceBusy = voicePhase !== "idle";
 
   if (phase.kind === "connecting") {
     return (
@@ -151,15 +230,25 @@ export function ConversationScreen() {
           ),
         )}
 
-        {thinking && <ThinkingRow />}
+        {(thinking || voicePhase === "thinking") && <ThinkingRow />}
       </ScrollView>
+
+      <View style={styles.dock}>
+        <VoiceButton phase={voicePhase} onPress={onMicPress} />
+        {notice && (
+          <Text style={styles.notice} accessibilityLiveRegion="polite">
+            {notice}
+          </Text>
+        )}
+      </View>
 
       <View style={styles.inputBar}>
         <TextInput
-          style={styles.input}
+          style={[styles.input, voiceBusy && styles.inputDisabled]}
           value={draft}
           onChangeText={setDraft}
-          placeholder="Sabihin mo… (say something)"
+          editable={!voiceBusy}
+          placeholder="…or type instead"
           placeholderTextColor={palette.onGabiSoft}
           multiline
           onSubmitEditing={onSend}
@@ -167,11 +256,11 @@ export function ConversationScreen() {
         />
         <Pressable
           onPress={onSend}
-          disabled={thinking || draft.trim().length === 0}
+          disabled={thinking || voiceBusy || draft.trim().length === 0}
           accessibilityRole="button"
           style={({ pressed }) => [
             styles.send,
-            (thinking || draft.trim().length === 0) && styles.sendDisabled,
+            (thinking || voiceBusy || draft.trim().length === 0) && styles.sendDisabled,
             pressed && styles.sendPressed,
           ]}
         >
@@ -351,6 +440,13 @@ const styles = StyleSheet.create({
   coachNote: { ...type.caption, color: palette.inkSoft },
   encouragement: { ...type.body, color: palette.primaryDeep, fontStyle: "italic" },
 
+  dock: {
+    alignItems: "center",
+    paddingTop: space.md,
+    paddingHorizontal: space.xl,
+    gap: space.sm,
+  },
+  notice: { ...type.caption, color: palette.puso, textAlign: "center" },
   inputBar: {
     flexDirection: "row",
     alignItems: "flex-end",
@@ -362,6 +458,7 @@ const styles = StyleSheet.create({
     borderTopColor: palette.gabiSoft,
     backgroundColor: palette.gabi,
   },
+  inputDisabled: { opacity: 0.5 },
   input: {
     flex: 1,
     ...type.body,

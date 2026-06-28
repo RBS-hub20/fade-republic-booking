@@ -86,3 +86,14 @@ export interface SendMessageResponse {
   level: LearnerLevel;
   utterance: Utterance;
 }
+
+export interface VoiceTurnResponse {
+  transcript: string;
+  transcriptConfidence: number;
+  reply: string;
+  coaching: Coaching | null;
+  level: LearnerLevel;
+  utterance: Utterance;
+  audioBase64: string;
+  audioMimeType: string;
+}

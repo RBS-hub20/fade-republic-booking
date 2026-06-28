@@ -119,6 +119,41 @@ export interface GetSessionResponse {
   session: Session;
 }
 
+/* ── Voice (Phase 3) ── */
+
+export interface VoiceTurnRequest {
+  /** The learner's spoken turn, base64-encoded audio. */
+  audioBase64: string;
+  /** e.g. "audio/m4a", "audio/webm". */
+  mimeType: string;
+}
+
+export interface VoiceTurnResponse {
+  /** What we heard the learner say. */
+  transcript: string;
+  /** 0..1 transcription confidence. */
+  transcriptConfidence: number;
+  /** The tutor's natural reply text. */
+  reply: string;
+  coaching: Coaching | null;
+  level: LearnerLevel;
+  utterance: Utterance;
+  /** The tutor reply spoken aloud, base64-encoded audio for playback. */
+  audioBase64: string;
+  audioMimeType: string;
+}
+
+export interface SpeakRequest {
+  text: string;
+  /** Optional voice override. */
+  voiceId?: string;
+}
+
+export interface SpeakResponse {
+  audioBase64: string;
+  audioMimeType: string;
+}
+
 /* ── Prompt authoring ── */
 
 export interface PromptVersionMeta {

@@ -3,17 +3,17 @@ import type { AppConfig } from "../config/env.js";
 import { StubLLMProvider } from "./llm/stub.js";
 import { ClaudeLLMProvider } from "./llm/claude.js";
 import { StubSTTProvider } from "./stt/stub.js";
+import { WhisperSTTProvider } from "./stt/whisper.js";
 import { StubTTSProvider } from "./tts/stub.js";
+import { ElevenLabsTTSProvider } from "./tts/elevenlabs.js";
 
 /**
  * Builds the active provider set from config.
  *
- * Phase 1 ships stub adapters only. When config asks for a "live" provider that
- * has no adapter yet, we downgrade to the stub and warn — the loop keeps
- * working instead of crashing. Health always reports each provider's REAL mode
- * (read from the adapter), so a downgrade is visible, never hidden.
- *
- * Phase 2+ adds live branches here; nothing else in the app changes.
+ * Live adapters (Claude, Whisper, ElevenLabs) are used when LOLA_LIVE_PROVIDERS=1
+ * and the matching key is present; otherwise each provider falls back to its
+ * stub so the loop always runs. Health reports each provider's REAL mode (read
+ * from the adapter instance), so the active backend is always visible.
  */
 export function createProviders(config: AppConfig): ProviderSet {
   return {
@@ -21,13 +21,6 @@ export function createProviders(config: AppConfig): ProviderSet {
     stt: buildSTT(config),
     tts: buildTTS(config),
   };
-}
-
-function notYet(kind: string, vendor: string): void {
-  console.warn(
-    `[lola] Live ${kind} adapter "${vendor}" is not available yet; using stub. ` +
-      `It will be wired in a later phase.`,
-  );
 }
 
 function buildLLM(config: AppConfig): ProviderSet["llm"] {
@@ -39,11 +32,17 @@ function buildLLM(config: AppConfig): ProviderSet["llm"] {
 }
 
 function buildSTT(config: AppConfig): ProviderSet["stt"] {
-  if (config.providers.stt.mode === "live") notYet("STT", config.providers.stt.vendor);
+  const stt = config.providers.stt;
+  if (stt.mode === "live" && stt.apiKey) {
+    return new WhisperSTTProvider(stt.apiKey);
+  }
   return new StubSTTProvider();
 }
 
 function buildTTS(config: AppConfig): ProviderSet["tts"] {
-  if (config.providers.tts.mode === "live") notYet("TTS", config.providers.tts.vendor);
+  const tts = config.providers.tts;
+  if (tts.mode === "live" && tts.apiKey) {
+    return new ElevenLabsTTSProvider(tts.apiKey, tts.defaultVoiceId);
+  }
   return new StubTTSProvider();
 }

@@ -5,12 +5,15 @@ import type {
   Scenario,
   SendMessageRequest,
   Session,
+  SpeakRequest,
+  VoiceTurnRequest,
 } from "@lola/shared";
 import { loadConfig, type AppConfig } from "./config/env.js";
 import { createProviders } from "./adapters/factory.js";
 import { buildHealth } from "./health.js";
 import { PromptStore } from "./conversation/prompt-store.js";
 import { ConversationService } from "./conversation/conversation-service.js";
+import { VoiceService, NoSpeechError } from "./conversation/voice-service.js";
 import { DEFAULT_SCENARIO } from "./conversation/scenarios.js";
 import { createSessionStore } from "./store/factory.js";
 import type { SessionStore } from "./store/session-store.js";
@@ -38,6 +41,7 @@ export function createApp(): App {
   const prompts = new PromptStore(config.paths.promptsDir);
   const store = createSessionStore(config);
   const conversation = new ConversationService(providers.llm, prompts, config.language);
+  const voice = new VoiceService(providers.stt, providers.tts, conversation, config.language);
 
   async function route(
     method: string,
@@ -59,6 +63,8 @@ export function createApp(): App {
           "POST /sessions",
           "GET /sessions/:id",
           "POST /sessions/:id/messages",
+          "POST /sessions/:id/voice",
+          "POST /speech/tts",
           "GET /prompts/tutor",
           "POST /prompts/tutor/versions",
           "POST /prompts/tutor/active",
@@ -95,6 +101,58 @@ export function createApp(): App {
       const result = await conversation.sendLearnerMessage(session, text);
       await store.upsert(session);
       return ok(result);
+    }
+
+    // Full spoken turn: audio in → transcript → reply → audio out
+    if (
+      m === "POST" &&
+      segments[0] === "sessions" &&
+      segments[2] === "voice" &&
+      segments.length === 3
+    ) {
+      const session = await store.get(segments[1]!);
+      if (!session) return notFound("session", segments[1]!);
+      const req = (body ?? {}) as VoiceTurnRequest;
+      if (!req.audioBase64 || !req.mimeType) {
+        return {
+          status: 400,
+          body: { error: "bad_request", message: "`audioBase64` and `mimeType` are required" },
+        };
+      }
+      const audio = new Uint8Array(Buffer.from(req.audioBase64, "base64"));
+      try {
+        const result = await voice.runVoiceTurn(session, audio, req.mimeType);
+        await store.upsert(session);
+        return ok(result);
+      } catch (err) {
+        if (err instanceof NoSpeechError) {
+          return {
+            status: 422,
+            body: {
+              error: "no_speech",
+              message: "We couldn't hear any words — try again, a little closer to the mic.",
+            },
+          };
+        }
+        throw err;
+      }
+    }
+
+    // Standalone TTS (e.g. replay a phrase)
+    if (m === "POST" && p === "/speech/tts") {
+      const { text, voiceId } = (body ?? {}) as SpeakRequest;
+      if (!text || text.trim().length === 0) {
+        return { status: 400, body: { error: "bad_request", message: "`text` is required" } };
+      }
+      const speech = await providers.tts.synthesize({
+        text,
+        languageCode: config.language.target,
+        voiceId,
+      });
+      return ok({
+        audioBase64: Buffer.from(speech.audio).toString("base64"),
+        audioMimeType: speech.mimeType,
+      });
     }
 
     // Prompt authoring (versioned, no redeploy)

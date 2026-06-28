@@ -3,6 +3,7 @@ import type {
   LearnerLevel,
   Session,
   SendMessageResponse,
+  VoiceTurnResponse,
 } from "../types";
 
 /**
@@ -44,4 +45,25 @@ export async function sendMessage(
   text: string,
 ): Promise<SendMessageResponse> {
   return post<SendMessageResponse>(`/sessions/${sessionId}/messages`, { text });
+}
+
+export class NoSpeechError extends Error {}
+
+export async function sendVoiceTurn(
+  sessionId: string,
+  audioBase64: string,
+  mimeType: string,
+): Promise<VoiceTurnResponse> {
+  const res = await fetch(`${API_URL}/sessions/${sessionId}/voice`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ audioBase64, mimeType }),
+  });
+  if (res.status === 422) {
+    throw new NoSpeechError("no_speech");
+  }
+  if (!res.ok) {
+    throw new Error(`Voice turn failed (${res.status})`);
+  }
+  return (await res.json()) as VoiceTurnResponse;
 }

@@ -47,6 +47,8 @@ block → the client renders them as two separate surfaces.
 | `POST /sessions` | Start a session (optional `{ scenario, level, baseLanguage }`) |
 | `GET /sessions/:id` | Fetch the full transcript (resume) |
 | `POST /sessions/:id/messages` | Send `{ text }` → `{ reply, coaching, level, utterance }` |
+| `POST /sessions/:id/voice` | Full spoken turn: `{ audioBase64, mimeType }` → transcript + reply + reply audio |
+| `POST /speech/tts` | Speak arbitrary text `{ text }` → `{ audioBase64 }` (e.g. replay a phrase) |
 | `GET /prompts/tutor` | List prompt versions + the active one |
 | `POST /prompts/tutor/versions` | Create + activate a new prompt version `{ content, notes }` |
 | `POST /prompts/tutor/active` | Switch the active version `{ id }` |
@@ -179,7 +181,9 @@ Nothing else in the app references a vendor.
 - [x] **Phase 2 — Conversation loop (text).** Real Claude adapter, versioned/authorable
       tutor prompt, structured coaching JSON (parsed safely), persisted transcripts,
       mobile conversation screen.
-- [ ] Phase 3 — Voice in/out (Whisper + ElevenLabs).
+- [x] **Phase 3 — Voice in/out.** Real Whisper STT (word-level timings) + ElevenLabs TTS
+      behind the adapters, a one-call spoken-turn endpoint, and a mobile record/playback
+      UI with listening / thinking / speaking states (reduced-motion aware).
 - [ ] Phase 4 — Pronunciation scoring + weak-phoneme tracking.
 - [ ] Phase 5 — Scenarios + "Talk to your family" prep mode.
 - [ ] Phase 6 — ICP onboarding + conversation/phoneme progress.
