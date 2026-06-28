@@ -87,6 +87,25 @@ export interface SendMessageResponse {
   utterance: Utterance;
 }
 
+export type PhonemeStatus = "good" | "shaky" | "off" | "missed" | "extra";
+
+export interface PhonemeScore {
+  phoneme: string;
+  produced: string | null;
+  status: PhonemeStatus;
+  score: number;
+  note?: string | null;
+}
+
+export interface PronunciationReport {
+  overall: number;
+  target: string;
+  heard: string;
+  phonemes: PhonemeScore[];
+  weakPhonemes: string[];
+  tips: string[];
+}
+
 export interface VoiceTurnResponse {
   transcript: string;
   transcriptConfidence: number;
@@ -94,6 +113,7 @@ export interface VoiceTurnResponse {
   coaching: Coaching | null;
   level: LearnerLevel;
   utterance: Utterance;
+  pronunciation: PronunciationReport | null;
   audioBase64: string;
   audioMimeType: string;
 }

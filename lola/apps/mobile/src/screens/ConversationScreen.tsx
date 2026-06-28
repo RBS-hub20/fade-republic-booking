@@ -25,7 +25,14 @@ import {
   stopRecording,
 } from "../audio/voice";
 import { VoiceButton, type VoicePhase } from "../components/VoiceButton";
-import type { Coaching, LearnerLevel, Session } from "../types";
+import type {
+  Coaching,
+  LearnerLevel,
+  PhonemeScore,
+  PhonemeStatus,
+  PronunciationReport,
+  Session,
+} from "../types";
 import { palette, radius, space, type } from "../theme/theme";
 
 interface Turn {
@@ -33,6 +40,7 @@ interface Turn {
   role: "learner" | "tutor";
   text: string;
   coaching?: Coaching | null;
+  pronunciation?: PronunciationReport | null;
 }
 
 type Phase =
@@ -53,6 +61,7 @@ export function ConversationScreen() {
   const [level, setLevel] = useState<LearnerLevel>("building");
   const [voicePhase, setVoicePhase] = useState<VoicePhase>("idle");
   const [notice, setNotice] = useState<string | null>(null);
+  const [working, setWorking] = useState<string[]>([]);
   const recordingRef = useRef<Audio.Recording | null>(null);
   const scrollRef = useRef<ScrollView>(null);
 
@@ -129,10 +138,19 @@ export function ConversationScreen() {
         const audio = await stopRecording(recording);
         const res = await sendVoiceTurn(phase.session.id, audio.base64, audio.mimeType);
         setLevel(res.level);
+        if (res.pronunciation && res.pronunciation.weakPhonemes.length > 0) {
+          setWorking(res.pronunciation.weakPhonemes);
+        }
         setTurns((prev) => [
           ...prev,
           { id: `vl-${res.utterance.id}`, role: "learner", text: res.transcript },
-          { id: res.utterance.id, role: "tutor", text: res.reply, coaching: res.coaching },
+          {
+            id: res.utterance.id,
+            role: "tutor",
+            text: res.reply,
+            coaching: res.coaching,
+            pronunciation: res.pronunciation,
+          },
         ]);
         scrollDown();
         setVoicePhase("speaking");
@@ -201,8 +219,15 @@ export function ConversationScreen() {
       <View style={styles.header}>
         <Text style={styles.scene}>{session.scenario.title}</Text>
         <Text style={styles.sceneSub}>{session.scenario.description}</Text>
-        <View style={styles.levelChip}>
-          <Text style={styles.levelText}>{level}</Text>
+        <View style={styles.headerChips}>
+          <View style={styles.levelChip}>
+            <Text style={styles.levelText}>{level}</Text>
+          </View>
+          {working.length > 0 && (
+            <Text style={styles.working}>
+              working on <Text style={styles.workingPhonemes}>{working.join(" · ")}</Text>
+            </Text>
+          )}
         </View>
       </View>
 
@@ -226,7 +251,12 @@ export function ConversationScreen() {
           turn.role === "learner" ? (
             <LearnerBubble key={turn.id} text={turn.text} />
           ) : (
-            <TutorTurn key={turn.id} text={turn.text} coaching={turn.coaching} />
+            <TutorTurn
+              key={turn.id}
+              text={turn.text}
+              coaching={turn.coaching}
+              pronunciation={turn.pronunciation}
+            />
           ),
         )}
 
@@ -281,13 +311,72 @@ function LearnerBubble({ text }: { text: string }) {
   );
 }
 
-function TutorTurn({ text, coaching }: { text: string; coaching?: Coaching | null }) {
+function TutorTurn({
+  text,
+  coaching,
+  pronunciation,
+}: {
+  text: string;
+  coaching?: Coaching | null;
+  pronunciation?: PronunciationReport | null;
+}) {
   return (
     <View style={styles.tutorRow}>
       <View style={styles.tutorBubble}>
         <Text style={styles.tutorText}>{text}</Text>
       </View>
+      {pronunciation && <PronunciationCard report={pronunciation} />}
       {coaching && <CoachingCard coaching={coaching} />}
+    </View>
+  );
+}
+
+const PHONEME_COLOR: Record<PhonemeStatus, string> = {
+  good: palette.listen,
+  shaky: palette.gold,
+  off: palette.puso,
+  missed: palette.danger,
+  extra: palette.inkFaint,
+};
+
+function PronunciationCard({ report }: { report: PronunciationReport }) {
+  // Show the sounds worth attention; if it was clean, celebrate briefly.
+  const flagged = report.phonemes.filter((p) => p.status !== "good");
+  const pct = Math.round(report.overall * 100);
+
+  return (
+    <View style={styles.pron} accessibilityLabel="Pronunciation feedback">
+      <View style={styles.pronHeaderRow}>
+        <Text style={styles.pronHeader}>pronunciation</Text>
+        <Text style={styles.pronScore}>{pct}%</Text>
+      </View>
+
+      {flagged.length === 0 ? (
+        <Text style={styles.pronClean}>Beautifully clear — every sound landed.</Text>
+      ) : (
+        <View style={styles.chips}>
+          {flagged.map((p, i) => (
+            <PhonemeChip key={i} phoneme={p} />
+          ))}
+        </View>
+      )}
+
+      {report.tips.map((tip, i) => (
+        <Text key={i} style={styles.pronTip}>
+          {tip.replace(/\*/g, "")}
+        </Text>
+      ))}
+    </View>
+  );
+}
+
+function PhonemeChip({ phoneme }: { phoneme: PhonemeScore }) {
+  return (
+    <View style={[styles.chip, { borderColor: PHONEME_COLOR[phoneme.status] }]}>
+      <Text style={[styles.chipText, { color: PHONEME_COLOR[phoneme.status] }]}>
+        {phoneme.phoneme}
+      </Text>
+      <Text style={styles.chipStatus}>{phoneme.status}</Text>
     </View>
   );
 }
@@ -379,15 +468,21 @@ const styles = StyleSheet.create({
   },
   scene: { ...type.title, color: palette.onGabi },
   sceneSub: { ...type.body, color: palette.onGabiSoft, marginTop: space.xs },
-  levelChip: {
-    alignSelf: "flex-start",
+  headerChips: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.md,
     marginTop: space.md,
+  },
+  levelChip: {
     backgroundColor: palette.gabiSoft,
     paddingHorizontal: space.md,
     paddingVertical: space.xs,
     borderRadius: radius.pill,
   },
   levelText: { ...type.caption, color: palette.gold, fontWeight: "700" },
+  working: { ...type.caption, color: palette.onGabiSoft },
+  workingPhonemes: { color: palette.puso, fontWeight: "700" },
 
   transcript: { flex: 1 },
   transcriptContent: { padding: space.lg, gap: space.lg },
@@ -419,6 +514,37 @@ const styles = StyleSheet.create({
   thinkingBubble: { backgroundColor: palette.gabiSoft },
   thinkingText: { ...type.body, color: palette.onGabiSoft, fontStyle: "italic" },
 
+  pron: {
+    backgroundColor: palette.surface,
+    borderRadius: radius.md,
+    padding: space.md,
+    gap: space.sm,
+    borderLeftWidth: 3,
+    borderLeftColor: palette.listen,
+  },
+  pronHeaderRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  pronHeader: {
+    ...type.caption,
+    color: palette.listen,
+    fontWeight: "700",
+    letterSpacing: 1,
+    textTransform: "uppercase",
+  },
+  pronScore: { ...type.label, color: palette.ink, fontWeight: "700" },
+  pronClean: { ...type.caption, color: palette.inkSoft },
+  chips: { flexDirection: "row", flexWrap: "wrap", gap: space.sm },
+  chip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderWidth: 1.5,
+    borderRadius: radius.pill,
+    paddingHorizontal: space.md,
+    paddingVertical: 4,
+  },
+  chipText: { ...type.label, fontWeight: "700" },
+  chipStatus: { ...type.caption, color: palette.inkFaint },
+  pronTip: { ...type.caption, color: palette.inkSoft },
   coaching: {
     backgroundColor: palette.goldTint,
     borderRadius: radius.md,

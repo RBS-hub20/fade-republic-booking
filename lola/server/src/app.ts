@@ -121,7 +121,7 @@ export function createApp(): App {
       }
       const audio = new Uint8Array(Buffer.from(req.audioBase64, "base64"));
       try {
-        const result = await voice.runVoiceTurn(session, audio, req.mimeType);
+        const result = await voice.runVoiceTurn(session, audio, req.mimeType, req.target);
         await store.upsert(session);
         return ok(result);
       } catch (err) {

@@ -65,6 +65,26 @@ block → the client renders them as two separate surfaces.
 - **Persistence** is swappable behind `SessionStore`: a local file store (dev default,
   zero credentials) or Supabase Postgres (`store/schema.sql`) when configured.
 
+## Pronunciation scoring (Phase 4)
+
+On a voice turn, the learner's utterance is scored against a target (an explicit
+"repeat after me" target, else the native form from the tutor's correction, else
+the transcript itself). The scorer (`server/src/pronunciation/`):
+
+1. **Tagalog G2P** (`g2p.ts`) — rule-based grapheme→phoneme (Tagalog is near
+   one-letter-one-sound), with the `ng` digraph as a single phoneme and a few
+   irregulars (`mga` → "manga").
+2. **Phoneme alignment** (`align.ts`) — Needleman–Wunsch edit script between the
+   target and heard phoneme sequences.
+3. **Scoring** (`scorer.ts`) — grades each target phoneme `good / shaky / off /
+   missed / extra` and emits **specific** advice ("your *ng* is landing too hard,"
+   not a bare number). Low STT confidence softens matches to `shaky`.
+
+Per-phoneme accuracy accumulates on the learner (`weak-spots.ts`); the worst
+sounds are resurfaced into the tutor prompt's `{{weakSpots}}` so the tutor
+reinforces them naturally, and shown in the app as a pronunciation card +
+"working on" chip.
+
 ```bash
 # Try the loop on stubs (no API key needed):
 SID=$(curl -s -X POST localhost:4000/sessions -d '{}' -H 'content-type: application/json' \
@@ -184,7 +204,9 @@ Nothing else in the app references a vendor.
 - [x] **Phase 3 — Voice in/out.** Real Whisper STT (word-level timings) + ElevenLabs TTS
       behind the adapters, a one-call spoken-turn endpoint, and a mobile record/playback
       UI with listening / thinking / speaking states (reduced-motion aware).
-- [ ] Phase 4 — Pronunciation scoring + weak-phoneme tracking.
+- [x] **Phase 4 — Pronunciation scoring.** Tagalog G2P → phoneme alignment → per-phoneme
+      feedback with specific tips; weak phonemes persisted per learner and resurfaced into
+      the tutor prompt; mobile pronunciation card + "working on" chip.
 - [ ] Phase 5 — Scenarios + "Talk to your family" prep mode.
 - [ ] Phase 6 — ICP onboarding + conversation/phoneme progress.
 
