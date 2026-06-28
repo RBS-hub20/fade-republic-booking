@@ -9,7 +9,8 @@
   ],
   "scripts": {
     "build": "npm run build --workspace @lola/shared && npm run build --workspace @lola/server",
-    "typecheck": "npm run typecheck --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present && npm run typecheck:api",
+    "typecheck:api": "tsc -p api/tsconfig.json",
     "test": "npm run test --workspace @lola/server",
     "dev:server": "npm run dev --workspace @lola/server"
   },

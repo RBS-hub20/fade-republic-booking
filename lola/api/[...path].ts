@@ -1,9 +1,10 @@
-import { createApp } from "../src/app.js";
+import { createApp } from "../server/src/app.js";
 
 /**
- * Vercel catch-all serverless function. Every request under /api/* lands here;
- * we strip the /api prefix and delegate to the shared app router, so the dev
- * server and Vercel run identical logic.
+ * Vercel catch-all serverless function, living at the workspace root so Vercel's
+ * install resolves the @lola/shared workspace package. Every request under
+ * /api/* lands here; we strip the /api prefix and delegate to the shared app
+ * router, so the dev server and Vercel run identical logic.
  *
  * Typed structurally (no @vercel/node dependency required).
  *

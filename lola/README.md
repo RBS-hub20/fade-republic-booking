@@ -163,6 +163,25 @@ EXPO_PUBLIC_API_URL=http://localhost:4000 npm run start
 
 ---
 
+## Deploy (Vercel)
+
+The API deploys as Vercel Serverless Functions. **Set the project's Root Directory
+to `lola`** (the npm-workspace root) — this is required so Vercel's install resolves
+the `@lola/shared` workspace package; the function (`lola/api/[...path].ts`) is then
+bundled with all its imports inlined.
+
+- `lola/vercel.json` sets `"framework": null` (this is a plain Functions app, **not**
+  Next.js) and registers the `api/**` functions on the Node runtime.
+- All routes are served under `/api/*` in production (the function strips the `/api`
+  prefix and delegates to the same router the dev server uses). So the mobile app's
+  `EXPO_PUBLIC_API_URL` is `https://<deployment>/api` in production, vs
+  `http://localhost:4000` locally.
+- Serverless invocations are stateless and the filesystem is ephemeral, so configure
+  **Supabase** (`SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`) for durable transcripts —
+  the file-backed store is for local dev only.
+- Set the provider secrets (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `ELEVENLABS_API_KEY`)
+  and `LOLA_LIVE_PROVIDERS=1` in the Vercel project's environment variables.
+
 ## Environment variables
 
 | Var                   | Where  | Purpose                                            |
