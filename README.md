@@ -20,8 +20,11 @@ Open **http://localhost:3000** and sign in with a demo account:
 | Admin  | `admin@rscryptofx.com`  | `admin123` |
 | Client | `client@rscryptofx.com` | `client123`|
 
-> First `npm run dev` auto-creates `.env`, pushes the Prisma schema to a local
-> SQLite database, and seeds demo data. No manual setup required.
+> Both `npm run dev` and `npm start` auto-create `.env`, push the Prisma schema
+> to a local SQLite database, and seed demo data on first run (idempotent — see
+> `scripts/ensure-db.mjs`). No manual setup required. If the database is ever
+> missing, the app shows a friendly notice instead of crashing; run
+> `npm run db:reset` to rebuild it.
 
 ### Useful scripts
 

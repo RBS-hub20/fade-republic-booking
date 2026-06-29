@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
-const mono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono" });
+// NOTE: We intentionally use a system font stack (defined in globals.css) rather
+// than next/font/google, so the app never depends on fetching fonts from Google
+// at build/runtime — important in restricted/offline environments.
 
 export const metadata: Metadata = {
   title: "RSCryptoFX Client Portal",
@@ -18,9 +18,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="dark">
-      <body className={`${inter.variable} ${mono.variable} font-sans antialiased`}>
-        {children}
-      </body>
+      <body className="font-sans antialiased">{children}</body>
     </html>
   );
 }
