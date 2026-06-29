@@ -1,0 +1,101 @@
+import Link from "next/link";
+import { FileText } from "lucide-react";
+import { PageHeader } from "@/components/shell/page-header";
+import { AddClientDialog } from "@/components/clients/add-client-dialog";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { getClientsWithBalance } from "@/lib/data";
+import { cn, formatUsd, formatDate } from "@/lib/utils";
+import { STATUS_LABELS, type ClientStatus } from "@/lib/constants";
+
+export const dynamic = "force-dynamic";
+
+const statusVariant: Record<ClientStatus, "success" | "warning" | "danger"> = {
+  ACTIVE: "success",
+  PAUSED: "warning",
+  CLOSED: "danger",
+};
+
+export default async function ClientsPage() {
+  const clients = await getClientsWithBalance();
+
+  return (
+    <>
+      <PageHeader title="Clients" subtitle={`${clients.length} managed accounts`}>
+        <AddClientDialog />
+      </PageHeader>
+
+      <Card>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Client</TableHead>
+              <TableHead>Account</TableHead>
+              <TableHead className="text-right">Initial</TableHead>
+              <TableHead className="text-right">Balance</TableHead>
+              <TableHead className="text-right">Net P/L</TableHead>
+              <TableHead>Start</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead className="text-right">Report</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {clients.map((c) => (
+              <TableRow key={c.id}>
+                <TableCell>
+                  <div className="font-medium">{c.name}</div>
+                  <div className="text-xs text-muted-foreground">{c.email}</div>
+                </TableCell>
+                <TableCell className="font-mono text-xs">{c.accountNumber}</TableCell>
+                <TableCell className="tnum text-right">{formatUsd(c.initialDeposit)}</TableCell>
+                <TableCell className="tnum text-right font-medium text-gold-300">
+                  {formatUsd(c.currentBalance)}
+                </TableCell>
+                <TableCell
+                  className={cn(
+                    "tnum text-right",
+                    c.totalNetPnl >= 0 ? "text-profit" : "text-loss"
+                  )}
+                >
+                  {c.totalNetPnl >= 0 ? "+" : ""}
+                  {formatUsd(c.totalNetPnl)}
+                </TableCell>
+                <TableCell className="text-xs text-muted-foreground">
+                  {formatDate(c.startDate)}
+                </TableCell>
+                <TableCell>
+                  <Badge variant={statusVariant[c.status as ClientStatus]}>
+                    {STATUS_LABELS[c.status as ClientStatus] ?? c.status}
+                  </Badge>
+                </TableCell>
+                <TableCell className="text-right">
+                  <Button asChild variant="ghost" size="sm">
+                    <Link href={`/reports/${c.id}`}>
+                      <FileText className="h-4 w-4" /> View
+                    </Link>
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
+            {clients.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
+                  No clients yet. Click “Add Client” to get started.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </Card>
+    </>
+  );
+}

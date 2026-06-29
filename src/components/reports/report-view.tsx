@@ -1,0 +1,306 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { FileDown, Check, Pencil, X } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { EquityChart } from "@/components/dashboard/equity-chart";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { cn, formatUsd, formatDate, formatDateKey } from "@/lib/utils";
+import { METHOD_LABELS } from "@/lib/constants";
+import { generateClientStatement, type ReportTxn } from "@/lib/pdf";
+import type { EquityPoint, PerformanceKpis } from "@/lib/performance";
+
+interface ReportClient {
+  id: string;
+  name: string;
+  email: string;
+  phone: string | null;
+  accountNumber: string;
+  startDate: string;
+  initialDeposit: number;
+}
+
+export function ReportView({
+  client,
+  kpis,
+  curve,
+  transactions,
+  isAdmin,
+}: {
+  client: ReportClient;
+  kpis: PerformanceKpis;
+  curve: EquityPoint[];
+  transactions: ReportTxn[];
+  isAdmin: boolean;
+}) {
+  const router = useRouter();
+
+  function exportPdf() {
+    generateClientStatement({
+      client: {
+        name: client.name,
+        email: client.email,
+        accountNumber: client.accountNumber,
+        startDate: client.startDate,
+      },
+      kpis,
+      curve,
+      transactions,
+    });
+  }
+
+  const dailyRows = curve
+    .filter((p) => p.isTradingDay && p.dailyPercent !== 0)
+    .slice()
+    .reverse();
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardContent className="flex flex-col gap-4 pt-5 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-xl font-bold">{client.name}</h2>
+            <p className="text-sm text-muted-foreground">
+              <span className="font-mono">{client.accountNumber}</span> · {client.email}
+              {client.phone ? ` · ${client.phone}` : ""}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Since {formatDate(client.startDate)} · Initial {formatUsd(client.initialDeposit)}
+            </p>
+          </div>
+          <Button onClick={exportPdf}>
+            <FileDown className="h-4 w-4" /> Export Monthly Report
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* KPI summary */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        <Stat label="Balance" value={formatUsd(kpis.currentBalance)} tone="gold" />
+        <Stat label="Deposits" value={formatUsd(kpis.totalDeposits)} />
+        <Stat label="Withdrawals" value={formatUsd(kpis.totalWithdrawals)} />
+        <Stat
+          label="Net P/L"
+          value={formatUsd(kpis.totalNetPnl)}
+          tone={kpis.totalNetPnl >= 0 ? "profit" : "loss"}
+        />
+        <Stat label="Win Rate" value={`${kpis.winRate.toFixed(1)}%`} tone="profit" />
+        <Stat label="Avg Daily" value={`${kpis.avgDailyPercent.toFixed(2)}%`} tone="gold" />
+      </div>
+
+      <EquityChart curve={curve} title="Equity Curve" />
+
+      {/* Transactions */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Deposits & Withdrawals</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Date</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead className="text-right">Amount</TableHead>
+                <TableHead>Method</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Notes</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {transactions.map((t, i) => (
+                <TableRow key={i}>
+                  <TableCell className="text-xs text-muted-foreground">{t.date}</TableCell>
+                  <TableCell>
+                    <Badge variant={t.type === "DEPOSIT" ? "success" : "danger"}>
+                      {t.type === "DEPOSIT" ? "Deposit" : "Withdrawal"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell
+                    className={cn(
+                      "tnum text-right font-medium",
+                      t.type === "DEPOSIT" ? "text-profit" : "text-loss"
+                    )}
+                  >
+                    {t.type === "DEPOSIT" ? "+" : "−"}
+                    {formatUsd(t.amount)}
+                  </TableCell>
+                  <TableCell className="text-sm">
+                    {METHOD_LABELS[t.method as keyof typeof METHOD_LABELS] ?? t.method}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={t.status === "APPROVED" ? "outline" : "warning"}>
+                      {t.status === "APPROVED" ? "Approved" : "Pending"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground">{t.notes}</TableCell>
+                </TableRow>
+              ))}
+              {transactions.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
+                    No transactions on record.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      {/* Daily P/L log with admin inline edit */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Daily Performance Log</CardTitle>
+          {isAdmin && (
+            <p className="text-xs text-muted-foreground">
+              Admin: click the pencil to enter an actual daily % (blank = random 0.3–0.6% estimate).
+            </p>
+          )}
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Date</TableHead>
+                <TableHead className="text-right">Daily %</TableHead>
+                <TableHead className="text-right">Daily P/L</TableHead>
+                <TableHead className="text-right">Balance EOD</TableHead>
+                {isAdmin && <TableHead className="text-right">Edit</TableHead>}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {dailyRows.map((p) => (
+                <DailyRow
+                  key={p.date}
+                  clientId={client.id}
+                  point={p}
+                  isAdmin={isAdmin}
+                  onSaved={() => router.refresh()}
+                />
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function DailyRow({
+  clientId,
+  point,
+  isAdmin,
+  onSaved,
+}: {
+  clientId: string;
+  point: EquityPoint;
+  isAdmin: boolean;
+  onSaved: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(point.dailyPercent.toFixed(2));
+  const [saving, setSaving] = useState(false);
+
+  async function save() {
+    setSaving(true);
+    await fetch("/api/performance", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clientId, date: point.date, dailyPercent: value }),
+    });
+    setSaving(false);
+    setEditing(false);
+    onSaved();
+  }
+
+  return (
+    <TableRow>
+      <TableCell className="font-medium">{formatDateKey(point.date)}</TableCell>
+      <TableCell className="text-right">
+        {editing ? (
+          <Input
+            type="number"
+            step="0.01"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            className="ml-auto h-7 w-24 text-right"
+          />
+        ) : (
+          <span
+            className={cn(
+              "tnum font-medium",
+              point.dailyPercent >= 0 ? "text-profit" : "text-loss"
+            )}
+          >
+            {point.dailyPercent.toFixed(2)}%
+          </span>
+        )}
+      </TableCell>
+      <TableCell
+        className={cn("tnum text-right", point.pnl >= 0 ? "text-profit" : "text-loss")}
+      >
+        {point.pnl >= 0 ? "+" : ""}
+        {formatUsd(point.pnl)}
+      </TableCell>
+      <TableCell className="tnum text-right font-medium">{formatUsd(point.balance)}</TableCell>
+      {isAdmin && (
+        <TableCell className="text-right">
+          {editing ? (
+            <div className="flex justify-end gap-1">
+              <Button variant="ghost" size="icon" onClick={save} disabled={saving} title="Save">
+                <Check className="h-4 w-4 text-profit" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setEditing(false)}
+                title="Cancel"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          ) : (
+            <Button variant="ghost" size="icon" onClick={() => setEditing(true)} title="Edit %">
+              <Pencil className="h-3.5 w-3.5" />
+            </Button>
+          )}
+        </TableCell>
+      )}
+    </TableRow>
+  );
+}
+
+function Stat({
+  label,
+  value,
+  tone = "neutral",
+}: {
+  label: string;
+  value: string;
+  tone?: "neutral" | "profit" | "loss" | "gold";
+}) {
+  const toneClass = {
+    neutral: "text-foreground",
+    profit: "text-profit",
+    loss: "text-loss",
+    gold: "text-gold-300",
+  }[tone];
+  return (
+    <Card className="p-3">
+      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className={cn("tnum mt-1 text-lg font-bold", toneClass)}>{value}</p>
+    </Card>
+  );
+}

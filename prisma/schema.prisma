@@ -1,0 +1,75 @@
+// Prisma schema for the RSCryptoFX Client Portal.
+//
+// Local dev uses SQLite for zero-config startup. To move to Postgres later:
+//   1. Change `provider` below to "postgresql".
+//   2. Set DATABASE_URL to your Postgres connection string in .env.
+//   3. Optionally promote the string "enum" fields below to real Prisma `enum`s
+//      (Postgres supports them; SQLite does not, which is why they are strings).
+//   4. Run `npx prisma migrate dev`.
+//
+// The string fields marked "enum:" are constrained at the app layer in
+// src/lib/constants.ts (single source of truth for allowed values).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Client {
+  id             String   @id @default(cuid())
+  name           String
+  email          String   @unique
+  phone          String?
+  accountNumber  String   @unique
+  initialDeposit Float    @default(0)
+  startDate      DateTime
+  // enum: ClientStatus — ACTIVE | PAUSED | CLOSED
+  status         String   @default("ACTIVE")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  transactions      Transaction[]
+  dailyPerformances DailyPerformance[]
+}
+
+model Transaction {
+  id       String   @id @default(cuid())
+  clientId String
+  date     DateTime
+  // enum: TransactionType — DEPOSIT | WITHDRAWAL
+  type     String
+  amount   Float
+  // enum: TransactionMethod — BANK | CRYPTO | OTC
+  method   String   @default("BANK")
+  // enum: TransactionStatus — PENDING | APPROVED
+  status   String   @default("APPROVED")
+  notes    String?
+  createdAt DateTime @default(now())
+
+  client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@index([date])
+}
+
+model DailyPerformance {
+  id           String   @id @default(cuid())
+  clientId     String
+  date         DateTime
+  dailyPercent Float
+  // Balance at end of day, after applying dailyPercent to the running equity.
+  balanceEOD   Float
+  pnlUsd       Float    @default(0)
+  notes        String?
+  createdAt    DateTime @default(now())
+
+  client       Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, date])
+  @@index([clientId])
+  @@index([date])
+}

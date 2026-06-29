@@ -1,0 +1,65 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Dark trading-terminal palette (zinc/slate base, gold accent). */
+    --background: 222 14% 7%;
+    --foreground: 210 20% 92%;
+    --card: 222 14% 9%;
+    --card-foreground: 210 20% 92%;
+    --primary: 43 74% 58%; /* gold */
+    --primary-foreground: 222 47% 8%;
+    --secondary: 217 14% 16%;
+    --secondary-foreground: 210 20% 92%;
+    --muted: 217 14% 14%;
+    --muted-foreground: 215 14% 58%;
+    --accent: 217 14% 18%;
+    --accent-foreground: 210 20% 92%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 210 20% 98%;
+    --border: 217 14% 18%;
+    --input: 217 14% 18%;
+    --ring: 43 74% 58%;
+    --radius: 0.6rem;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  /* Tabular numerals make financial figures line up nicely. */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* Subtle terminal grid backdrop for the shell. */
+.terminal-bg {
+  background-color: hsl(var(--background));
+  background-image:
+    radial-gradient(circle at 1px 1px, hsl(217 14% 16% / 0.4) 1px, transparent 0);
+  background-size: 28px 28px;
+}
+
+/* Thin custom scrollbars to match the terminal aesthetic. */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: hsl(222 14% 9%);
+}
+::-webkit-scrollbar-thumb {
+  background: hsl(217 14% 22%);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(217 14% 30%);
+}
