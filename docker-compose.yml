@@ -1,0 +1,28 @@
+# Local PostgreSQL for QuantumX Global Markets development.
+#   docker compose up -d      # start Postgres on localhost:5432
+#   npm run dev               # app connects using the default DATABASE_URL
+#
+# The default local DATABASE_URL (written by scripts/db-deploy.mjs when no env
+# is set) matches these credentials:
+#   postgresql://quantumx:quantumx@localhost:5432/quantumx?schema=public
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: quantumx-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: quantumx
+      POSTGRES_PASSWORD: quantumx
+      POSTGRES_DB: quantumx
+    ports:
+      - "5432:5432"
+    volumes:
+      - quantumx_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U quantumx"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  quantumx_pgdata:

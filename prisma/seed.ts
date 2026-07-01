@@ -76,7 +76,7 @@ const SEED_CLIENTS: SeedClient[] = [
 ];
 
 async function main() {
-  console.log("🌱 Seeding RSCryptoFX Client Portal...");
+  console.log("🌱 Seeding QuantumX Global Markets...");
 
   // Reset demo data.
   await prisma.dailyPerformance.deleteMany();

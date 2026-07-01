@@ -1,17 +1,23 @@
 # QuantumX Global Markets
 
-**Trade Beyond Limits.** A full-stack **Forex/multi-asset trading client portal** — a PAMM-style **performance reporting** platform (not an auto-trader). Built with Next.js 14 (App Router), TypeScript, TailwindCSS, Prisma + SQLite, Recharts, Zustand, and TradingView's free charting widgets.
+**Trade Beyond Limits.** A full-stack **Forex/multi-asset trading client portal** — a PAMM-style **performance reporting** platform (not an auto-trader). Built with Next.js 14 (App Router), TypeScript, TailwindCSS, Prisma + PostgreSQL, Recharts, Zustand, and TradingView's free charting widgets.
 
 Dark trading-terminal theme (zinc/slate with gold accents for XAUUSD), mobile responsive, styled like Myfxbook / FXBlue.
 
 ---
 
-## Quick start
+## Quick start (local)
+
+Requires a PostgreSQL database. The easiest path is the bundled Docker Postgres:
 
 ```bash
-npm install      # installs deps (Prisma downloads its query engine here)
-npm run dev      # sets up + seeds the SQLite DB on first run, then starts Next
+docker compose up -d   # start Postgres on localhost:5432
+npm install            # installs deps (Prisma downloads its query engine here)
+npm run dev            # generates client, pushes schema, seeds (first run), starts Next
 ```
+
+No Docker? Point `DATABASE_URL` in `.env` at any Postgres instance instead (see
+`.env.example`), then `npm run dev`.
 
 Open **http://localhost:3000** and sign in with a demo account:
 
@@ -20,21 +26,36 @@ Open **http://localhost:3000** and sign in with a demo account:
 | Admin  | `admin@quantumxglobal.com`  | `admin123` |
 | Client | `client@quantumxglobal.com` | `client123`|
 
-> Both `npm run dev` and `npm start` auto-create `.env`, push the Prisma schema
-> to a local SQLite database, and seed demo data on first run (idempotent — see
-> `scripts/ensure-db.mjs`). No manual setup required. If the database is ever
-> missing, the app shows a friendly notice instead of crashing; run
-> `npm run db:reset` to rebuild it.
+> `npm run dev`, `npm run build` and `npm start` all run `scripts/db-deploy.mjs`
+> first: generate the Prisma client, push the schema, and seed demo data **only
+> when the database is empty** (so a redeploy never wipes real data). It never
+> hard-fails — if the DB is unreachable the app shows a friendly notice instead
+> of crashing.
 
 ### Useful scripts
 
 | Script              | What it does                                            |
 | ------------------- | ------------------------------------------------------- |
-| `npm run dev`       | Setup + seed (first run) then start the dev server      |
-| `npm run build`     | `prisma generate` + production build                    |
-| `npm run start`     | Start the production server                             |
+| `npm run dev`       | DB setup + seed (if empty) then start the dev server    |
+| `npm run build`     | DB setup + `prisma generate` + production build         |
+| `npm run start`     | DB setup then start the production server               |
 | `npm run db:seed`   | Re-seed demo data                                       |
 | `npm run db:reset`  | Wipe + re-create + re-seed the database                 |
+
+---
+
+## Deploying to Vercel
+
+1. Provision a Postgres database — **Vercel Postgres**, **Neon**, or **Supabase**.
+2. In the Vercel project → **Settings → Environment Variables**, set:
+   - `DATABASE_URL` — your connection string (a pooled URL is fine for the app).
+   - `DIRECT_URL` *(optional)* — a **direct/non-pooled** URL, used only for the
+     schema push. Set this if your provider uses a pgbouncer pool.
+     - Vercel Postgres: `DATABASE_URL` = `POSTGRES_PRISMA_URL`, `DIRECT_URL` = `POSTGRES_URL_NON_POOLING`.
+     - Neon: use the pooled string for `DATABASE_URL` and the direct string for `DIRECT_URL`.
+3. Deploy. The build runs `db-deploy` (generate → push → seed-if-empty) then
+   `next build`, so the schema and demo data are provisioned automatically on the
+   first deploy. Subsequent deploys leave existing data untouched.
 
 ---
 
@@ -86,16 +107,16 @@ Open **http://localhost:3000** and sign in with a demo account:
 
 ## Data model (Prisma)
 
-`Client`, `Transaction`, `DailyPerformance` — see `prisma/schema.prisma`.
+`Client`, `Transaction`, `DailyPerformance` — see `prisma/schema.prisma`
+(PostgreSQL).
 
-> SQLite doesn't support native enums, so enum-like fields (`status`, `type`,
-> `method`) are stored as strings and constrained at the app layer in
-> `src/lib/constants.ts`.
+> Enum-like fields (`status`, `type`, `method`) are stored as strings and
+> constrained at the app layer in `src/lib/constants.ts`, keeping the model
+> portable. You may promote them to native Postgres `enum`s if desired.
 
-### Switching to Postgres
-1. In `prisma/schema.prisma`, set `provider = "postgresql"` (optionally promote the string fields back to real `enum`s).
-2. Set `DATABASE_URL` to your Postgres URL in `.env`.
-3. `npx prisma migrate dev`.
+The schema is applied with `prisma db push` (run automatically by
+`scripts/db-deploy.mjs`). To adopt versioned migrations later, switch to
+`prisma migrate dev` / `prisma migrate deploy`.
 
 ---
 
@@ -116,6 +137,6 @@ This portal is **reporting only**. The integration seams are commented in-code:
 
 ## Tech stack
 
-Next.js 14 · TypeScript · TailwindCSS (shadcn-style primitives) · Prisma + SQLite · Recharts · Zustand · TradingView widgets · jsPDF · PapaParse.
+Next.js 14 · TypeScript · TailwindCSS (shadcn-style primitives) · Prisma + PostgreSQL · Recharts · Zustand · TradingView widgets · jsPDF · PapaParse.
 
 > Demo/educational project. Past performance is not indicative of future results. Not financial advice.

@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "node scripts/ensure-db.mjs && next dev",
-    "build": "node scripts/ensure-env.mjs && prisma generate && next build",
-    "start": "node scripts/ensure-db.mjs && next start",
+    "dev": "node scripts/db-deploy.mjs && next dev",
+    "build": "node scripts/db-deploy.mjs && next build",
+    "start": "node scripts/db-deploy.mjs && next start",
     "lint": "next lint",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
