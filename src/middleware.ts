@@ -3,18 +3,23 @@ import type { NextRequest } from "next/server";
 import { SESSION_COOKIE } from "@/lib/auth-config";
 
 /**
- * Gate the app behind the demo session cookie. Unauthenticated users are sent
- * to /login; authenticated users hitting /login are sent to /dashboard.
+ * Gate the authenticated app behind the demo session cookie.
+ *
+ * Public (no session needed): the marketing landing page `/`, `/login`,
+ * `/signup`. Everything else redirects unauthenticated users to /login.
+ * Authenticated users hitting /login or /signup are sent to /dashboard.
  *
  * NOTE: This only checks for cookie presence (edge runtime can't decode our
  * base64 session easily without extra work). Real apps should verify a signed
  * token here.
  */
+const PUBLIC_PATHS = new Set(["/", "/login", "/signup"]);
+
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const hasSession = Boolean(req.cookies.get(SESSION_COOKIE)?.value);
 
-  const isLogin = pathname === "/login";
+  const isPublicPath = PUBLIC_PATHS.has(pathname);
   const isPublicAsset =
     pathname.startsWith("/_next") ||
     pathname.startsWith("/api/auth") ||
@@ -22,13 +27,14 @@ export function middleware(req: NextRequest) {
 
   if (isPublicAsset) return NextResponse.next();
 
-  if (!hasSession && !isLogin) {
+  if (!hasSession && !isPublicPath) {
     const url = req.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
   }
 
-  if (hasSession && isLogin) {
+  // Signed-in users don't need the auth screens.
+  if (hasSession && (pathname === "/login" || pathname === "/signup")) {
     const url = req.nextUrl.clone();
     url.pathname = "/dashboard";
     return NextResponse.redirect(url);

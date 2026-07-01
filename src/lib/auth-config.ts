@@ -27,6 +27,24 @@ export function verifyCredentials(email: string, password: string): Session | nu
   return { email: email.toLowerCase().trim(), role: user.role, name: user.name };
 }
 
+/**
+ * Build a session for a newly signed-up user. This demo issues a `client`-role
+ * session directly from the submitted details — it does NOT persist an account
+ * or password.
+ *
+ * TO MAKE SIGNUP REAL: create a user + hashed password in your store here, then
+ * have `verifyCredentials` check against it.
+ */
+export function createSignupSession(name: string, email: string): Session {
+  const clean = email.toLowerCase().trim();
+  return { email: clean, role: "client", name: name.trim() || clean };
+}
+
+/** Basic email shape check (demo-grade). */
+export function isValidEmail(email: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+}
+
 export function encodeSession(session: Session): string {
   return Buffer.from(JSON.stringify(session), "utf8").toString("base64");
 }
