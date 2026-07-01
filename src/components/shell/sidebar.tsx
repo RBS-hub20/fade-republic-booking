@@ -11,6 +11,7 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Logo } from "@/components/brand/logo";
 
 const NAV = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -47,13 +48,8 @@ export function Sidebar({
         )}
       >
         <div className="flex h-16 items-center justify-between gap-2 border-b border-border px-5">
-          <Link href="/dashboard" className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gold-400 text-black">
-              <CandlestickChart className="h-5 w-5" />
-            </div>
-            <span className="text-lg font-bold tracking-tight">
-              RSCrypto<span className="text-gold-400">FX</span>
-            </span>
+          <Link href="/dashboard">
+            <Logo size="md" />
           </Link>
           <button onClick={onClose} className="text-muted-foreground lg:hidden">
             <X className="h-5 w-5" />
@@ -85,8 +81,8 @@ export function Sidebar({
         </nav>
 
         <div className="border-t border-border p-4 text-xs text-muted-foreground">
-          <p className="font-medium text-foreground">Asia/Manila</p>
-          <p>PAMM reporting · demo data</p>
+          <p className="font-medium text-foreground">Trade Beyond Limits</p>
+          <p>Asia/Manila · demo data</p>
         </div>
       </aside>
     </>

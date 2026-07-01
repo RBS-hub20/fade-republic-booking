@@ -1,5 +1,5 @@
 /**
- * Core PAMM-style performance math for the RSCryptoFX Client Portal.
+ * Core PAMM-style performance math for QuantumX Global Markets.
  *
  * This is a *reporting* engine, not an auto-trader. It takes a client's opening
  * balance, their deposit/withdrawal ledger, and a set of per-day performance

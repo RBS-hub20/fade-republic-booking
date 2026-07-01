@@ -6,9 +6,9 @@ import "./globals.css";
 // at build/runtime — important in restricted/offline environments.
 
 export const metadata: Metadata = {
-  title: "RSCryptoFX Client Portal",
+  title: "QuantumX Global Markets — Trade Beyond Limits",
   description:
-    "PAMM-style forex trading client dashboard — performance reporting, ledger, and live charts.",
+    "QuantumX Global Markets is a next-generation trading platform for secure, transparent, and intelligent access to the world's financial markets — crypto, Forex, commodities, indices and more.",
 };
 
 export default function RootLayout({

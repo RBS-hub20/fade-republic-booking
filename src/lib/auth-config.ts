@@ -17,8 +17,8 @@ export const SESSION_COOKIE = "rscfx_session";
 
 // Demo credentials. Replace with a real user table + password hashing.
 const DEMO_USERS: Record<string, { password: string; role: Role; name: string }> = {
-  "admin@rscryptofx.com": { password: "admin123", role: "admin", name: "Portfolio Admin" },
-  "client@rscryptofx.com": { password: "client123", role: "client", name: "Demo Client" },
+  "admin@quantumxglobal.com": { password: "admin123", role: "admin", name: "Portfolio Admin" },
+  "client@quantumxglobal.com": { password: "client123", role: "client", name: "Demo Client" },
 };
 
 export function verifyCredentials(email: string, password: string): Session | null {
@@ -60,6 +60,6 @@ export function decodeSession(raw: string): Session | null {
 }
 
 export const DEMO_CREDENTIALS = [
-  { label: "Admin", email: "admin@rscryptofx.com", password: "admin123" },
-  { label: "Client", email: "client@rscryptofx.com", password: "client123" },
+  { label: "Admin", email: "admin@quantumxglobal.com", password: "admin123" },
+  { label: "Client", email: "client@quantumxglobal.com", password: "client123" },
 ];

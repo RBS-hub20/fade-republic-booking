@@ -1,77 +1,87 @@
 import Link from "next/link";
 import {
-  CandlestickChart,
   LineChart,
-  ArrowLeftRight,
-  FileText,
   TrendingUp,
   ShieldCheck,
-  Wallet,
-  Percent,
+  BrainCircuit,
+  Copy,
+  Gauge,
   ArrowRight,
   Check,
+  Bitcoin,
+  DollarSign,
+  Boxes,
+  BarChart3,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Logo, LogoMark } from "@/components/brand/logo";
 import { getSession } from "@/lib/auth";
 
 // Public marketing landing page. No auth required (see middleware PUBLIC_PATHS).
 export const dynamic = "force-dynamic";
 
+const MARKETS = [
+  { icon: Bitcoin, label: "Cryptocurrencies" },
+  { icon: DollarSign, label: "Forex" },
+  { icon: Boxes, label: "Commodities" },
+  { icon: BarChart3, label: "Indices" },
+];
+
 const FEATURES = [
   {
-    icon: TrendingUp,
-    title: "Performance Dashboard",
-    body: "PAMM-style compounded equity curves per client with KPI cards — balance, net P/L, win rate and average daily return.",
-  },
-  {
-    icon: ArrowLeftRight,
-    title: "Deposit / Withdrawal Ledger",
-    body: "Track every cashflow with methods, statuses and notes. Approved entries update balances automatically. CSV in/out.",
+    icon: Gauge,
+    title: "Advanced Trading Tools",
+    body: "A powerful ecosystem built for speed, performance and reliability — everything you need to execute with confidence.",
   },
   {
     icon: LineChart,
-    title: "Live Forex Charts",
-    body: "Full TradingView charting for XAU/USD and the majors, with a live watchlist and multiple timeframes.",
+    title: "Real-Time Market Data",
+    body: "Live prices and full charting across crypto, Forex, commodities and indices, streamed straight to your terminal.",
   },
   {
-    icon: FileText,
-    title: "Client Statements",
-    body: "Generate branded monthly PDF statements covering deposits, withdrawals, daily P/L and the equity curve.",
+    icon: BrainCircuit,
+    title: "AI-Powered Insights",
+    body: "Intelligent analytics that surface opportunities and help you make informed decisions in fast-moving markets.",
   },
   {
-    icon: Wallet,
-    title: "Multi-Client PAMM",
-    body: "Manage many client accounts from one portal with a combined portfolio view and per-client drill-down.",
+    icon: TrendingUp,
+    title: "Portfolio Tracking",
+    body: "Compounding equity curves and KPI dashboards so you always know your balance, net P/L and performance.",
+  },
+  {
+    icon: Copy,
+    title: "Copy Trading",
+    body: "Follow and mirror experienced traders, or run PAMM-style managed accounts across multiple clients.",
   },
   {
     icon: ShieldCheck,
-    title: "Transparent Reporting",
-    body: "Daily performance logs, compounding math you can audit, and clear disclaimers. Built for trust.",
+    title: "World-Class Security",
+    body: "Secure, transparent access to global markets, with clear reporting and auditable performance history.",
   },
 ];
 
 const STATS = [
-  { value: "0.3–0.6%", label: "Est. daily target" },
-  { value: "Mon–Fri", label: "Trading days only" },
-  { value: "Compounding", label: "Daily equity growth" },
-  { value: "Asia/Manila", label: "Reporting timezone" },
+  { value: "5+", label: "Asset classes" },
+  { value: "24/7", label: "Global markets" },
+  { value: "AI", label: "Powered insights" },
+  { value: "Real-time", label: "Market data" },
 ];
 
 const STEPS = [
   {
     n: "01",
-    title: "Open your account",
-    body: "Sign up and record your initial deposit to establish your starting equity.",
+    title: "Create your account",
+    body: "Sign up in seconds and set up your profile to access the QuantumX ecosystem.",
   },
   {
     n: "02",
-    title: "We report daily",
-    body: "Each trading day, performance is applied and compounded into your equity curve.",
+    title: "Fund & explore",
+    body: "Record your deposit, explore live markets, tools and AI insights across every asset class.",
   },
   {
     n: "03",
-    title: "Track & withdraw",
-    body: "Follow your dashboard in real time and export monthly statements anytime.",
+    title: "Trade & track",
+    body: "Follow your portfolio in real time, copy top traders, and export detailed statements anytime.",
   },
 ];
 
@@ -83,13 +93,8 @@ export default function LandingPage() {
       {/* Nav */}
       <header className="sticky top-0 z-30 border-b border-border/60 bg-background/80 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gold-400 text-black">
-              <CandlestickChart className="h-5 w-5" />
-            </div>
-            <span className="text-lg font-bold tracking-tight">
-              RSCrypto<span className="text-gold-400">FX</span>
-            </span>
+          <Link href="/">
+            <Logo size="md" subtitle />
           </Link>
           <nav className="flex items-center gap-2">
             {session ? (
@@ -115,15 +120,16 @@ export default function LandingPage() {
       {/* Hero */}
       <section className="mx-auto max-w-6xl px-4 pb-16 pt-20 text-center sm:px-6 sm:pt-28">
         <span className="inline-flex items-center gap-2 rounded-full border border-gold-400/30 bg-gold-400/10 px-3 py-1 text-xs font-medium text-gold-300">
-          <Percent className="h-3.5 w-3.5" /> PAMM-style forex performance reporting
+          Where innovation meets global finance
         </span>
-        <h1 className="mx-auto mt-6 max-w-3xl text-4xl font-bold leading-tight tracking-tight sm:text-6xl">
-          Your capital, <span className="text-gold-400">professionally reported.</span>
+        <h1 className="mx-auto mt-6 max-w-4xl text-4xl font-bold leading-tight tracking-tight sm:text-6xl">
+          Welcome to Quantum<span className="text-gold-400">X</span> Global Markets
         </h1>
         <p className="mx-auto mt-5 max-w-2xl text-base text-muted-foreground sm:text-lg">
-          RSCryptoFX is a client portal for transparent, compounding forex performance —
-          equity curves, deposit &amp; withdrawal ledgers, live XAU/USD charts and
-          exportable monthly statements, all in one dark trading terminal.
+          A next-generation trading platform designed for traders and investors who want
+          secure, transparent and intelligent access to the world&apos;s financial markets.
+          Trade cryptocurrencies, Forex, commodities, indices and more through one powerful
+          ecosystem built for speed, performance and reliability.
         </p>
         <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
           <Button asChild size="lg" className="w-full sm:w-auto">
@@ -135,12 +141,27 @@ export default function LandingPage() {
             <Link href="/login">Log in to your account</Link>
           </Button>
         </div>
-        <p className="mt-4 text-xs text-muted-foreground">
-          Demo environment · Not financial advice
+        <p className="mt-6 text-sm font-medium tracking-wide text-gold-300">
+          Trade Smarter. Grow Stronger. Connect to Global Markets.
         </p>
 
+        {/* Markets strip */}
+        <div className="mx-auto mt-14 flex max-w-3xl flex-wrap items-center justify-center gap-3">
+          {MARKETS.map((m) => {
+            const Icon = m.icon;
+            return (
+              <span
+                key={m.label}
+                className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-sm font-medium"
+              >
+                <Icon className="h-4 w-4 text-gold-300" /> {m.label}
+              </span>
+            );
+          })}
+        </div>
+
         {/* Stats */}
-        <div className="mx-auto mt-16 grid max-w-4xl grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-4">
+        <div className="mx-auto mt-10 grid max-w-4xl grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-4">
           {STATS.map((s) => (
             <div key={s.label} className="bg-card px-4 py-6">
               <p className="text-xl font-bold text-gold-300 sm:text-2xl">{s.value}</p>
@@ -153,9 +174,12 @@ export default function LandingPage() {
       {/* Features */}
       <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
         <div className="mb-10 text-center">
-          <h2 className="text-3xl font-bold tracking-tight">Everything in one portal</h2>
-          <p className="mx-auto mt-3 max-w-xl text-muted-foreground">
-            Built like Myfxbook / FXBlue — clean, professional and transparent.
+          <h2 className="text-3xl font-bold tracking-tight">
+            Everything you need to trade beyond limits
+          </h2>
+          <p className="mx-auto mt-3 max-w-2xl text-muted-foreground">
+            Whether you&apos;re a beginner or a professional trader, QuantumX provides the
+            tools, data and insights to help you make informed decisions with confidence.
           </p>
         </div>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -174,6 +198,19 @@ export default function LandingPage() {
               </div>
             );
           })}
+        </div>
+      </section>
+
+      {/* Mission */}
+      <section className="mx-auto max-w-4xl px-4 py-12 sm:px-6">
+        <div className="rounded-2xl border border-border bg-card p-8 text-center sm:p-12">
+          <LogoMark size="lg" className="mx-auto mb-5 rounded-xl" />
+          <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">Our mission</h2>
+          <p className="mx-auto mt-4 max-w-2xl text-muted-foreground">
+            At QuantumX Global Markets, we believe financial opportunities should be
+            accessible to everyone. Our mission is to empower traders worldwide through
+            cutting-edge technology, world-class security and continuous education.
+          </p>
         </div>
       </section>
 
@@ -197,10 +234,10 @@ export default function LandingPage() {
       <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
         <div className="relative overflow-hidden rounded-2xl border border-gold-400/30 bg-gradient-to-br from-gold-400/15 via-card to-card p-8 text-center sm:p-14">
           <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-            Ready to see your equity curve?
+            Ready to connect to global markets?
           </h2>
           <p className="mx-auto mt-3 max-w-xl text-muted-foreground">
-            Create an account in seconds, or explore the portal with a demo login.
+            Create an account in seconds, or explore the platform with a demo login.
           </p>
           <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
             <Button asChild size="lg">
@@ -213,7 +250,7 @@ export default function LandingPage() {
             </Button>
           </div>
           <ul className="mx-auto mt-8 flex max-w-md flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-muted-foreground">
-            {["No credit card", "Instant demo access", "Export PDF statements"].map((i) => (
+            {["Instant demo access", "AI-powered insights", "Export PDF statements"].map((i) => (
               <li key={i} className="flex items-center gap-1.5">
                 <Check className="h-4 w-4 text-profit" /> {i}
               </li>
@@ -224,26 +261,35 @@ export default function LandingPage() {
 
       {/* Footer */}
       <footer className="border-t border-border">
-        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-4 py-8 text-sm text-muted-foreground sm:flex-row sm:px-6">
-          <div className="flex items-center gap-2">
-            <div className="flex h-6 w-6 items-center justify-center rounded bg-gold-400 text-black">
-              <CandlestickChart className="h-4 w-4" />
+        <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
+          <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
+            <Logo size="md" subtitle />
+            <div className="flex gap-5 text-sm text-muted-foreground">
+              <Link href="/login" className="hover:text-foreground">
+                Log in
+              </Link>
+              <Link href="/signup" className="hover:text-foreground">
+                Sign up
+              </Link>
+              <Link href="/dashboard" className="hover:text-foreground">
+                Dashboard
+              </Link>
             </div>
-            <span className="font-semibold text-foreground">
-              RSCrypto<span className="text-gold-400">FX</span>
-            </span>
           </div>
-          <p className="text-center text-xs">
-            © {new Date().getFullYear()} RSCryptoFX · Demo environment · Past performance is not
-            indicative of future results. Not financial advice.
-          </p>
-          <div className="flex gap-4">
-            <Link href="/login" className="hover:text-foreground">
-              Log in
-            </Link>
-            <Link href="/signup" className="hover:text-foreground">
-              Sign up
-            </Link>
+
+          {/* Risk disclosure */}
+          <div className="mt-8 border-t border-border pt-6">
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              <span className="font-semibold text-foreground">Risk Disclosure:</span> Trading
+              cryptocurrencies, foreign exchange (Forex) and other financial instruments involves
+              substantial risk and may not be suitable for all investors. Past performance does not
+              guarantee future results. Nothing on this website constitutes financial or investment
+              advice. Please trade responsibly and ensure compliance with the laws and regulations
+              applicable in your jurisdiction.
+            </p>
+            <p className="mt-4 text-xs text-muted-foreground">
+              © {new Date().getFullYear()} QuantumX Global Markets. All rights reserved.
+            </p>
           </div>
         </div>
       </footer>

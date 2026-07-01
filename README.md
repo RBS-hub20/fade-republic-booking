@@ -1,6 +1,6 @@
-# RSCryptoFX Client Portal
+# QuantumX Global Markets
 
-A full-stack **Forex Trading Client Dashboard** — a PAMM-style **performance reporting** portal (not an auto-trader). Built with Next.js 14 (App Router), TypeScript, TailwindCSS, Prisma + SQLite, Recharts, Zustand, and TradingView's free charting widgets.
+**Trade Beyond Limits.** A full-stack **Forex/multi-asset trading client portal** — a PAMM-style **performance reporting** platform (not an auto-trader). Built with Next.js 14 (App Router), TypeScript, TailwindCSS, Prisma + SQLite, Recharts, Zustand, and TradingView's free charting widgets.
 
 Dark trading-terminal theme (zinc/slate with gold accents for XAUUSD), mobile responsive, styled like Myfxbook / FXBlue.
 
@@ -17,8 +17,8 @@ Open **http://localhost:3000** and sign in with a demo account:
 
 | Role   | Email                   | Password   |
 | ------ | ----------------------- | ---------- |
-| Admin  | `admin@rscryptofx.com`  | `admin123` |
-| Client | `client@rscryptofx.com` | `client123`|
+| Admin  | `admin@quantumxglobal.com`  | `admin123` |
+| Client | `client@quantumxglobal.com` | `client123`|
 
 > Both `npm run dev` and `npm start` auto-create `.env`, push the Prisma schema
 > to a local SQLite database, and seed demo data on first run (idempotent — see

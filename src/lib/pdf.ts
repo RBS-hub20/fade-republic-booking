@@ -49,7 +49,7 @@ export function generateClientStatement(params: {
   doc.setTextColor(...GOLD);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(22);
-  doc.text("RSCryptoFX", 40, 45);
+  doc.text("QuantumX Global Markets", 40, 45);
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(11);
   doc.setFont("helvetica", "normal");
@@ -174,7 +174,7 @@ export function generateClientStatement(params: {
     doc.setFontSize(8);
     doc.setTextColor(150, 150, 150);
     doc.text(
-      "RSCryptoFX · PAMM-style performance reporting. Past performance is not indicative of future results. Not financial advice.",
+      "QuantumX Global Markets · Trading involves substantial risk. Past performance does not guarantee future results. Not financial advice.",
       40,
       doc.internal.pageSize.getHeight() - 24
     );
@@ -186,5 +186,5 @@ export function generateClientStatement(params: {
     );
   }
 
-  doc.save(`RSCryptoFX-Statement-${client.accountNumber}-${month.replace(/\s/g, "-")}.pdf`);
+  doc.save(`QuantumX-Statement-${client.accountNumber}-${month.replace(/\s/g, "-")}.pdf`);
 }

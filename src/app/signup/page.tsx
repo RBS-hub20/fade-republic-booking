@@ -3,7 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CandlestickChart, Loader2, ArrowLeft } from "lucide-react";
+import { Loader2, ArrowLeft } from "lucide-react";
+import { LogoMark } from "@/components/brand/logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -52,12 +53,10 @@ export default function SignupPage() {
         </Link>
 
         <div className="mb-8 flex flex-col items-center text-center">
-          <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-xl bg-gold-400 text-black">
-            <CandlestickChart className="h-8 w-8" />
-          </div>
+          <LogoMark size="lg" className="mb-3 rounded-xl" />
           <h1 className="text-2xl font-bold tracking-tight">Create your account</h1>
           <p className="text-sm text-muted-foreground">
-            Start tracking your forex performance
+            Join QuantumX Global Markets — trade beyond limits
           </p>
         </div>
 
