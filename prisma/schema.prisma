@@ -25,18 +25,34 @@ datasource db {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  name         String
+  id            String   @id @default(cuid())
+  email         String   @unique
+  name          String
   // Salted password hash (scrypt) — see src/lib/password.ts.
-  passwordHash String
+  passwordHash  String
   // enum: Role — admin | client
-  role         String   @default("client")
+  role          String   @default("client")
+  emailVerified Boolean  @default(false)
   // Client users are linked to their trading account.
-  clientId     String?  @unique
-  client       Client?  @relation(fields: [clientId], references: [id], onDelete: SetNull)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  clientId      String?  @unique
+  client        Client?  @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  tokens        AuthToken[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model AuthToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // enum: AuthTokenType — EMAIL_VERIFY | PASSWORD_RESET
+  type      String
+  // sha256 of the raw token (raw token is only ever sent in the email link).
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }
 
 model Client {

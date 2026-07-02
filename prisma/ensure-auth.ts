@@ -29,6 +29,7 @@ async function ensureUser(opts: {
       passwordHash: hashPassword(opts.password),
       role: opts.role,
       clientId: opts.clientId ?? null,
+      emailVerified: true,
     },
   });
   return true;

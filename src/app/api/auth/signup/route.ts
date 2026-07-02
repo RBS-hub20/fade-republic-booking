@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { SESSION_COOKIE, isValidEmail, type Session } from "@/lib/auth-config";
 import { encodeSession } from "@/lib/session";
 import { hashPassword } from "@/lib/password";
+import { createAndSendVerification } from "@/lib/mailers";
 
 /** Generate a unique-ish account number like QX-10042. */
 async function nextAccountNumber(): Promise<string> {
@@ -68,6 +69,14 @@ export async function POST(req: Request) {
       });
     });
 
+    // Fire off a verification email (best-effort — never blocks signup).
+    let devLink: string | undefined;
+    try {
+      ({ devLink } = await createAndSendVerification(user));
+    } catch (err) {
+      console.error("Verification email failed:", err);
+    }
+
     const session: Session = {
       userId: user.id,
       email: user.email,
@@ -76,7 +85,7 @@ export async function POST(req: Request) {
       clientId: user.clientId,
     };
 
-    const res = NextResponse.json({ ok: true, role: "client" });
+    const res = NextResponse.json({ ok: true, role: "client", ...(devLink ? { devLink } : {}) });
     res.cookies.set(SESSION_COOKIE, encodeSession(session), {
       httpOnly: true,
       sameSite: "lax",

@@ -166,6 +166,7 @@ async function main() {
       name: "Portfolio Admin",
       passwordHash: hashPassword("admin123"),
       role: "admin",
+      emailVerified: true,
     },
   });
 
@@ -177,6 +178,7 @@ async function main() {
       passwordHash: hashPassword("client123"),
       role: "client",
       clientId: demoClientId,
+      emailVerified: true,
     },
   });
 

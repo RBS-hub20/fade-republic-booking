@@ -13,7 +13,13 @@ import { SESSION_COOKIE } from "@/lib/auth-config";
  * base64 session easily without extra work). Real apps should verify a signed
  * token here.
  */
-const PUBLIC_PATHS = new Set(["/", "/login", "/signup"]);
+const PUBLIC_PATHS = new Set([
+  "/",
+  "/login",
+  "/signup",
+  "/forgot-password",
+  "/reset-password",
+]);
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;

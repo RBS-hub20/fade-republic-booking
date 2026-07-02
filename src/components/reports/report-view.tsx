@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { EquityChart } from "@/components/dashboard/equity-chart";
+import { AddFundsDialog } from "@/components/reports/add-funds-dialog";
 import {
   Table,
   TableBody,
@@ -79,9 +80,12 @@ export function ReportView({
               Since {formatDate(client.startDate)} · Initial {formatUsd(client.initialDeposit)}
             </p>
           </div>
-          <Button onClick={exportPdf}>
-            <FileDown className="h-4 w-4" /> Export Monthly Report
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            {isAdmin && <AddFundsDialog clientId={client.id} clientName={client.name} />}
+            <Button onClick={exportPdf}>
+              <FileDown className="h-4 w-4" /> Export Monthly Report
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
