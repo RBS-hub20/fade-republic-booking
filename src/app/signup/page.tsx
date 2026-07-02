@@ -32,12 +32,12 @@ export default function SignupPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name, email, password }),
     });
-    setLoading(false);
+    const data = await res.json().catch(() => ({}));
     if (res.ok) {
-      router.push("/dashboard");
-      router.refresh();
+      // Account created but unverified — send them to verify their email.
+      router.push(`/auth/verify-pending?email=${encodeURIComponent(data.email ?? email)}`);
     } else {
-      const data = await res.json().catch(() => ({}));
+      setLoading(false);
       setError(data.error ?? "Sign up failed");
     }
   }

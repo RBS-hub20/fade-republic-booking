@@ -16,11 +16,13 @@ export default function LoginPage() {
   const [email, setEmail] = useState("admin@quantumxglobal.com");
   const [password, setPassword] = useState("admin123");
   const [error, setError] = useState<string | null>(null);
+  const [unverified, setUnverified] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setUnverified(null);
     setLoading(true);
     const res = await fetch("/api/auth/login", {
       method: "POST",
@@ -33,7 +35,11 @@ export default function LoginPage() {
       router.refresh();
     } else {
       const data = await res.json().catch(() => ({}));
-      setError(data.error ?? "Login failed");
+      if (data.unverified) {
+        setUnverified(data.email ?? email);
+      } else {
+        setError(data.error ?? "Login failed");
+      }
     }
   }
 
@@ -90,6 +96,22 @@ export default function LoginPage() {
 
               {error && (
                 <p className="rounded-md bg-loss/10 px-3 py-2 text-sm text-loss">{error}</p>
+              )}
+
+              {unverified && (
+                <div className="rounded-md border border-gold-400/30 bg-gold-400/10 px-3 py-2.5 text-sm">
+                  <p className="font-medium text-gold-200">Please verify your email first.</p>
+                  <p className="mt-0.5 text-muted-foreground">
+                    We sent a link to <span className="text-foreground">{unverified}</span>. Check
+                    your inbox and spam.
+                  </p>
+                  <Link
+                    href={`/auth/verify-pending?email=${encodeURIComponent(unverified)}`}
+                    className="mt-1 inline-block font-medium text-gold-300 hover:underline"
+                  >
+                    Resend verification email →
+                  </Link>
+                </div>
               )}
 
               <Button type="submit" className="w-full" disabled={loading}>

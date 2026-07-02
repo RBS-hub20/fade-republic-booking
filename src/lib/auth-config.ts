@@ -16,6 +16,8 @@ export interface Session {
   name: string;
   /** Set for client-role users: their trading account id. */
   clientId?: string | null;
+  /** Whether the user's email was verified at login time. */
+  emailVerified?: boolean;
 }
 
 export const SESSION_COOKIE = "rscfx_session";

@@ -23,12 +23,26 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
   }
 
+  // Block unverified accounts — the client uses `unverified` + `email` to offer
+  // a resend link.
+  if (!user.emailVerified) {
+    return NextResponse.json(
+      {
+        error: "Please verify your email first.",
+        unverified: true,
+        email: user.email,
+      },
+      { status: 403 }
+    );
+  }
+
   const session: Session = {
     userId: user.id,
     email: user.email,
     role: user.role as Role,
     name: user.name,
     clientId: user.clientId,
+    emailVerified: true,
   };
 
   const res = NextResponse.json({ ok: true, role: session.role });

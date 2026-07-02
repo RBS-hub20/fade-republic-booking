@@ -29,7 +29,12 @@ export function AppShell({
         clientId={clientId}
       />
       <div className="flex min-w-0 flex-1 flex-col">
-        <Topbar onMenu={() => setSidebarOpen(true)} role={role} name={name} />
+        <Topbar
+          onMenu={() => setSidebarOpen(true)}
+          role={role}
+          name={name}
+          emailVerified={emailVerified}
+        />
         {!emailVerified && <VerifyBanner />}
         <main className="terminal-bg flex-1 p-4 lg:p-6">{children}</main>
       </div>

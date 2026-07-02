@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { SESSION_COOKIE, isValidEmail, type Session } from "@/lib/auth-config";
-import { encodeSession } from "@/lib/session";
+import { isValidEmail } from "@/lib/auth-config";
 import { hashPassword } from "@/lib/password";
 import { createAndSendVerification } from "@/lib/mailers";
 import { enforce } from "@/lib/rate-limit";
@@ -26,6 +25,10 @@ async function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T
 /**
  * Real signup: creates a trading Client + a linked client-role User with a
  * hashed password, then issues a signed session.
+ *
+ * The new account starts UNVERIFIED and is NOT logged in — the user must verify
+ * their email before they can sign in. We return the email so the client can
+ * redirect to the "check your inbox" page.
  *
  * The verification email is best-effort and fully decoupled: once the account
  * is created we ALWAYS return success. Email is bounded by a timeout and its
@@ -110,20 +113,10 @@ export async function POST(req: Request) {
     console.error("Verification email error (ignored):", err);
   }
 
-  const session: Session = {
-    userId: user.id,
+  // No session — the user must verify their email before signing in.
+  return NextResponse.json({
+    ok: true,
     email: user.email,
-    role: "client",
-    name: user.name,
-    clientId: user.clientId,
-  };
-
-  const res = NextResponse.json({ ok: true, role: "client", ...(devLink ? { devLink } : {}) });
-  res.cookies.set(SESSION_COOKIE, encodeSession(session), {
-    httpOnly: true,
-    sameSite: "lax",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 7,
+    ...(devLink ? { devLink } : {}),
   });
-  return res;
 }

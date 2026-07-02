@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Menu, LogOut, Clock } from "lucide-react";
+import { Menu, LogOut, Clock, BadgeCheck } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -10,10 +10,12 @@ export function Topbar({
   onMenu,
   role,
   name,
+  emailVerified,
 }: {
   onMenu: () => void;
   role: string;
   name: string;
+  emailVerified: boolean;
 }) {
   const router = useRouter();
   const [clock, setClock] = useState("");
@@ -58,6 +60,15 @@ export function Topbar({
           <p className="text-sm font-medium leading-tight">{name}</p>
           <p className="text-xs text-muted-foreground capitalize">{role}</p>
         </div>
+        {emailVerified && (
+          <Badge
+            variant="success"
+            className="hidden items-center gap-1 sm:inline-flex"
+            title="Email verified"
+          >
+            <BadgeCheck className="h-3.5 w-3.5" /> Verified
+          </Badge>
+        )}
         <Badge variant={role === "admin" ? "gold" : "outline"} className="capitalize">
           {role}
         </Badge>
