@@ -20,6 +20,16 @@ export async function GET() {
     RESEND_API_KEY: Boolean(process.env.RESEND_API_KEY),
     EMAIL_FROM: FROM_EMAIL,
     emailConfigured: emailConfigured(),
+    CRON_SECRET: Boolean(process.env.CRON_SECRET),
+    ETHERSCAN_API_KEY: Boolean(process.env.ETHERSCAN_API_KEY),
+    BSCSCAN_API_KEY: Boolean(process.env.BSCSCAN_API_KEY),
+    TRONGRID_API_KEY: Boolean(process.env.TRONGRID_API_KEY),
+  };
+
+  // Which deposit auto-verification paths are enabled.
+  const deposits = {
+    bep20AutoVerify: Boolean(process.env.ETHERSCAN_API_KEY || process.env.BSCSCAN_API_KEY),
+    trc20AutoVerify: true, // TronGrid works without a key
   };
 
   const db: {
@@ -61,7 +71,7 @@ export async function GET() {
 
   const ok = db.connected && db.userTable;
   return NextResponse.json(
-    { ok, db, env, timestamp: new Date().toISOString() },
+    { ok, db, env, deposits, timestamp: new Date().toISOString() },
     { status: ok ? 200 : 503 }
   );
 }

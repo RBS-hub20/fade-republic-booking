@@ -113,6 +113,43 @@ export async function fetchBep20TransfersTo(
 }
 
 /**
+ * Live diagnostic: make one BEP20 call and report whether the configured key
+ * works (without leaking it). Used by the admin deposit probe.
+ */
+export async function probeBep20(address: string): Promise<{
+  configured: boolean;
+  provider: "etherscan" | "bscscan" | "none";
+  ok: boolean;
+  count: number;
+  message: string;
+}> {
+  const etherscanKey = process.env.ETHERSCAN_API_KEY;
+  const bscKey = process.env.BSCSCAN_API_KEY;
+  const provider = etherscanKey ? "etherscan" : bscKey ? "bscscan" : "none";
+  if (provider === "none") {
+    return { configured: false, provider, ok: false, count: 0, message: "No BEP20 key configured" };
+  }
+  const query =
+    `module=account&action=tokentx&contractaddress=${USDT_BEP20_CONTRACT}` +
+    `&address=${address}&page=1&offset=5&sort=desc`;
+  const url =
+    provider === "etherscan"
+      ? `${ETHERSCAN_V2_URL}?chainid=56&${query}&apikey=${etherscanKey}`
+      : `${BSCSCAN_URL}?${query}&apikey=${bscKey}`;
+  try {
+    const data = await fetchJson(url);
+    const status = String(data?.status ?? "");
+    const message = String(data?.message ?? "");
+    const count = Array.isArray(data?.result) ? data.result.length : 0;
+    // "1" = OK with results; "0" + "No transactions found" = valid but empty.
+    const ok = status === "1" || /no transactions found/i.test(message);
+    return { configured: true, provider, ok, count, message: ok ? "OK" : message || "provider error" };
+  } catch (e: any) {
+    return { configured: true, provider, ok: false, count: 0, message: e?.message ?? "request failed" };
+  }
+}
+
+/**
  * Recent USDT (TRC20) transfers TO `address`, keyed by lowercased tx id.
  * TronGrid works without a key (lower limits); a key raises the limit.
  */
