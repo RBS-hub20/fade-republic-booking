@@ -2,17 +2,27 @@
  * Idempotent login-account bootstrap. Runs on every deploy (after schema push).
  *
  * Guarantees an admin can always sign in — important when upgrading a database
- * that already had Client rows from before the User model existed (the empty-DB
- * seed would otherwise be skipped, leaving no users).
+ * that already had rows from an older/incompatible auth implementation.
  *
- * Only CREATES accounts that are missing; it never overwrites an existing
- * password, so changed credentials are preserved across deploys.
+ * Admin credentials:
+ *   - ADMIN_EMAIL    (optional, default admin@quantumxglobal.com)
+ *   - ADMIN_PASSWORD (optional). If set, the admin account is force-created OR
+ *     RESET to this password on every deploy (recovers a mismatched/legacy hash
+ *     and lets you control the admin password from env). If unset, a default
+ *     admin (admin123) is created only when missing and never overwritten.
+ *
+ * The demo client login is created only when missing.
  */
 import { PrismaClient } from "@prisma/client";
 import { hashPassword } from "../src/lib/password";
 
 const prisma = new PrismaClient();
 
+const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || "admin@quantumxglobal.com").toLowerCase().trim();
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD; // if set → force reset
+const ADMIN_NAME = process.env.ADMIN_NAME || "Portfolio Admin";
+
+/** Create a user only if it's missing (never overwrites an existing password). */
 async function ensureUser(opts: {
   email: string;
   name: string;
@@ -36,36 +46,48 @@ async function ensureUser(opts: {
 }
 
 async function main() {
-  // Always ensure an admin exists.
-  const createdAdmin = await ensureUser({
-    email: "admin@quantumxglobal.com",
-    name: "Portfolio Admin",
-    password: "admin123",
-    role: "admin",
-  });
+  // --- Admin ---
+  if (ADMIN_PASSWORD) {
+    // Force-set (create or reset) so a known password always works.
+    await prisma.user.upsert({
+      where: { email: ADMIN_EMAIL },
+      update: {
+        passwordHash: hashPassword(ADMIN_PASSWORD),
+        role: "admin",
+        emailVerified: true,
+      },
+      create: {
+        email: ADMIN_EMAIL,
+        name: ADMIN_NAME,
+        passwordHash: hashPassword(ADMIN_PASSWORD),
+        role: "admin",
+        emailVerified: true,
+      },
+    });
+    console.log(`🔐 Admin password set from ADMIN_PASSWORD env for ${ADMIN_EMAIL}.`);
+  } else {
+    const created = await ensureUser({
+      email: ADMIN_EMAIL,
+      name: ADMIN_NAME,
+      password: "admin123",
+      role: "admin",
+    });
+    console.log(`🔐 Admin ${created ? "created (default password)" : "already present"} — ${ADMIN_EMAIL}.`);
+  }
 
-  // If the demo client exists but has no login yet, link one (demo convenience).
+  // --- Demo client login (created only if missing) ---
   const demoClient = await prisma.client.findUnique({
     where: { email: "miguel.santos@example.com" },
   });
-  let createdClient = false;
   if (demoClient) {
-    createdClient = await ensureUser({
+    const created = await ensureUser({
       email: "client@quantumxglobal.com",
       name: demoClient.name,
       password: "client123",
       role: "client",
       clientId: demoClient.id,
     });
-  }
-
-  if (createdAdmin || createdClient) {
-    console.log(
-      `🔐 Ensured login accounts (admin: ${createdAdmin ? "created" : "exists"}` +
-        `, demo client: ${createdClient ? "created" : demoClient ? "exists" : "n/a"}).`
-    );
-  } else {
-    console.log("🔐 Login accounts already present.");
+    if (created) console.log("🔐 Demo client login created — client@quantumxglobal.com.");
   }
 }
 
