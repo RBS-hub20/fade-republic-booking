@@ -97,6 +97,14 @@ async function main() {
   } catch (err) {
     console.warn("⚠️  Seed check failed (continuing):", err.message);
   }
+
+  // Always ensure login accounts exist (idempotent) — covers databases upgraded
+  // from before the User model, where the empty-DB seed is skipped.
+  try {
+    run("tsx prisma/ensure-auth.ts");
+  } catch (err) {
+    console.warn("⚠️  ensure-auth failed (continuing):", err.message);
+  }
 }
 
 main().catch((err) => {
