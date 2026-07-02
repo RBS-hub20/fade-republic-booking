@@ -9,7 +9,13 @@ export type ClientStatus = (typeof CLIENT_STATUSES)[number];
 export const TRANSACTION_TYPES = ["DEPOSIT", "WITHDRAWAL"] as const;
 export type TransactionType = (typeof TRANSACTION_TYPES)[number];
 
-export const TRANSACTION_METHODS = ["BANK", "CRYPTO", "OTC"] as const;
+export const TRANSACTION_METHODS = [
+  "USDT_BEP20",
+  "USDT_TRC20",
+  "BANK",
+  "CRYPTO",
+  "OTC",
+] as const;
 export type TransactionMethod = (typeof TRANSACTION_METHODS)[number];
 
 export const TRANSACTION_STATUSES = ["PENDING", "APPROVED", "REJECTED"] as const;
@@ -31,6 +37,8 @@ export const STATUS_LABELS: Record<ClientStatus, string> = {
 };
 
 export const METHOD_LABELS: Record<TransactionMethod, string> = {
+  USDT_BEP20: "USDT · BEP20",
+  USDT_TRC20: "USDT · TRC20",
   BANK: "Bank",
   CRYPTO: "Crypto",
   OTC: "OTC Desk",

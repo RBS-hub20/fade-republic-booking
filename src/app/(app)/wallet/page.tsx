@@ -3,6 +3,7 @@ import { PageHeader } from "@/components/shell/page-header";
 import { WalletView } from "@/components/wallet/wallet-view";
 import { getSession } from "@/lib/auth";
 import { getClientPerformance } from "@/lib/data";
+import { getDepositWallets, BANK_ENABLED } from "@/lib/payments";
 
 export const dynamic = "force-dynamic";
 
@@ -29,9 +30,13 @@ export default async function WalletPage() {
     <>
       <PageHeader
         title="Deposit / Withdraw"
-        subtitle="Submit a funding request — approved requests update your balance."
+        subtitle="Fund your account with USDT — approved deposits update your balance."
       />
-      <WalletView currentBalance={currentBalance} />
+      <WalletView
+        currentBalance={currentBalance}
+        wallets={getDepositWallets()}
+        bankEnabled={BANK_ENABLED}
+      />
     </>
   );
 }
