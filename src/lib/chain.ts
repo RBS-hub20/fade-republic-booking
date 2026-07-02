@@ -9,6 +9,8 @@
  */
 
 const BSCSCAN_URL = process.env.BSCSCAN_API_URL || "https://api.bscscan.com/api";
+// Etherscan V2 unified multichain endpoint (BSC = chainid 56).
+const ETHERSCAN_V2_URL = process.env.ETHERSCAN_API_URL || "https://api.etherscan.io/v2/api";
 const TRONGRID_URL = process.env.TRONGRID_API_URL || "https://api.trongrid.io";
 
 // USDT token contracts (override via env if ever needed).
@@ -72,13 +74,24 @@ async function fetchJson(url: string, headers?: Record<string, string>): Promise
 export async function fetchBep20TransfersTo(
   address: string
 ): Promise<Map<string, OnChainTransfer> | null> {
-  const apiKey = process.env.BSCSCAN_API_KEY;
-  if (!apiKey) return null;
+  // Prefer the Etherscan V2 multichain endpoint (chainid 56 = BSC) when an
+  // Etherscan key is present; otherwise fall back to the classic BscScan API.
+  const etherscanKey = process.env.ETHERSCAN_API_KEY;
+  const bscKey = process.env.BSCSCAN_API_KEY;
 
-  const url =
-    `${BSCSCAN_URL}?module=account&action=tokentx` +
-    `&contractaddress=${USDT_BEP20_CONTRACT}` +
-    `&address=${address}&page=1&offset=100&sort=desc&apikey=${apiKey}`;
+  const query =
+    `module=account&action=tokentx&contractaddress=${USDT_BEP20_CONTRACT}` +
+    `&address=${address}&page=1&offset=100&sort=desc`;
+
+  let url: string;
+  if (etherscanKey) {
+    url = `${ETHERSCAN_V2_URL}?chainid=56&${query}&apikey=${etherscanKey}`;
+  } else if (bscKey) {
+    url = `${BSCSCAN_URL}?${query}&apikey=${bscKey}`;
+  } else {
+    return null; // BEP20 auto-verify disabled (no key configured)
+  }
+
   const data = await fetchJson(url);
   const map = new Map<string, OnChainTransfer>();
   if (data?.status !== "1" || !Array.isArray(data.result)) return map;
