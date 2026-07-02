@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Logo, LogoMark } from "@/components/brand/logo";
+import { LiveMarketTicker } from "@/components/market/live-market-ticker";
 import { getSession } from "@/lib/auth";
 
 // Public marketing landing page. No auth required (see middleware PUBLIC_PATHS).
@@ -144,6 +145,9 @@ export default function LandingPage() {
         <p className="mt-6 text-sm font-medium tracking-wide text-gold-300">
           Trade Smarter. Grow Stronger. Connect to Global Markets.
         </p>
+
+        {/* Live market ticker — auto-updating prices for visitor attraction */}
+        <LiveMarketTicker />
 
         {/* Markets strip */}
         <div className="mx-auto mt-14 flex max-w-3xl flex-wrap items-center justify-center gap-3">

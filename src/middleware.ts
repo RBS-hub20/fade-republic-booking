@@ -29,6 +29,7 @@ export function middleware(req: NextRequest) {
   const isPublicAsset =
     pathname.startsWith("/_next") ||
     pathname.startsWith("/api/auth") ||
+    pathname.startsWith("/api/market") ||
     pathname === "/api/health" ||
     pathname === "/favicon.ico";
 
