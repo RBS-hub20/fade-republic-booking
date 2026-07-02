@@ -4,6 +4,7 @@ import { SESSION_COOKIE, isValidEmail, type Session } from "@/lib/auth-config";
 import { encodeSession } from "@/lib/session";
 import { hashPassword } from "@/lib/password";
 import { createAndSendVerification } from "@/lib/mailers";
+import { enforce } from "@/lib/rate-limit";
 
 /** Generate a unique-ish account number like QX-10042. */
 async function nextAccountNumber(): Promise<string> {
@@ -17,6 +18,10 @@ async function nextAccountNumber(): Promise<string> {
  * zero balance and no performance history (until they deposit).
  */
 export async function POST(req: Request) {
+  // 5 signups / hour per IP.
+  const limited = enforce(req, "signup", 5, 60 * 60_000);
+  if (limited) return limited;
+
   const { name, email, password, phone } = await req.json().catch(() => ({}));
 
   if (!name || !email || !password) {

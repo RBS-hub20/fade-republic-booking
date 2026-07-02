@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { isValidEmail } from "@/lib/auth-config";
 import { generateToken, appBaseUrl, TOKEN_TYPES } from "@/lib/tokens";
 import { sendEmail, emailConfigured, emailTemplate } from "@/lib/email";
+import { enforce } from "@/lib/rate-limit";
 
 const ONE_HOUR = 60 * 60 * 1000;
 
@@ -12,6 +13,10 @@ const ONE_HOUR = 60 * 60 * 1000;
  * in production, returns a `devLink` so the flow is testable locally.
  */
 export async function POST(req: Request) {
+  // 5 requests / 15 min per IP.
+  const limited = enforce(req, "forgot", 5, 15 * 60_000);
+  if (limited) return limited;
+
   const { email } = await req.json().catch(() => ({}));
   if (!email || !isValidEmail(email)) {
     return NextResponse.json({ error: "Enter a valid email address" }, { status: 400 });

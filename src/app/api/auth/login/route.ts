@@ -3,8 +3,13 @@ import { prisma } from "@/lib/prisma";
 import { SESSION_COOKIE, type Session, type Role } from "@/lib/auth-config";
 import { encodeSession } from "@/lib/session";
 import { verifyPassword } from "@/lib/password";
+import { enforce } from "@/lib/rate-limit";
 
 export async function POST(req: Request) {
+  // 10 attempts / 15 min per IP.
+  const limited = enforce(req, "login", 10, 15 * 60_000);
+  if (limited) return limited;
+
   const { email, password } = await req.json().catch(() => ({}));
   if (!email || !password) {
     return NextResponse.json({ error: "Email and password are required" }, { status: 400 });

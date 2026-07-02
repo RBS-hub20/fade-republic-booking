@@ -2,9 +2,14 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { hashToken, TOKEN_TYPES } from "@/lib/tokens";
 import { hashPassword } from "@/lib/password";
+import { enforce } from "@/lib/rate-limit";
 
 /** Complete a password reset with a valid, unexpired token. */
 export async function POST(req: Request) {
+  // 10 attempts / 15 min per IP.
+  const limited = enforce(req, "reset", 10, 15 * 60_000);
+  if (limited) return limited;
+
   const { token, password } = await req.json().catch(() => ({}));
   if (!token || !password) {
     return NextResponse.json({ error: "Token and new password are required" }, { status: 400 });

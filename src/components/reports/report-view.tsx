@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { EquityChart } from "@/components/dashboard/equity-chart";
 import { AddFundsDialog } from "@/components/reports/add-funds-dialog";
+import { SetPasswordDialog } from "@/components/reports/set-password-dialog";
 import {
   Table,
   TableBody,
@@ -81,7 +82,12 @@ export function ReportView({
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {isAdmin && <AddFundsDialog clientId={client.id} clientName={client.name} />}
+            {isAdmin && (
+              <>
+                <AddFundsDialog clientId={client.id} clientName={client.name} />
+                <SetPasswordDialog clientId={client.id} clientEmail={client.email} />
+              </>
+            )}
             <Button onClick={exportPdf}>
               <FileDown className="h-4 w-4" /> Export Monthly Report
             </Button>
