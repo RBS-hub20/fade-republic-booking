@@ -55,3 +55,13 @@ export function getDepositWallets(): DepositWallet[] {
 
 /** Bank transfer is "coming soon" until enabled. */
 export const BANK_ENABLED = process.env.BANK_DEPOSITS_ENABLED === "true";
+
+/** Per-request deposit limits (USD), env-overridable. */
+export function getDepositLimits(): { min: number; max: number } {
+  const min = Number(process.env.DEPOSIT_MIN_USD || 10);
+  const max = Number(process.env.DEPOSIT_MAX_USD || 10000);
+  return {
+    min: Number.isFinite(min) ? min : 10,
+    max: Number.isFinite(max) ? max : 10000,
+  };
+}

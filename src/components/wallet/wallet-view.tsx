@@ -13,6 +13,8 @@ import {
   AlertTriangle,
   ExternalLink,
   Landmark,
+  Radar,
+  CheckCircle2,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -54,10 +56,12 @@ export function WalletView({
   currentBalance,
   wallets,
   bankEnabled,
+  limits,
 }: {
   currentBalance: number;
   wallets: DepositWallet[];
   bankEnabled: boolean;
+  limits: { min: number; max: number };
 }) {
   const [tab, setTab] = useState<"DEPOSIT" | "WITHDRAWAL">("DEPOSIT");
   const [method, setMethod] = useState<TransactionMethod>(wallets[0]?.method ?? "USDT_BEP20");
@@ -72,6 +76,12 @@ export function WalletView({
 
   const [txns, setTxns] = useState<Txn[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Near-real-time deposit confirmation poller.
+  const [pendingCheck, setPendingCheck] = useState<{ id: string; amount: number } | null>(null);
+  const [checkStatus, setCheckStatus] = useState<"idle" | "checking" | "confirmed" | "timeout">("idle");
+  const [checkAttempt, setCheckAttempt] = useState(0);
+  const [confirmedAmount, setConfirmedAmount] = useState<number | null>(null);
 
   const selectedWallet = wallets.find((w) => w.method === method);
   const isCrypto = method === "USDT_BEP20" || method === "USDT_TRC20";
@@ -88,6 +98,62 @@ export function WalletView({
     load();
   }, [load]);
 
+  // Poll for near-real-time confirmation after a deposit with a TxID is filed.
+  useEffect(() => {
+    if (!pendingCheck) return;
+    let stop = false;
+    let attempt = 0;
+    let timer: ReturnType<typeof setTimeout>;
+
+    async function tick() {
+      if (stop) return;
+      attempt += 1;
+      setCheckAttempt(attempt);
+      // Ask the server to verify our own pending deposits on-chain.
+      try {
+        await fetch("/api/deposits/check", { method: "POST" });
+      } catch {
+        /* ignore transient errors */
+      }
+      // Reload and inspect the tracked deposit.
+      let list: Txn[] = [];
+      try {
+        const res = await fetch("/api/transactions");
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          list = data;
+          setTxns(data);
+        }
+      } catch {
+        /* ignore */
+      }
+      const tracked = list.find((t) => t.id === pendingCheck!.id);
+      if (tracked?.status === "APPROVED") {
+        setConfirmedAmount(tracked.amount);
+        setCheckStatus("confirmed");
+        setPendingCheck(null);
+        return;
+      }
+      if (tracked?.status === "REJECTED") {
+        setCheckStatus("timeout");
+        setPendingCheck(null);
+        return;
+      }
+      if (attempt >= 10) {
+        setCheckStatus("timeout");
+        setPendingCheck(null);
+        return;
+      }
+      timer = setTimeout(tick, 18_000);
+    }
+
+    timer = setTimeout(tick, 5_000); // first check ~5s after submitting
+    return () => {
+      stop = true;
+      clearTimeout(timer);
+    };
+  }, [pendingCheck]);
+
   function copyAddress(addr: string) {
     navigator.clipboard?.writeText(addr);
     setCopied(true);
@@ -101,6 +167,12 @@ export function WalletView({
     const value = Number(amount);
     if (!Number.isFinite(value) || value <= 0) {
       setError("Enter an amount greater than zero.");
+      return;
+    }
+    if (tab === "DEPOSIT" && (value < limits.min || value > limits.max)) {
+      setError(
+        `Deposit must be between ${formatUsd(limits.min)} and ${formatUsd(limits.max)}.`
+      );
       return;
     }
     if (tab === "WITHDRAWAL" && isCrypto && !destAddress.trim()) {
@@ -122,20 +194,27 @@ export function WalletView({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ type: tab, amount: value, method, notes: composedNotes }),
     });
+    const created = await res.json().catch(() => ({}));
     setSubmitting(false);
     if (res.ok) {
       setOk(
         `${tab === "DEPOSIT" ? "Deposit" : "Withdrawal"} request for ${formatUsd(value)} submitted — ` +
-          "pending admin approval."
+          "pending approval."
       );
+      // Start near-real-time verification if this was a crypto deposit with a TxID.
+      if (tab === "DEPOSIT" && isCrypto && txHash.trim() && created?.id) {
+        setConfirmedAmount(null);
+        setCheckAttempt(0);
+        setCheckStatus("checking");
+        setPendingCheck({ id: created.id, amount: value });
+      }
       setAmount("");
       setTxHash("");
       setDestAddress("");
       setNotes("");
       load();
     } else {
-      const d = await res.json().catch(() => ({}));
-      setError(d.error ?? "Request failed");
+      setError(created?.error ?? "Request failed");
     }
   }
 
@@ -299,15 +378,20 @@ export function WalletView({
                   onChange={(e) => setAmount(e.target.value)}
                   required
                 />
+                {tab === "DEPOSIT" && (
+                  <p className="text-xs text-muted-foreground">
+                    Min {formatUsd(limits.min)} · Max {formatUsd(limits.max)} per deposit
+                  </p>
+                )}
               </div>
 
               {/* Deposit crypto → optional tx hash */}
               {tab === "DEPOSIT" && isCrypto && (
                 <div className="space-y-1.5">
-                  <Label htmlFor="txhash">Transaction hash (optional)</Label>
+                  <Label htmlFor="txhash">Transaction hash (recommended)</Label>
                   <Input
                     id="txhash"
-                    placeholder="Paste your TxID after sending — speeds up approval"
+                    placeholder="Paste your TxID after sending — enables instant confirmation"
                     value={txHash}
                     onChange={(e) => setTxHash(e.target.value)}
                   />
@@ -341,7 +425,31 @@ export function WalletView({
               </div>
 
               {error && <p className="rounded-md bg-loss/10 px-3 py-2 text-sm text-loss">{error}</p>}
-              {ok && <p className="rounded-md bg-profit/10 px-3 py-2 text-sm text-profit">{ok}</p>}
+              {ok && !pendingCheck && checkStatus !== "confirmed" && (
+                <p className="rounded-md bg-profit/10 px-3 py-2 text-sm text-profit">{ok}</p>
+              )}
+
+              {/* Near-real-time confirmation status */}
+              {checkStatus === "checking" && (
+                <div className="flex items-center gap-2 rounded-md border border-gold-400/30 bg-gold-400/10 px-3 py-2.5 text-sm text-gold-200">
+                  <Radar className="h-4 w-4 shrink-0 animate-pulse" />
+                  <span>Checking your transaction on-chain… (attempt {checkAttempt}/10)</span>
+                </div>
+              )}
+              {checkStatus === "confirmed" && (
+                <div className="flex items-center gap-2 rounded-md border border-profit/30 bg-profit/10 px-3 py-2.5 text-sm text-profit">
+                  <CheckCircle2 className="h-4 w-4 shrink-0" />
+                  <span>
+                    Deposit confirmed! {formatUsd(confirmedAmount ?? 0)} credited to your balance.
+                  </span>
+                </div>
+              )}
+              {checkStatus === "timeout" && (
+                <div className="rounded-md border border-border bg-secondary/40 px-3 py-2.5 text-sm text-muted-foreground">
+                  Still confirming — this can take a few minutes. Your balance updates automatically
+                  once the transaction is verified.
+                </div>
+              )}
 
               <Button type="submit" className="w-full" disabled={submitting || (method === "BANK" && !bankEnabled)}>
                 {submitting && <Loader2 className="h-4 w-4 animate-spin" />}

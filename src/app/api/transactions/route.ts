@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
+import { getDepositLimits } from "@/lib/payments";
 import {
   TRANSACTION_TYPES,
   TRANSACTION_METHODS,
@@ -55,6 +56,17 @@ export async function POST(req: Request) {
   const value = Math.abs(Number(amount));
   if (!Number.isFinite(value) || value <= 0) {
     return NextResponse.json({ error: "Amount must be greater than zero" }, { status: 400 });
+  }
+
+  // Enforce deposit limits for client-submitted deposits (admins are exempt).
+  if (!isAdmin && type === "DEPOSIT") {
+    const { min, max } = getDepositLimits();
+    if (value < min || value > max) {
+      return NextResponse.json(
+        { error: `Deposit must be between $${min.toLocaleString()} and $${max.toLocaleString()}.` },
+        { status: 400 }
+      );
+    }
   }
 
   // Clients may only file a PENDING request on their OWN account.

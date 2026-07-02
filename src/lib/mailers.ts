@@ -6,8 +6,34 @@
 import { prisma } from "./prisma";
 import { generateToken, appBaseUrl, TOKEN_TYPES } from "./tokens";
 import { sendEmail, emailConfigured, emailTemplate } from "./email";
+import { METHOD_LABELS, type TransactionMethod } from "./constants";
+import { formatUsd } from "./utils";
 
 const DAY = 24 * 60 * 60 * 1000;
+
+/** Notify a client that their deposit was approved/credited. Best-effort. */
+export async function notifyDepositApproved(opts: {
+  email: string;
+  name: string;
+  amount: number;
+  method: string;
+  auto: boolean;
+}): Promise<void> {
+  const label = METHOD_LABELS[opts.method as TransactionMethod] ?? opts.method;
+  await sendEmail({
+    to: opts.email,
+    subject: `Deposit confirmed — ${formatUsd(opts.amount)} credited`,
+    html: emailTemplate({
+      heading: `Deposit confirmed, ${opts.name.split(" ")[0]}!`,
+      body:
+        `Your deposit of <strong>${formatUsd(opts.amount)}</strong> via ${label} has been ` +
+        `${opts.auto ? "automatically verified on-chain and " : ""}credited to your QuantumX account. ` +
+        `Log in to view your updated balance.`,
+      buttonLabel: "Open dashboard",
+      buttonUrl: `${appBaseUrl()}/dashboard`,
+    }),
+  });
+}
 
 export async function createAndSendVerification(user: {
   id: string;
