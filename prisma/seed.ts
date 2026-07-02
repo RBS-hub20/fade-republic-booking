@@ -10,6 +10,7 @@ import {
   randomDailyPercent,
   computeEquityCurve,
 } from "../src/lib/performance";
+import { hashPassword } from "../src/lib/password";
 
 const prisma = new PrismaClient();
 
@@ -79,6 +80,7 @@ async function main() {
   console.log("🌱 Seeding QuantumX Global Markets...");
 
   // Reset demo data.
+  await prisma.user.deleteMany();
   await prisma.dailyPerformance.deleteMany();
   await prisma.transaction.deleteMany();
   await prisma.client.deleteMany();
@@ -86,6 +88,8 @@ async function main() {
   // The shared 60 trading-day window (oldest first).
   const days = recentTradingDays(TRADING_DAYS);
   const startKey = days[0];
+
+  const clientIdByEmail = new Map<string, string>();
 
   for (const sc of SEED_CLIENTS) {
     const client = await prisma.client.create({
@@ -99,6 +103,7 @@ async function main() {
         status: sc.status,
       },
     });
+    clientIdByEmail.set(sc.email, client.id);
 
     // Ledger transactions.
     const ledger = sc.cashflows.map((cf) => ({
@@ -153,6 +158,29 @@ async function main() {
     );
   }
 
+  // --- Login accounts ---------------------------------------------------------
+  // Admin (monitoring portal) + a demo client linked to Miguel Santos.
+  await prisma.user.create({
+    data: {
+      email: "admin@quantumxglobal.com",
+      name: "Portfolio Admin",
+      passwordHash: hashPassword("admin123"),
+      role: "admin",
+    },
+  });
+
+  const demoClientId = clientIdByEmail.get("miguel.santos@example.com")!;
+  await prisma.user.create({
+    data: {
+      email: "client@quantumxglobal.com",
+      name: "Miguel Santos",
+      passwordHash: hashPassword("client123"),
+      role: "client",
+      clientId: demoClientId,
+    },
+  });
+
+  console.log("  ✓ Users: admin@quantumxglobal.com / client@quantumxglobal.com");
   console.log("✅ Seed complete.");
 }
 

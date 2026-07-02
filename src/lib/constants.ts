@@ -12,8 +12,17 @@ export type TransactionType = (typeof TRANSACTION_TYPES)[number];
 export const TRANSACTION_METHODS = ["BANK", "CRYPTO", "OTC"] as const;
 export type TransactionMethod = (typeof TRANSACTION_METHODS)[number];
 
-export const TRANSACTION_STATUSES = ["PENDING", "APPROVED"] as const;
+export const TRANSACTION_STATUSES = ["PENDING", "APPROVED", "REJECTED"] as const;
 export type TransactionStatus = (typeof TRANSACTION_STATUSES)[number];
+
+export const STATUS_BADGE: Record<
+  TransactionStatus,
+  { label: string; variant: "outline" | "warning" | "danger" }
+> = {
+  APPROVED: { label: "Approved", variant: "outline" },
+  PENDING: { label: "Pending", variant: "warning" },
+  REJECTED: { label: "Rejected", variant: "danger" },
+};
 
 export const STATUS_LABELS: Record<ClientStatus, string> = {
   ACTIVE: "Active",

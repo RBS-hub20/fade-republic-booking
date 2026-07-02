@@ -7,7 +7,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   if (!session) redirect("/login");
 
   return (
-    <AppShell role={session.role} name={session.name}>
+    <AppShell
+      role={session.role}
+      name={session.name}
+      clientId={session.clientId ?? null}
+    >
       {children}
     </AppShell>
   );

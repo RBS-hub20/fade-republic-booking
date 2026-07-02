@@ -13,7 +13,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { redirect } from "next/navigation";
 import { getClientsWithBalance } from "@/lib/data";
+import { getSession } from "@/lib/auth";
 import { cn, formatUsd, formatDate } from "@/lib/utils";
 import { STATUS_LABELS, type ClientStatus } from "@/lib/constants";
 
@@ -26,6 +28,8 @@ const statusVariant: Record<ClientStatus, "success" | "warning" | "danger"> = {
 };
 
 export default async function ClientsPage() {
+  const session = getSession();
+  if (session?.role !== "admin") redirect("/dashboard");
   const clients = await getClientsWithBalance();
 
   return (

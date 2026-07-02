@@ -53,6 +53,7 @@ Open **http://localhost:3000** and sign in with a demo account:
      schema push. Set this if your provider uses a pgbouncer pool.
      - Vercel Postgres: `DATABASE_URL` = `POSTGRES_PRISMA_URL`, `DIRECT_URL` = `POSTGRES_URL_NON_POOLING`.
      - Neon: use the pooled string for `DATABASE_URL` and the direct string for `DIRECT_URL`.
+   - `SESSION_SECRET` — a long random string used to sign session cookies.
 3. Deploy. The build runs `db-deploy` (generate → push → seed-if-empty) then
    `next build`, so the schema and demo data are provisioned automatically on the
    first deploy. Subsequent deploys leave existing data untouched.
@@ -61,15 +62,21 @@ Open **http://localhost:3000** and sign in with a demo account:
 
 ## Features
 
-### 1. Auth & clients
-- Simple cookie-based login with **admin / client** roles (`src/lib/auth-config.ts`).
-- Clients: name, email, phone, account number, initial deposit, start date, status.
-- Route protection via `src/middleware.ts`. Mutations are admin-only.
+### 1. Accounts & auth (real, persisted)
+- **Sign up** creates a `User` (hashed password via Node scrypt — `src/lib/password.ts`)
+  plus a linked trading `Client` account. **Log in** verifies against the database.
+- Sessions are **signed** cookies (HMAC, `src/lib/session.ts`) carrying role + clientId.
+- Two roles:
+  - **Client** — sees only their own account: dashboard, wallet, charts, statement.
+  - **Admin** — monitoring portal: all clients, approvals, full ledger, reports.
+- Route protection via `src/middleware.ts` + per-page role guards.
 
-### 2. Deposit / withdrawal ledger
-- Entries: date, client, type (deposit/withdrawal), amount USD, method (bank/crypto/otc), notes, status (pending/approved).
-- **Approved** entries automatically update the client balance (the equity curve recomputes from the ledger).
-- **CSV import & export**, plus filtering by client and date range.
+### 2. Deposits & withdrawals (request → approval)
+- **Clients** submit deposit/withdrawal **requests** from `/wallet` (created as `PENDING`).
+- **Admins** review them on `/approvals` and **Approve** or **Reject**.
+- **Approved** entries automatically update the client balance (the equity curve
+  recomputes from the ledger). Admins can also add entries directly in the `/ledger`
+  with **CSV import & export** and client/date filters.
 
 ### 3. Trading performance dashboard
 - PAMM-style **compounded equity curve** per client (and a portfolio aggregate).
@@ -93,15 +100,18 @@ Open **http://localhost:3000** and sign in with a demo account:
 
 ## Pages
 
-| Route                  | Description                                  |
-| ---------------------- | -------------------------------------------- |
-| `/login`               | Login                                        |
-| `/dashboard`           | KPI cards + equity chart + daily log         |
-| `/clients`             | Client list + add client                     |
-| `/ledger`              | Deposits/withdrawals table, filters, CSV     |
-| `/charts`              | Full TradingView XAUUSD chart + watchlist    |
-| `/reports`             | Pick a client                                |
-| `/reports/[clientId]`  | Client statement + PDF export                |
+| Route                  | Access  | Description                                  |
+| ---------------------- | ------- | -------------------------------------------- |
+| `/`                    | public  | Marketing landing page                       |
+| `/login` · `/signup`   | public  | Log in / create an account                   |
+| `/dashboard`           | both    | KPIs + equity chart (own account / portfolio)|
+| `/wallet`              | client  | Submit deposit / withdrawal requests         |
+| `/approvals`           | admin   | Approve / reject client requests             |
+| `/clients`             | admin   | Client list + add client                     |
+| `/ledger`              | admin   | Deposits/withdrawals table, filters, CSV     |
+| `/charts`              | both    | Full TradingView XAUUSD chart + watchlist    |
+| `/reports`             | admin   | Pick a client                                |
+| `/reports/[clientId]`  | scoped  | Client statement + PDF export (own if client)|
 
 ---
 

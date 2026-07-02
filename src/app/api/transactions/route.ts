@@ -8,9 +8,9 @@ import {
 } from "@/lib/constants";
 
 /** Build a Prisma `where` from query filters (clientId, from, to date range). */
-function buildWhere(searchParams: URLSearchParams) {
+function buildWhere(searchParams: URLSearchParams, forceClientId?: string | null) {
   const where: any = {};
-  const clientId = searchParams.get("clientId");
+  const clientId = forceClientId ?? searchParams.get("clientId");
   const from = searchParams.get("from");
   const to = searchParams.get("to");
   if (clientId && clientId !== "all") where.clientId = clientId;
@@ -23,9 +23,15 @@ function buildWhere(searchParams: URLSearchParams) {
 }
 
 export async function GET(req: Request) {
+  const session = getSession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const { searchParams } = new URL(req.url);
+  // Clients are locked to their own account; admins may filter freely.
+  const forceClientId = session.role === "client" ? session.clientId ?? "__none__" : null;
+
   const transactions = await prisma.transaction.findMany({
-    where: buildWhere(searchParams),
+    where: buildWhere(searchParams, forceClientId),
     orderBy: { date: "desc" },
     include: { client: { select: { name: true, accountNumber: true } } },
   });
@@ -34,32 +40,50 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   const session = getSession();
-  if (session?.role !== "admin") {
-    return NextResponse.json({ error: "Admin access required" }, { status: 403 });
-  }
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json();
-  const { clientId, date, type, amount, method, status, notes } = body;
+  const { type, amount, method, notes } = body;
+  const isAdmin = session.role === "admin";
 
-  if (!clientId || !type || amount == null) {
-    return NextResponse.json(
-      { error: "clientId, type and amount are required" },
-      { status: 400 }
-    );
+  if (!type || amount == null) {
+    return NextResponse.json({ error: "type and amount are required" }, { status: 400 });
   }
   if (!TRANSACTION_TYPES.includes(type)) {
     return NextResponse.json({ error: "Invalid transaction type" }, { status: 400 });
+  }
+  const value = Math.abs(Number(amount));
+  if (!Number.isFinite(value) || value <= 0) {
+    return NextResponse.json({ error: "Amount must be greater than zero" }, { status: 400 });
+  }
+
+  // Clients may only file a PENDING request on their OWN account.
+  // Admins may create for any client with any status.
+  let clientId: string;
+  let status: string;
+  if (isAdmin) {
+    clientId = body.clientId;
+    if (!clientId) {
+      return NextResponse.json({ error: "clientId is required" }, { status: 400 });
+    }
+    status = TRANSACTION_STATUSES.includes(body.status) ? body.status : "APPROVED";
+  } else {
+    if (!session.clientId) {
+      return NextResponse.json({ error: "No trading account linked to this user" }, { status: 400 });
+    }
+    clientId = session.clientId;
+    status = "PENDING";
   }
 
   const tx = await prisma.transaction.create({
     data: {
       clientId,
-      date: date ? new Date(date) : new Date(),
+      date: isAdmin && body.date ? new Date(body.date) : new Date(),
       type,
-      amount: Math.abs(Number(amount)),
+      amount: value,
       method: TRANSACTION_METHODS.includes(method) ? method : "BANK",
-      status: TRANSACTION_STATUSES.includes(status) ? status : "APPROVED",
-      notes: notes || null,
+      status,
+      notes: notes ? String(notes).slice(0, 500) : null,
     },
   });
 

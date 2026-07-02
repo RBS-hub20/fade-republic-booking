@@ -23,7 +23,13 @@ export interface DashboardDataset {
   kpis: PerformanceKpis;
 }
 
-export function DashboardView({ datasets }: { datasets: DashboardDataset[] }) {
+export function DashboardView({
+  datasets,
+  showSelector = true,
+}: {
+  datasets: DashboardDataset[];
+  showSelector?: boolean;
+}) {
   const [selected, setSelected] = useState(datasets[0]?.id ?? "");
   const active = useMemo(
     () => datasets.find((d) => d.id === selected) ?? datasets[0],
@@ -43,20 +49,20 @@ export function DashboardView({ datasets }: { datasets: DashboardDataset[] }) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-sm text-muted-foreground">
-          Viewing performance for
-        </p>
-        <div className="w-64">
-          <Select value={selected} onChange={(e) => setSelected(e.target.value)}>
-            {datasets.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.label}
-              </option>
-            ))}
-          </Select>
+      {showSelector && datasets.length > 1 && (
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-sm text-muted-foreground">Viewing performance for</p>
+          <div className="w-64">
+            <Select value={selected} onChange={(e) => setSelected(e.target.value)}>
+              {datasets.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.label}
+                </option>
+              ))}
+            </Select>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* KPI cards */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-6">

@@ -8,31 +8,53 @@ import {
   ArrowLeftRight,
   CandlestickChart,
   FileText,
+  Wallet,
+  CheckSquare,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/brand/logo";
 
-const NAV = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/clients", label: "Clients", icon: Users },
-  { href: "/ledger", label: "Ledger", icon: ArrowLeftRight },
-  { href: "/charts", label: "Charts", icon: CandlestickChart },
-  { href: "/reports", label: "Reports", icon: FileText },
-];
+type NavItem = { href: string; label: string; icon: typeof LayoutDashboard };
+
+function navForRole(role: string, clientId: string | null): NavItem[] {
+  if (role === "admin") {
+    return [
+      { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+      { href: "/clients", label: "Clients", icon: Users },
+      { href: "/approvals", label: "Approvals", icon: CheckSquare },
+      { href: "/ledger", label: "Ledger", icon: ArrowLeftRight },
+      { href: "/charts", label: "Charts", icon: CandlestickChart },
+      { href: "/reports", label: "Reports", icon: FileText },
+    ];
+  }
+  // Client
+  return [
+    { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { href: "/wallet", label: "Deposit / Withdraw", icon: Wallet },
+    { href: "/charts", label: "Charts", icon: CandlestickChart },
+    ...(clientId
+      ? [{ href: `/reports/${clientId}`, label: "My Statement", icon: FileText }]
+      : []),
+  ];
+}
 
 export function Sidebar({
   open,
   onClose,
+  role,
+  clientId,
 }: {
   open: boolean;
   onClose: () => void;
+  role: string;
+  clientId: string | null;
 }) {
   const pathname = usePathname();
+  const nav = navForRole(role, clientId);
 
   return (
     <>
-      {/* Mobile backdrop */}
       {open && (
         <div
           className="fixed inset-0 z-30 bg-black/60 lg:hidden"
@@ -57,9 +79,10 @@ export function Sidebar({
         </div>
 
         <nav className="flex-1 space-y-1 p-3">
-          {NAV.map((item) => {
+          {nav.map((item) => {
             const active =
-              pathname === item.href || pathname.startsWith(item.href + "/");
+              pathname === item.href ||
+              (item.href !== "/dashboard" && pathname.startsWith(item.href + "/"));
             const Icon = item.icon;
             return (
               <Link
@@ -82,7 +105,7 @@ export function Sidebar({
 
         <div className="border-t border-border p-4 text-xs text-muted-foreground">
           <p className="font-medium text-foreground">Trade Beyond Limits</p>
-          <p>Asia/Manila · demo data</p>
+          <p className="capitalize">{role} · Asia/Manila</p>
         </div>
       </aside>
     </>

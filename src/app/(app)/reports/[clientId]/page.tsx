@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { PageHeader } from "@/components/shell/page-header";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,11 @@ export default async function ReportPage({
   params: { clientId: string };
 }) {
   const session = getSession();
+  if (!session) redirect("/login");
+  const isAdmin = session.role === "admin";
+  // Clients may only view their own statement.
+  if (!isAdmin && session.clientId !== params.clientId) redirect("/dashboard");
+
   const perf = await getClientPerformance(params.clientId);
   if (!perf || !perf.client) notFound();
 
@@ -33,12 +38,17 @@ export default async function ReportPage({
 
   return (
     <>
-      <PageHeader title="Client Statement" subtitle={client.accountNumber}>
-        <Button asChild variant="outline" size="sm">
-          <Link href="/reports">
-            <ArrowLeft className="h-4 w-4" /> All reports
-          </Link>
-        </Button>
+      <PageHeader
+        title={isAdmin ? "Client Statement" : "My Statement"}
+        subtitle={client.accountNumber}
+      >
+        {isAdmin && (
+          <Button asChild variant="outline" size="sm">
+            <Link href="/reports">
+              <ArrowLeft className="h-4 w-4" /> All reports
+            </Link>
+          </Button>
+        )}
       </PageHeader>
 
       <ReportView
@@ -54,7 +64,7 @@ export default async function ReportPage({
         kpis={kpis}
         curve={curve}
         transactions={transactions}
-        isAdmin={session?.role === "admin"}
+        isAdmin={isAdmin}
       />
     </>
   );

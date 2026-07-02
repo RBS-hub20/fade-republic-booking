@@ -3,13 +3,21 @@ import { FileText, ChevronRight } from "lucide-react";
 import { PageHeader } from "@/components/shell/page-header";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { redirect } from "next/navigation";
 import { getClientsWithBalance } from "@/lib/data";
+import { getSession } from "@/lib/auth";
 import { formatUsd } from "@/lib/utils";
 import { STATUS_LABELS, type ClientStatus } from "@/lib/constants";
 
 export const dynamic = "force-dynamic";
 
 export default async function ReportsIndexPage() {
+  const session = getSession();
+  if (!session) redirect("/login");
+  // Clients have a single statement (their own); send them straight to it.
+  if (session.role === "client") {
+    redirect(session.clientId ? `/reports/${session.clientId}` : "/dashboard");
+  }
   const clients = await getClientsWithBalance();
 
   return (
