@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, X, Loader2, Inbox } from "lucide-react";
+import { Check, X, Loader2, Inbox, RefreshCw } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +30,8 @@ interface PendingTxn {
 export function ApprovalsView({ pending }: { pending: PendingTxn[] }) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
+  const [verifying, setVerifying] = useState(false);
+  const [verifyMsg, setVerifyMsg] = useState<string | null>(null);
 
   async function act(id: string, status: "APPROVED" | "REJECTED") {
     setBusy(id);
@@ -42,22 +44,60 @@ export function ApprovalsView({ pending }: { pending: PendingTxn[] }) {
     router.refresh();
   }
 
+  async function verifyOnChain() {
+    setVerifying(true);
+    setVerifyMsg(null);
+    try {
+      const res = await fetch("/api/deposits/verify", { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setVerifyMsg(
+          `Checked ${data.checked ?? 0} USDT deposit(s), auto-approved ${data.approved ?? 0}.` +
+            (data.bep20Enabled === false ? " (BEP20 verification off — set BSCSCAN_API_KEY)" : "")
+        );
+        router.refresh();
+      } else {
+        setVerifyMsg(data.error ?? "Verification failed");
+      }
+    } catch {
+      setVerifyMsg("Verification failed");
+    }
+    setVerifying(false);
+  }
+
+  const actionBar = (
+    <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+      <p className="text-sm text-muted-foreground">
+        {verifyMsg ?? "Auto-approve USDT deposits by matching their on-chain transaction."}
+      </p>
+      <Button variant="outline" size="sm" onClick={verifyOnChain} disabled={verifying}>
+        {verifying ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+        Verify USDT deposits on-chain
+      </Button>
+    </div>
+  );
+
   if (pending.length === 0) {
     return (
-      <Card className="flex flex-col items-center justify-center gap-3 p-16 text-center">
-        <span className="flex h-12 w-12 items-center justify-center rounded-full bg-secondary text-muted-foreground">
-          <Inbox className="h-6 w-6" />
-        </span>
-        <p className="font-medium">No pending requests</p>
-        <p className="text-sm text-muted-foreground">
-          Deposit and withdrawal requests from clients will appear here for review.
-        </p>
-      </Card>
+      <>
+        {actionBar}
+        <Card className="flex flex-col items-center justify-center gap-3 p-16 text-center">
+          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-secondary text-muted-foreground">
+            <Inbox className="h-6 w-6" />
+          </span>
+          <p className="font-medium">No pending requests</p>
+          <p className="text-sm text-muted-foreground">
+            Deposit and withdrawal requests from clients will appear here for review.
+          </p>
+        </Card>
+      </>
     );
   }
 
   return (
-    <Card>
+    <>
+      {actionBar}
+      <Card>
       <Table>
         <TableHeader>
           <TableRow>
@@ -128,6 +168,7 @@ export function ApprovalsView({ pending }: { pending: PendingTxn[] }) {
           ))}
         </TableBody>
       </Table>
-    </Card>
+      </Card>
+    </>
   );
 }

@@ -30,6 +30,8 @@ export function middleware(req: NextRequest) {
     pathname.startsWith("/_next") ||
     pathname.startsWith("/api/auth") ||
     pathname.startsWith("/api/market") ||
+    // The verify route enforces its own CRON_SECRET / admin check.
+    pathname.startsWith("/api/deposits/verify") ||
     pathname === "/api/health" ||
     pathname === "/favicon.ico";
 
