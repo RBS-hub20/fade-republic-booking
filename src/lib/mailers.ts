@@ -35,6 +35,28 @@ export async function notifyDepositApproved(opts: {
   });
 }
 
+/** Notify a client that their withdrawal has been paid out. Best-effort. */
+export async function notifyWithdrawalApproved(opts: {
+  email: string;
+  name: string;
+  amount: number;
+  method: string;
+}): Promise<void> {
+  const label = METHOD_LABELS[opts.method as TransactionMethod] ?? opts.method;
+  await sendEmail({
+    to: opts.email,
+    subject: `Payout sent — ${formatUsd(opts.amount)}`,
+    html: emailTemplate({
+      heading: `Payout sent, ${opts.name.split(" ")[0]}!`,
+      body:
+        `Your withdrawal of <strong>${formatUsd(opts.amount)}</strong> via ${label} has been ` +
+        `approved and sent. It has been debited from your QuantumX balance.`,
+      buttonLabel: "Open dashboard",
+      buttonUrl: `${appBaseUrl()}/dashboard`,
+    }),
+  });
+}
+
 export async function createAndSendVerification(user: {
   id: string;
   email: string;

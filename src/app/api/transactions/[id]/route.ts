@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { TRANSACTION_STATUSES } from "@/lib/constants";
-import { notifyDepositApproved } from "@/lib/mailers";
+import { notifyDepositApproved, notifyWithdrawalApproved } from "@/lib/mailers";
 
 /** Update a transaction (e.g. approve a pending one). Admin only. */
 export async function PATCH(
@@ -28,20 +28,25 @@ export async function PATCH(
 
   const tx = await prisma.transaction.update({ where: { id: params.id }, data });
 
-  // Email the client when a deposit is manually approved (PENDING → APPROVED).
-  if (
-    before.type === "DEPOSIT" &&
-    before.status !== "APPROVED" &&
-    tx.status === "APPROVED" &&
-    before.client
-  ) {
-    notifyDepositApproved({
-      email: before.client.email,
-      name: before.client.name,
-      amount: tx.amount,
-      method: tx.method,
-      auto: false,
-    }).catch(() => {});
+  // Email the client when a request is approved (PENDING → APPROVED).
+  const justApproved = before.status !== "APPROVED" && tx.status === "APPROVED";
+  if (justApproved && before.client) {
+    if (before.type === "DEPOSIT") {
+      notifyDepositApproved({
+        email: before.client.email,
+        name: before.client.name,
+        amount: tx.amount,
+        method: tx.method,
+        auto: false,
+      }).catch(() => {});
+    } else if (before.type === "WITHDRAWAL") {
+      notifyWithdrawalApproved({
+        email: before.client.email,
+        name: before.client.name,
+        amount: tx.amount,
+        method: tx.method,
+      }).catch(() => {});
+    }
   }
 
   return NextResponse.json(tx);

@@ -1,9 +1,13 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
+import { ArrowDownToLine, ArrowUpFromLine } from "lucide-react";
 import { PageHeader } from "@/components/shell/page-header";
 import { DashboardView, type DashboardDataset } from "@/components/dashboard/dashboard-view";
+import { KpiCard } from "@/components/dashboard/kpi-card";
 import { getPortfolioPerformance, getClientPerformance } from "@/lib/data";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { formatUsd } from "@/lib/utils";
 
 // Always fetch fresh — balances change as the ledger is edited.
 export const dynamic = "force-dynamic";
@@ -50,6 +54,18 @@ export default async function DashboardPage() {
   const portfolio = await getPortfolioPerformance();
   const clients = await prisma.client.findMany({ orderBy: { createdAt: "asc" } });
 
+  // Pending-request aggregates for the admin KPI cards.
+  const pendingAgg = await prisma.transaction.groupBy({
+    by: ["type"],
+    where: { status: "PENDING" },
+    _count: { _all: true },
+    _sum: { amount: true },
+  });
+  const dep = pendingAgg.find((p) => p.type === "DEPOSIT");
+  const wit = pendingAgg.find((p) => p.type === "WITHDRAWAL");
+  const pendingDeposits = { count: dep?._count._all ?? 0, volume: dep?._sum.amount ?? 0 };
+  const pendingWithdrawals = { count: wit?._count._all ?? 0, volume: wit?._sum.amount ?? 0 };
+
   const datasets: DashboardDataset[] = [
     {
       id: "portfolio",
@@ -77,6 +93,29 @@ export default async function DashboardPage() {
         title="Performance Dashboard"
         subtitle="Admin monitoring · PAMM-style compounded equity across all clients (Asia/Manila)"
       />
+
+      {/* Pending-request KPIs */}
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <Link href="/approvals">
+          <KpiCard
+            label="Pending Deposits"
+            value={formatUsd(pendingDeposits.volume)}
+            sub={`${pendingDeposits.count} request${pendingDeposits.count === 1 ? "" : "s"} awaiting approval`}
+            icon={ArrowDownToLine}
+            tone="profit"
+          />
+        </Link>
+        <Link href="/approvals">
+          <KpiCard
+            label="Pending Withdrawals"
+            value={formatUsd(pendingWithdrawals.volume)}
+            sub={`${pendingWithdrawals.count} request${pendingWithdrawals.count === 1 ? "" : "s"} awaiting approval`}
+            icon={ArrowUpFromLine}
+            tone="loss"
+          />
+        </Link>
+      </div>
+
       <DashboardView datasets={datasets} />
     </>
   );
