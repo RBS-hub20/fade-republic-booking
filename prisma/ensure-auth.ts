@@ -21,6 +21,8 @@ const prisma = new PrismaClient();
 const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || "admin@quantumxglobal.com").toLowerCase().trim();
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD; // if set → force reset
 const ADMIN_NAME = process.env.ADMIN_NAME || "Portfolio Admin";
+// Demo default used when ADMIN_PASSWORD is not configured (env-overridable).
+const DEFAULT_ADMIN_PASSWORD = process.env.DEFAULT_ADMIN_PASSWORD || "admin123";
 
 /** Create a user only if it's missing (never overwrites an existing password). */
 async function ensureUser(opts: {
@@ -66,13 +68,29 @@ async function main() {
     });
     console.log(`🔐 Admin password set from ADMIN_PASSWORD env for ${ADMIN_EMAIL}.`);
   } else {
-    const created = await ensureUser({
-      email: ADMIN_EMAIL,
-      name: ADMIN_NAME,
-      password: "admin123",
-      role: "admin",
+    // No ADMIN_PASSWORD configured — guarantee a working default login by
+    // (re)setting the admin to the demo default password on every deploy. This
+    // repairs a stale/legacy hash so `admin123` always works out of the box.
+    // Set ADMIN_PASSWORD in the host env to use your own private password.
+    await prisma.user.upsert({
+      where: { email: ADMIN_EMAIL },
+      update: {
+        passwordHash: hashPassword(DEFAULT_ADMIN_PASSWORD),
+        role: "admin",
+        emailVerified: true,
+      },
+      create: {
+        email: ADMIN_EMAIL,
+        name: ADMIN_NAME,
+        passwordHash: hashPassword(DEFAULT_ADMIN_PASSWORD),
+        role: "admin",
+        emailVerified: true,
+      },
     });
-    console.log(`🔐 Admin ${created ? "created (default password)" : "already present"} — ${ADMIN_EMAIL}.`);
+    console.log(
+      `🔐 Admin ensured with the DEFAULT password for ${ADMIN_EMAIL}. ` +
+        "Set ADMIN_PASSWORD in your host env to use a private password."
+    );
   }
 
   // --- Demo client login (created only if missing) ---
