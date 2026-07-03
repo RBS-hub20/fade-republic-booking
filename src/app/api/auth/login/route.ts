@@ -35,10 +35,9 @@ export async function POST(req: Request) {
 
   let user = await prisma.user.findUnique({ where: { email: cleanEmail } });
   let passOk = !!user && verifyPassword(String(password), user.passwordHash);
-  log(
-    `attempt email=${cleanEmail} userFound=${!!user} passOk=${passOk} ` +
-      `role=${user?.role ?? "n/a"} verified=${user?.emailVerified ?? "n/a"}`
-  );
+  const envPassSet = Boolean(process.env.ADMIN_PASSWORD);
+  console.log("[auth:login]", { email: cleanEmail, userFound: !!user, passOk, envPassSet });
+  log(`role=${user?.role ?? "n/a"} verified=${user?.emailVerified ?? "n/a"}`);
 
   // --- ADMIN_PASSWORD env fallback -----------------------------------------
   // If a matching ADMIN_PASSWORD is configured, (re)provision and log in the
