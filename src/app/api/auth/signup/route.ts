@@ -5,6 +5,7 @@ import { hashPassword } from "@/lib/password";
 import { createAndSendVerification } from "@/lib/mailers";
 import { enforce } from "@/lib/rate-limit";
 import { findReferrerByCode, ensureReferralCode } from "@/lib/referrals";
+import { REFERRALS_ENABLED } from "@/lib/referrals-config";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -74,8 +75,12 @@ export async function POST(req: Request) {
       accountNumber = `QX-${Date.now().toString().slice(-6)}`;
     }
 
-    // Resolve the referrer (if a valid ?ref= code was supplied).
-    const referredById = ref ? await findReferrerByCode(String(ref)) : null;
+    // Resolve the referrer (if a valid ?ref= code was supplied). Never let a
+    // referral hiccup block signup.
+    let referredById: string | null = null;
+    if (REFERRALS_ENABLED && ref) {
+      referredById = await findReferrerByCode(String(ref)).catch(() => null);
+    }
 
     user = await prisma.$transaction(async (tx) => {
       const client = await tx.client.create({

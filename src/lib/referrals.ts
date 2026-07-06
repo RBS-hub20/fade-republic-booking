@@ -14,6 +14,7 @@
 import { prisma } from "./prisma";
 import { getClientPerformance } from "./data";
 import { TIERS, tierForBalance, type TierId } from "./tiers";
+import { REFERRALS_ENABLED } from "./referrals-config";
 
 /** Commission percentage a referrer earns, keyed by their current tier. */
 export const COMMISSION_RATES: Record<"none" | TierId, number> = {
@@ -76,6 +77,7 @@ export async function creditFirstPackageCommission(opts: {
   clientId: string;
   amount: number;
 }): Promise<void> {
+  if (!REFERRALS_ENABLED) return;
   try {
     // Which package did they activate? Must be at least Bronze ($50).
     const tier = tierForBalance(opts.amount);

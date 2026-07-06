@@ -9,6 +9,7 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { formatUsd } from "@/lib/utils";
 import { getReferralSummary } from "@/lib/referrals";
+import { REFERRALS_ENABLED } from "@/lib/referrals-config";
 import { ReferralLinkCard } from "@/components/referrals/referral-link-card";
 import { ReferralHistory } from "@/components/referrals/referral-history";
 
@@ -43,20 +44,23 @@ export default async function DashboardPage() {
         ]
       : [];
 
-    // Referral program data for this user. Wrapped defensively: if the referral
-    // columns/tables aren't migrated yet, the dashboard still renders fully
-    // (just without the referral panel) instead of 500-ing.
+    // Referral program data for this user. Gated by the feature flag and wrapped
+    // defensively: if referrals are disabled OR the columns/tables aren't
+    // migrated yet, the dashboard still renders fully (just without the referral
+    // panel) instead of 500-ing.
     let referral = null;
-    try {
-      const me = session.userId
-        ? await prisma.user.findUnique({
-            where: { id: session.userId },
-            select: { id: true, name: true, referralCode: true, commissionBalance: true, clientId: true },
-          })
-        : null;
-      referral = me ? await getReferralSummary(me) : null;
-    } catch (err) {
-      console.error("[dashboard] referral summary unavailable:", err);
+    if (REFERRALS_ENABLED) {
+      try {
+        const me = session.userId
+          ? await prisma.user.findUnique({
+              where: { id: session.userId },
+              select: { id: true, name: true, referralCode: true, commissionBalance: true, clientId: true },
+            })
+          : null;
+        referral = me ? await getReferralSummary(me) : null;
+      } catch (err) {
+        console.error("[dashboard] referral summary unavailable:", err);
+      }
     }
 
     return (
