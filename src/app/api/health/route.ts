@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { FROM_EMAIL, emailConfigured } from "@/lib/resend";
+import { REFERRALS_ENABLED } from "@/lib/referrals-config";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -69,9 +70,52 @@ export async function GET() {
     db.error = code ? `${code}: ${hint}` : hint;
   }
 
+  // Referral readiness — tells us at a glance why the dashboard card may be
+  // hidden: flag off, User columns missing, or referral tables not created.
+  const referrals: {
+    flagEnabled: boolean;
+    userColumns: boolean;
+    commissionTable: boolean;
+    withdrawalTable: boolean;
+    ready: boolean;
+    error?: string;
+  } = {
+    flagEnabled: REFERRALS_ENABLED,
+    userColumns: false,
+    commissionTable: false,
+    withdrawalTable: false,
+    ready: false,
+  };
+  if (db.connected) {
+    try {
+      // Selecting the new column throws (42703) if the migration didn't apply.
+      await prisma.user.findFirst({ select: { referralCode: true } });
+      referrals.userColumns = true;
+    } catch (e: any) {
+      referrals.error = e?.code ? `user cols ${e.code}` : "user cols missing";
+    }
+    try {
+      await prisma.referralCommission.count();
+      referrals.commissionTable = true;
+    } catch {
+      /* table missing */
+    }
+    try {
+      await prisma.commissionWithdrawal.count();
+      referrals.withdrawalTable = true;
+    } catch {
+      /* table missing */
+    }
+    referrals.ready =
+      referrals.flagEnabled &&
+      referrals.userColumns &&
+      referrals.commissionTable &&
+      referrals.withdrawalTable;
+  }
+
   const ok = db.connected && db.userTable;
   return NextResponse.json(
-    { ok, db, env, deposits, timestamp: new Date().toISOString() },
+    { ok, db, env, deposits, referrals, timestamp: new Date().toISOString() },
     { status: ok ? 200 : 503 }
   );
 }
