@@ -10,12 +10,21 @@ import {
   FileText,
   Wallet,
   CheckSquare,
+  Crown,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/brand/logo";
 
-type NavItem = { href: string; label: string; icon: typeof LayoutDashboard };
+type NavItem = {
+  href: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  /** Small pulsing badge (e.g. "NEW"). */
+  badge?: string;
+  /** Render a divider line beneath this item. */
+  divider?: boolean;
+};
 
 function navForRole(role: string, clientId: string | null): NavItem[] {
   if (role === "admin") {
@@ -31,6 +40,7 @@ function navForRole(role: string, clientId: string | null): NavItem[] {
   // Client
   return [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { href: "/qx-tiers", label: "QX Tiers", icon: Crown, badge: "NEW", divider: true },
     { href: "/wallet", label: "Deposit / Withdraw", icon: Wallet },
     { href: "/charts", label: "Charts", icon: CandlestickChart },
     ...(clientId
@@ -85,20 +95,37 @@ export function Sidebar({
               (item.href !== "/dashboard" && pathname.startsWith(item.href + "/"));
             const Icon = item.icon;
             return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={onClose}
-                className={cn(
-                  "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                  active
-                    ? "bg-gold-400/15 text-gold-300"
-                    : "text-muted-foreground hover:bg-accent hover:text-foreground"
-                )}
-              >
-                <Icon className="h-4 w-4" />
-                {item.label}
-              </Link>
+              <div key={item.href}>
+                <Link
+                  href={item.href}
+                  onClick={onClose}
+                  className={cn(
+                    "group flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-all",
+                    active
+                      ? "bg-gold-400/15 text-gold-300"
+                      : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                    // Gold glow on hover.
+                    "hover:shadow-[0_0_16px_-4px_rgba(224,181,74,0.5)] hover:ring-1 hover:ring-gold-400/40"
+                  )}
+                >
+                  <Icon
+                    className={cn(
+                      "h-4 w-4 transition-colors",
+                      item.badge && "text-gold-400 group-hover:text-gold-300"
+                    )}
+                  />
+                  <span className="flex-1">{item.label}</span>
+                  {item.badge && (
+                    <span className="relative inline-flex">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-gold-400/60" />
+                      <span className="relative inline-flex rounded-full bg-gold-400 px-1.5 py-0.5 text-[9px] font-bold uppercase leading-none tracking-wide text-black">
+                        {item.badge}
+                      </span>
+                    </span>
+                  )}
+                </Link>
+                {item.divider && <div className="my-2 border-t border-border" />}
+              </div>
             );
           })}
         </nav>

@@ -5,17 +5,22 @@ import { Sidebar } from "./sidebar";
 import { Topbar } from "./topbar";
 import { VerifyBanner } from "./verify-banner";
 
+/** Compact tier descriptor shown in the header (clients only). */
+export type HeaderTier = { name: string; monogram: string; accent: string };
+
 export function AppShell({
   role,
   name,
   clientId,
   emailVerified,
+  tier,
   children,
 }: {
   role: string;
   name: string;
   clientId: string | null;
   emailVerified: boolean;
+  tier?: HeaderTier | null;
   children: React.ReactNode;
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -34,6 +39,7 @@ export function AppShell({
           role={role}
           name={name}
           emailVerified={emailVerified}
+          tier={tier ?? null}
         />
         {!emailVerified && <VerifyBanner />}
         <main className="terminal-bg flex-1 p-4 lg:p-6">{children}</main>

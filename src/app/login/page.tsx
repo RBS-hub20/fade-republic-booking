@@ -30,7 +30,8 @@ export default function LoginPage() {
     });
     setLoading(false);
     if (res.ok) {
-      router.push("/dashboard");
+      const data = await res.json().catch(() => ({}));
+      router.push(typeof data.redirectTo === "string" ? data.redirectTo : "/dashboard");
       router.refresh();
     } else {
       const data = await res.json().catch(() => ({}));

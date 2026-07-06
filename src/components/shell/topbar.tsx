@@ -1,21 +1,26 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Menu, LogOut, Clock, BadgeCheck } from "lucide-react";
+import { Menu, LogOut, Clock, BadgeCheck, ChevronRight } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
+import type { HeaderTier } from "./app-shell";
 
 export function Topbar({
   onMenu,
   role,
   name,
   emailVerified,
+  tier,
 }: {
   onMenu: () => void;
   role: string;
   name: string;
   emailVerified: boolean;
+  tier?: HeaderTier | null;
 }) {
   const router = useRouter();
   const [clock, setClock] = useState("");
@@ -56,6 +61,31 @@ export function Topbar({
       </div>
 
       <div className="ml-auto flex items-center gap-3">
+        {/* Current tier (clients only) — shows the active package or an Upgrade nudge. */}
+        {role === "client" &&
+          (tier ? (
+            <Link
+              href="/qx-tiers"
+              title={`Current tier: ${tier.name}`}
+              className="hidden items-center gap-1.5 rounded-full border border-gold-400/40 bg-gold-400/10 px-2.5 py-1 text-xs font-medium transition-colors hover:bg-gold-400/20 sm:inline-flex"
+            >
+              <span className={cn("flex h-4 w-4 items-center justify-center rounded-full bg-black/40 text-[10px] font-bold", tier.accent)}>
+                {tier.monogram}
+              </span>
+              <span className="text-muted-foreground">Tier:</span>
+              <span className="font-semibold text-gold-200">{tier.name}</span>
+            </Link>
+          ) : (
+            <Link
+              href="/qx-tiers"
+              title="Choose a QX tier"
+              className="hidden items-center gap-1 rounded-full border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:border-gold-400/40 hover:text-gold-200 sm:inline-flex"
+            >
+              <span>Current Tier: None</span>
+              <span className="font-semibold text-gold-300">· Upgrade</span>
+              <ChevronRight className="h-3 w-3" />
+            </Link>
+          ))}
         <div className="hidden text-right sm:block">
           <p className="text-sm font-medium leading-tight">{name}</p>
           <p className="text-xs text-muted-foreground capitalize">{role}</p>

@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { AppShell } from "@/components/shell/app-shell";
+import { getClientPerformance } from "@/lib/data";
+import { tierForBalance } from "@/lib/tiers";
+import { AppShell, type HeaderTier } from "@/components/shell/app-shell";
 
 export const dynamic = "force-dynamic";
 
@@ -19,12 +21,21 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     emailVerified = user?.emailVerified ?? true;
   }
 
+  // Header tier chip (clients only) — derived from the account balance.
+  let tier: HeaderTier | null = null;
+  if (session.role === "client" && session.clientId) {
+    const perf = await getClientPerformance(session.clientId);
+    const t = tierForBalance(perf?.kpis.currentBalance ?? 0);
+    tier = t ? { name: t.name, monogram: t.monogram, accent: t.accent } : null;
+  }
+
   return (
     <AppShell
       role={session.role}
       name={session.name}
       clientId={session.clientId ?? null}
       emailVerified={emailVerified}
+      tier={tier}
     >
       {children}
     </AppShell>

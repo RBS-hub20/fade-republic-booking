@@ -4,6 +4,7 @@ import { SESSION_COOKIE, type Session, type Role } from "@/lib/auth-config";
 import { encodeSession } from "@/lib/session";
 import { verifyPassword, hashPassword } from "@/lib/password";
 import { enforce } from "@/lib/rate-limit";
+import { getClientPerformance } from "@/lib/data";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -91,7 +92,15 @@ export async function POST(req: Request) {
     emailVerified: user.emailVerified,
   };
 
-  const res = NextResponse.json({ ok: true, role: session.role });
+  // Landing target: a client who hasn't funded yet (balance $0 → no tier) lands
+  // on QX Tiers to pick a package; everyone else goes to the dashboard.
+  let redirectTo = "/dashboard";
+  if (user.role === "client" && user.clientId) {
+    const perf = await getClientPerformance(user.clientId).catch(() => null);
+    if ((perf?.kpis.currentBalance ?? 0) <= 0) redirectTo = "/qx-tiers";
+  }
+
+  const res = NextResponse.json({ ok: true, role: session.role, redirectTo });
   res.cookies.set(SESSION_COOKIE, encodeSession(session), {
     httpOnly: true,
     sameSite: "lax",

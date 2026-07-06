@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { QRCodeSVG } from "qrcode.react";
 import {
   Loader2,
@@ -51,9 +51,16 @@ export function DepositFlow({
   onChanged: () => void;
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // A tier "Select Package" button links here as /deposit?amount=NN — pre-fill it.
+  const presetAmount = (() => {
+    const raw = Number(searchParams.get("amount"));
+    return Number.isFinite(raw) && raw > 0 ? String(raw) : "";
+  })();
 
   const [method, setMethod] = useState<DepositWallet["method"]>(wallets[0]?.method ?? "USDT_BEP20");
-  const [amount, setAmount] = useState("");
+  const [amount, setAmount] = useState(presetAmount);
   const [formError, setFormError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
 
