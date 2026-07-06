@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/deposits/verify",
-      "schedule": "*/2 * * * *"
+      "schedule": "0 0 * * *"
     }
   ]
 }
