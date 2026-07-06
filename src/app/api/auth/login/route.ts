@@ -12,6 +12,19 @@ export const dynamic = "force-dynamic";
 const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || "admin@quantumxglobal.com").toLowerCase().trim();
 const ADMIN_NAME = process.env.ADMIN_NAME || "Portfolio Admin";
 
+// Only ever read the stable auth columns. This keeps login working even if a
+// newer migration (e.g. referral fields) hasn't been applied to the DB yet —
+// Prisma would otherwise SELECT every column and throw on a missing one.
+const AUTH_SELECT = {
+  id: true,
+  email: true,
+  name: true,
+  passwordHash: true,
+  role: true,
+  emailVerified: true,
+  clientId: true,
+} as const;
+
 // Server-side only (visible in Vercel function logs) — never logs secrets.
 function log(...args: unknown[]) {
   console.log("[auth:login]", ...args);
@@ -34,7 +47,10 @@ export async function POST(req: Request) {
     log("WARNING: SESSION_SECRET is not set — using an insecure dev fallback secret.");
   }
 
-  let user = await prisma.user.findUnique({ where: { email: cleanEmail } });
+  let user = await prisma.user.findUnique({
+    where: { email: cleanEmail },
+    select: AUTH_SELECT,
+  });
   let passOk = !!user && verifyPassword(String(password), user.passwordHash);
   const envPassSet = Boolean(process.env.ADMIN_PASSWORD);
   console.log("[auth:login]", { email: cleanEmail, userFound: !!user, passOk, envPassSet });
@@ -65,6 +81,7 @@ export async function POST(req: Request) {
         role: "admin",
         emailVerified: true,
       },
+      select: AUTH_SELECT,
     });
     passOk = true;
   }

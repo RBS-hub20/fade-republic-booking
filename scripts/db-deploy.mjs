@@ -64,6 +64,57 @@ if (!process.env.DATABASE_URL && !existsSync(envPath)) {
     "postgresql://placeholder:placeholder@localhost:5432/placeholder?schema=public";
 }
 
+/**
+ * Idempotent, additive guard that guarantees the referral schema exists even if
+ * `prisma db push` is flaky over a pooled connection. Because `prisma generate`
+ * always runs first, the client SELECTs the new columns on every user query — so
+ * if they're missing, even LOGIN breaks. This makes the columns/tables a
+ * hard guarantee on every deploy. All statements use IF NOT EXISTS, so this is
+ * a no-op once the schema is in place.
+ */
+async function ensureReferralSchema(url) {
+  const { PrismaClient } = await import("@prisma/client");
+  const prisma = url
+    ? new PrismaClient({ datasources: { db: { url } } })
+    : new PrismaClient();
+  const stmts = [
+    `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "referralCode" TEXT`,
+    `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "referredById" TEXT`,
+    `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "commissionBalance" DOUBLE PRECISION NOT NULL DEFAULT 0`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS "User_referralCode_key" ON "User"("referralCode")`,
+    `CREATE TABLE IF NOT EXISTS "ReferralCommission" (
+       "id" TEXT NOT NULL PRIMARY KEY,
+       "referrerId" TEXT NOT NULL,
+       "referredUserId" TEXT NOT NULL,
+       "referredName" TEXT NOT NULL,
+       "packageLabel" TEXT NOT NULL,
+       "packageAmount" DOUBLE PRECISION NOT NULL,
+       "commission" DOUBLE PRECISION NOT NULL,
+       "status" TEXT NOT NULL DEFAULT 'PENDING',
+       "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+       "paidAt" TIMESTAMP(3)
+     )`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS "ReferralCommission_referredUserId_key" ON "ReferralCommission"("referredUserId")`,
+    `CREATE INDEX IF NOT EXISTS "ReferralCommission_referrerId_idx" ON "ReferralCommission"("referrerId")`,
+    `CREATE TABLE IF NOT EXISTS "CommissionWithdrawal" (
+       "id" TEXT NOT NULL PRIMARY KEY,
+       "userId" TEXT NOT NULL,
+       "amount" DOUBLE PRECISION NOT NULL,
+       "address" TEXT NOT NULL,
+       "network" TEXT NOT NULL,
+       "status" TEXT NOT NULL DEFAULT 'PENDING',
+       "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+     )`,
+    `CREATE INDEX IF NOT EXISTS "CommissionWithdrawal_userId_idx" ON "CommissionWithdrawal"("userId")`,
+  ];
+  try {
+    for (const sql of stmts) await prisma.$executeRawUnsafe(sql);
+    console.log("✓ Referral schema verified (columns + tables present).");
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
 async function main() {
   // 2. Generate the Prisma client. Always run it: hosts (Vercel) cache
   //    dependencies, so a stale or missing client is a common failure mode.
@@ -71,15 +122,25 @@ async function main() {
 
   // 3. Push schema. Prefer a direct (non-pooled) URL for DDL when available.
   const pushUrl = process.env.DIRECT_URL || process.env.DATABASE_URL;
+  let pushOk = true;
   try {
     run(
       "prisma db push --skip-generate --accept-data-loss",
       pushUrl ? { DATABASE_URL: pushUrl } : {}
     );
   } catch (err) {
+    pushOk = false;
     console.warn("⚠️  prisma db push failed:", err.message);
-    console.warn("   The app will show a 'database not ready' screen until this succeeds.");
-    return; // don't attempt to seed if the schema isn't in place
+    console.warn("   Falling back to the additive referral-schema guard.");
+  }
+
+  // 3b. Belt-and-suspenders: guarantee the referral schema regardless of whether
+  //     `db push` succeeded. This is what keeps login alive after this update.
+  try {
+    await ensureReferralSchema(pushUrl);
+  } catch (err) {
+    console.warn("⚠️  Referral-schema guard failed (continuing):", err.message);
+    if (!pushOk) return; // neither path applied schema — skip seed/ensure-auth
   }
 
   // 4. Seed only when empty.

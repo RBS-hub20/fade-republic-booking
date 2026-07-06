@@ -43,14 +43,21 @@ export default async function DashboardPage() {
         ]
       : [];
 
-    // Referral program data for this user.
-    const me = session.userId
-      ? await prisma.user.findUnique({
-          where: { id: session.userId },
-          select: { id: true, name: true, referralCode: true, commissionBalance: true, clientId: true },
-        })
-      : null;
-    const referral = me ? await getReferralSummary(me) : null;
+    // Referral program data for this user. Wrapped defensively: if the referral
+    // columns/tables aren't migrated yet, the dashboard still renders fully
+    // (just without the referral panel) instead of 500-ing.
+    let referral = null;
+    try {
+      const me = session.userId
+        ? await prisma.user.findUnique({
+            where: { id: session.userId },
+            select: { id: true, name: true, referralCode: true, commissionBalance: true, clientId: true },
+          })
+        : null;
+      referral = me ? await getReferralSummary(me) : null;
+    } catch (err) {
+      console.error("[dashboard] referral summary unavailable:", err);
+    }
 
     return (
       <>
@@ -62,7 +69,7 @@ export default async function DashboardPage() {
         <DashboardView
           datasets={datasets}
           showSelector={false}
-          referralEarnings={referral?.totalEarned ?? 0}
+          referralEarnings={referral ? referral.totalEarned : null}
         />
         {referral && (
           <div className="mt-6">
