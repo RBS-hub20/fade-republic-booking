@@ -37,8 +37,56 @@ model User {
   clientId      String?  @unique
   client        Client?  @relation(fields: [clientId], references: [id], onDelete: SetNull)
   tokens        AuthToken[]
+
+  // --- Referral program -----------------------------------------------------
+  // Unique shareable code (first 4 letters of name + 3 digits, e.g. RENZ123).
+  referralCode      String?  @unique
+  // The user who referred THIS user (set at signup via ?ref=).
+  referredById      String?
+  referredBy        User?    @relation("UserReferrals", fields: [referredById], references: [id], onDelete: SetNull)
+  referrals         User[]   @relation("UserReferrals")
+  // Withdrawable, settled referral commission (separate from trading balance).
+  commissionBalance Float    @default(0)
+  commissionsEarned    ReferralCommission[]   @relation("CommissionEarner")
+  commissionWithdrawals CommissionWithdrawal[]
+
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+}
+
+// One commission per referred user (first QX Tier activation only).
+model ReferralCommission {
+  id             String    @id @default(cuid())
+  referrerId     String
+  referrer       User      @relation("CommissionEarner", fields: [referrerId], references: [id], onDelete: Cascade)
+  // The referred user whose first package generated this commission (unique).
+  referredUserId String    @unique
+  referredName   String
+  // e.g. "Silver $100" — the tier the referral activated.
+  packageLabel   String
+  packageAmount  Float
+  commission     Float
+  // enum: PENDING | PAID  (auto-settles to PAID after 24h)
+  status         String    @default("PENDING")
+  createdAt      DateTime  @default(now())
+  paidAt         DateTime?
+
+  @@index([referrerId])
+}
+
+// A payout request that draws down commissionBalance only.
+model CommissionWithdrawal {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amount    Float
+  address   String
+  network   String
+  // enum: PENDING | PAID | REJECTED
+  status    String   @default("PENDING")
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }
 
 model AuthToken {

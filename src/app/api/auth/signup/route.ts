@@ -4,6 +4,7 @@ import { isValidEmail } from "@/lib/auth-config";
 import { hashPassword } from "@/lib/password";
 import { createAndSendVerification } from "@/lib/mailers";
 import { enforce } from "@/lib/rate-limit";
+import { findReferrerByCode, ensureReferralCode } from "@/lib/referrals";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -40,7 +41,7 @@ export async function POST(req: Request) {
   const limited = enforce(req, "signup", 5, 60 * 60_000);
   if (limited) return limited;
 
-  const { name, email, password, phone } = await req.json().catch(() => ({}));
+  const { name, email, password, phone, ref } = await req.json().catch(() => ({}));
 
   if (!name || !email || !password) {
     return NextResponse.json(
@@ -73,6 +74,9 @@ export async function POST(req: Request) {
       accountNumber = `QX-${Date.now().toString().slice(-6)}`;
     }
 
+    // Resolve the referrer (if a valid ?ref= code was supplied).
+    const referredById = ref ? await findReferrerByCode(String(ref)) : null;
+
     user = await prisma.$transaction(async (tx) => {
       const client = await tx.client.create({
         data: {
@@ -92,9 +96,13 @@ export async function POST(req: Request) {
           passwordHash: hashPassword(String(password)),
           role: "client",
           clientId: client.id,
+          referredById,
         },
       });
     });
+
+    // Give the new user their own referral code up front (best-effort).
+    ensureReferralCode({ id: user.id, name: user.name, referralCode: null }).catch(() => {});
   } catch (e: any) {
     if (e?.code === "P2002") {
       return NextResponse.json({ error: "That email or account already exists" }, { status: 409 });

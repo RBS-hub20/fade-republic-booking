@@ -1,17 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { Loader2, ArrowLeft } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Loader2, ArrowLeft, Gift } from "lucide-react";
 import { LogoMark } from "@/components/brand/logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 
-export default function SignupPage() {
+function SignupForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const ref = searchParams.get("ref")?.trim() || "";
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -30,7 +32,7 @@ export default function SignupPage() {
     const res = await fetch("/api/auth/signup", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email, password }),
+      body: JSON.stringify({ name, email, password, ref }),
     });
     const data = await res.json().catch(() => ({}));
     if (res.ok) {
@@ -62,6 +64,15 @@ export default function SignupPage() {
 
         <Card>
           <CardContent className="pt-6">
+            {ref && (
+              <div className="mb-4 flex items-center gap-2 rounded-lg border border-gold-400/30 bg-gold-400/10 px-3 py-2.5 text-sm text-gold-200">
+                <Gift className="h-4 w-4 shrink-0" />
+                <span>
+                  You were invited with code <span className="font-semibold">{ref}</span> — welcome
+                  to QuantumX!
+                </span>
+              </div>
+            )}
             <form onSubmit={onSubmit} className="space-y-4">
               <div className="space-y-1.5">
                 <Label htmlFor="name">Full name</Label>
@@ -127,10 +138,15 @@ export default function SignupPage() {
             </p>
           </CardContent>
         </Card>
-        <p className="mt-4 text-center text-xs text-muted-foreground">
-          Demo environment · Not financial advice
-        </p>
       </div>
     </main>
+  );
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense fallback={null}>
+      <SignupForm />
+    </Suspense>
   );
 }

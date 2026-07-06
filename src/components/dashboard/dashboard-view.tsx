@@ -8,12 +8,13 @@ import {
   TrendingUp,
   Target,
   Percent,
+  DollarSign,
 } from "lucide-react";
 import { KpiCard } from "./kpi-card";
 import { EquityChart } from "./equity-chart";
 import { DailyPerformanceTable } from "./daily-performance-table";
 import { Select } from "@/components/ui/select";
-import { formatUsd, formatPct } from "@/lib/utils";
+import { cn, formatUsd, formatPct } from "@/lib/utils";
 import type { EquityPoint, PerformanceKpis } from "@/lib/performance";
 
 export interface DashboardDataset {
@@ -26,9 +27,12 @@ export interface DashboardDataset {
 export function DashboardView({
   datasets,
   showSelector = true,
+  referralEarnings = null,
 }: {
   datasets: DashboardDataset[];
   showSelector?: boolean;
+  /** Lifetime referral commissions — adds a gold KPI card when provided. */
+  referralEarnings?: number | null;
 }) {
   const [selected, setSelected] = useState(datasets[0]?.id ?? "");
   const active = useMemo(
@@ -65,7 +69,12 @@ export function DashboardView({
       )}
 
       {/* KPI cards */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-6">
+      <div
+        className={cn(
+          "grid grid-cols-2 gap-4 lg:grid-cols-3",
+          referralEarnings != null ? "xl:grid-cols-4 2xl:grid-cols-7" : "xl:grid-cols-6"
+        )}
+      >
         <KpiCard
           label="Current Balance"
           value={formatUsd(k.currentBalance)}
@@ -101,6 +110,15 @@ export function DashboardView({
           icon={Percent}
           tone="gold"
         />
+        {referralEarnings != null && (
+          <KpiCard
+            label="Referral Earnings"
+            value={formatUsd(referralEarnings)}
+            sub="Lifetime commissions"
+            icon={DollarSign}
+            tone="gold"
+          />
+        )}
       </div>
 
       <EquityChart curve={active.curve} />

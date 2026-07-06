@@ -8,6 +8,9 @@ import { getPortfolioPerformance, getClientPerformance } from "@/lib/data";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { formatUsd } from "@/lib/utils";
+import { getReferralSummary } from "@/lib/referrals";
+import { ReferralLinkCard } from "@/components/referrals/referral-link-card";
+import { ReferralHistory } from "@/components/referrals/referral-history";
 
 // Always fetch fresh — balances change as the ledger is edited.
 export const dynamic = "force-dynamic";
@@ -39,13 +42,36 @@ export default async function DashboardPage() {
           },
         ]
       : [];
+
+    // Referral program data for this user.
+    const me = session.userId
+      ? await prisma.user.findUnique({
+          where: { id: session.userId },
+          select: { id: true, name: true, referralCode: true, commissionBalance: true, clientId: true },
+        })
+      : null;
+    const referral = me ? await getReferralSummary(me) : null;
+
     return (
       <>
         <PageHeader
           title={`Welcome, ${session.name.split(" ")[0]}`}
           subtitle="Your account performance · compounded daily, Mon–Fri (Asia/Manila)"
         />
-        <DashboardView datasets={datasets} showSelector={false} />
+        {referral && <div className="mb-6"><ReferralLinkCard summary={referral} /></div>}
+        <DashboardView
+          datasets={datasets}
+          showSelector={false}
+          referralEarnings={referral?.totalEarned ?? 0}
+        />
+        {referral && (
+          <div className="mt-6">
+            <ReferralHistory
+              history={referral.history}
+              commissionBalance={referral.commissionBalance}
+            />
+          </div>
+        )}
       </>
     );
   }
