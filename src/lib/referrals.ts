@@ -166,24 +166,38 @@ export interface ReferralSummary {
 const APP_ORIGIN =
   process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || "https://quantumxglobal.online";
 
-/** Assemble everything the dashboard referral panel needs for one user. */
+/**
+ * Assemble everything the dashboard referral panel needs for one user.
+ *
+ * Fully defensive: returns `null` (so the caller hides the panel) if referrals
+ * are disabled or a referral code can't be provisioned, and each table-dependent
+ * query degrades to an empty/zero value on its own — so a lagging migration
+ * (columns present, tables missing) can NEVER throw or crash the dashboard.
+ */
 export async function getReferralSummary(user: {
   id: string;
   name: string;
   referralCode: string | null;
   commissionBalance: number;
   clientId: string | null;
-}): Promise<ReferralSummary> {
-  const code = await ensureReferralCode(user);
-  await settleDueCommissions(user.id);
+}): Promise<ReferralSummary | null> {
+  if (!REFERRALS_ENABLED) return null;
+
+  // A working code is the one hard requirement — without it the link is useless.
+  const code = await ensureReferralCode(user).catch(() => null);
+  if (!code) return null;
+
+  // Each of these degrades independently; a missing table just yields zeros.
+  await settleDueCommissions(user.id).catch(() => {});
 
   const [totalReferrals, commissions, fresh] = await Promise.all([
-    prisma.user.count({ where: { referredById: user.id } }),
-    prisma.referralCommission.findMany({
-      where: { referrerId: user.id },
-      orderBy: { createdAt: "desc" },
-    }),
-    prisma.user.findUnique({ where: { id: user.id }, select: { commissionBalance: true } }),
+    prisma.user.count({ where: { referredById: user.id } }).catch(() => 0),
+    prisma.referralCommission
+      .findMany({ where: { referrerId: user.id }, orderBy: { createdAt: "desc" } })
+      .catch(() => [] as Awaited<ReturnType<typeof prisma.referralCommission.findMany>>),
+    prisma.user
+      .findUnique({ where: { id: user.id }, select: { commissionBalance: true } })
+      .catch(() => null),
   ]);
 
   let balance = 0;
@@ -204,7 +218,7 @@ export async function getReferralSummary(user: {
     pendingReferrals: pending.length,
     commissionRate: commissionRateForBalance(balance),
     totalEarned: paid.reduce((s, c) => s + c.commission, 0),
-    commissionBalance: fresh?.commissionBalance ?? user.commissionBalance,
+    commissionBalance: fresh?.commissionBalance ?? user.commissionBalance ?? 0,
     tierName: tier?.name ?? "None",
     history: commissions.map((c) => ({
       id: c.id,
