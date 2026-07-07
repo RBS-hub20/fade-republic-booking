@@ -15,6 +15,22 @@ import { prisma } from "./prisma";
 import { getClientPerformance } from "./data";
 import { TIERS, tierForBalance, type TierId } from "./tiers";
 import { REFERRALS_ENABLED } from "./referrals-config";
+import { applyReferralSchema } from "./referral-schema";
+
+// One-time-per-process runtime self-heal. If the build-time migration never
+// reached the DB (e.g. Vercel build can't connect over DIRECT_URL), the first
+// referral read applies the idempotent DDL over the app's live connection.
+let schemaHealed = false;
+async function ensureReferralSchemaOnce(): Promise<void> {
+  if (schemaHealed) return;
+  try {
+    await applyReferralSchema(prisma);
+    schemaHealed = true;
+  } catch (e) {
+    // Leave un-healed so a later request can retry (e.g. transient DB issue).
+    console.error("[referrals] runtime schema self-heal failed:", e);
+  }
+}
 
 /** Commission percentage a referrer earns, keyed by their current tier. */
 export const COMMISSION_RATES: Record<"none" | TierId, number> = {
@@ -184,8 +200,13 @@ export async function getReferralSummary(user: {
   if (!REFERRALS_ENABLED) return null;
 
   // A working code is the one hard requirement — without it the link is useless.
-  const code = await ensureReferralCode(user).catch(() => null);
-  if (!code) return null;
+  let code = await ensureReferralCode(user).catch(() => null);
+  if (!code) {
+    // Likely the referral columns aren't migrated — self-heal once, then retry.
+    await ensureReferralSchemaOnce();
+    code = await ensureReferralCode(user).catch(() => null);
+    if (!code) return null;
+  }
 
   // Each of these degrades independently; a missing table just yields zeros.
   await settleDueCommissions(user.id).catch(() => {});
