@@ -11,6 +11,7 @@ import {
   Wallet,
   CheckSquare,
   Crown,
+  Activity,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -30,6 +31,7 @@ function navForRole(role: string, clientId: string | null): NavItem[] {
   if (role === "admin") {
     return [
       { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+      { href: "/admin/performance", label: "Fund P&L", icon: Activity },
       { href: "/clients", label: "Clients", icon: Users },
       { href: "/approvals", label: "Approvals", icon: CheckSquare },
       { href: "/ledger", label: "Ledger", icon: ArrowLeftRight },
