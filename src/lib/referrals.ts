@@ -27,7 +27,6 @@ export const COMMISSION_RATES: Record<"none" | TierId, number> = {
 };
 
 export const MIN_COMMISSION_WITHDRAWAL = 10;
-const SETTLE_AFTER_MS = 24 * 60 * 60 * 1000; // 24h pending → paid
 
 /** Commission % for a given balance-derived tier (None/Bronze both 5%). */
 export function commissionRateForBalance(balance: number): number {
@@ -104,17 +103,26 @@ export async function creditFirstPackageCommission(opts: {
     const rate = commissionRateForBalance(referrerBalance);
     const commission = Math.round(tier.price * (rate / 100) * 100) / 100;
 
-    await prisma.referralCommission.create({
-      data: {
-        referrerId: referrer.id,
-        referredUserId: referred.id,
-        referredName: referred.name,
-        packageLabel: `${tier.name} $${tier.price}`,
-        packageAmount: tier.price,
-        commission,
-        status: "PENDING",
-      },
-    });
+    // INSTANT credit: record the commission as PAID and add it to the referrer's
+    // withdrawable balance immediately — no pending state, no 24h delay.
+    await prisma.$transaction([
+      prisma.referralCommission.create({
+        data: {
+          referrerId: referrer.id,
+          referredUserId: referred.id,
+          referredName: referred.name,
+          packageLabel: `${tier.name} $${tier.price}`,
+          packageAmount: tier.price,
+          commission,
+          status: "PAID",
+          paidAt: new Date(),
+        },
+      }),
+      prisma.user.update({
+        where: { id: referrer.id },
+        data: { commissionBalance: { increment: commission } },
+      }),
+    ]);
   } catch (e) {
     // Commission crediting must never break a deposit approval.
     console.error("creditFirstPackageCommission failed (ignored):", e);
@@ -122,19 +130,19 @@ export async function creditFirstPackageCommission(opts: {
 }
 
 /**
- * Settle any of a referrer's PENDING commissions older than 24h → PAID, crediting
- * their withdrawable commissionBalance. Lazy: called on dashboard load.
+ * Settle any lingering PENDING commissions (created before instant crediting was
+ * introduced) → PAID, crediting the withdrawable balance immediately. New
+ * commissions are already PAID on creation, so this only migrates legacy rows.
  */
-export async function settleDueCommissions(referrerId: string): Promise<void> {
-  const cutoff = new Date(Date.now() - SETTLE_AFTER_MS);
-  const due = await prisma.referralCommission.findMany({
-    where: { referrerId, status: "PENDING", createdAt: { lte: cutoff } },
+export async function settlePendingCommissions(referrerId: string): Promise<void> {
+  const pending = await prisma.referralCommission.findMany({
+    where: { referrerId, status: "PENDING" },
   });
-  if (due.length === 0) return;
-  const total = due.reduce((s, c) => s + c.commission, 0);
+  if (pending.length === 0) return;
+  const total = pending.reduce((s, c) => s + c.commission, 0);
   await prisma.$transaction([
     prisma.referralCommission.updateMany({
-      where: { id: { in: due.map((d) => d.id) } },
+      where: { id: { in: pending.map((d) => d.id) } },
       data: { status: "PAID", paidAt: new Date() },
     }),
     prisma.user.update({
@@ -194,7 +202,7 @@ export async function getReferralSummary(user: {
   }
 
   // Each of these degrades independently; a missing table just yields zeros.
-  await settleDueCommissions(user.id).catch(() => {});
+  await settlePendingCommissions(user.id).catch(() => {});
 
   const [totalReferrals, commissions, fresh] = await Promise.all([
     prisma.user.count({ where: { referredById: user.id } }).catch(() => 0),

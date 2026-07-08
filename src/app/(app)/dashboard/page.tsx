@@ -67,7 +67,7 @@ export default async function DashboardPage() {
       <>
         <PageHeader
           title={`Welcome, ${session.name.split(" ")[0]}`}
-          subtitle="Your account performance · compounded daily, Mon–Fri (Asia/Manila)"
+          subtitle="Your account performance · compounded daily, Mon–Sun (Asia/Manila)"
         />
         {referral && <div className="mb-6"><ReferralLinkCard summary={referral} /></div>}
         <DashboardView

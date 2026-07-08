@@ -169,17 +169,11 @@ export function ReferralHistory({
   );
 }
 
-function StatusPill({ status }: { status: "PENDING" | "PAID" }) {
-  if (status === "PAID") {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-[#00C851]/15 px-2.5 py-1 text-xs font-semibold text-[#00C851]">
-        <Check className="h-3 w-3" /> Paid
-      </span>
-    );
-  }
+function StatusPill(_props: { status: "PENDING" | "PAID" }) {
+  // Commissions are credited instantly, so every row is Paid.
   return (
-    <span className="inline-flex items-center rounded-full bg-[#FFB800]/15 px-2.5 py-1 text-xs font-semibold text-[#FFB800]">
-      Pending
+    <span className="inline-flex items-center gap-1 rounded-full bg-[#00C851]/15 px-2.5 py-1 text-xs font-semibold text-[#00C851]">
+      <Check className="h-3 w-3" /> Paid
     </span>
   );
 }

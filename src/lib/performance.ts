@@ -163,18 +163,21 @@ export function computeEquityCurve(params: {
     const withdrawals = withdrawalsByDay.get(cursor) ?? 0;
     balance += deposits - withdrawals;
 
-    const trading = isTradingDay(cursor);
+    // A day "trades" whenever it carries a recorded percentage. Performance is
+    // now credited every calendar day (Mon–Sun), so the presence of a stored
+    // percent — not the weekday — decides whether returns compound.
+    const traded = pctByDay.has(cursor);
     let pnl = 0;
     let dailyPercent = 0;
-    if (trading && pctByDay.has(cursor)) {
+    if (traded) {
       dailyPercent = pctByDay.get(cursor)!;
       pnl = (balance * dailyPercent) / 100;
       balance += pnl;
     }
 
-    // Only record days that carry information (cashflow or trading) plus the
+    // Only record days that carry information (cashflow or a return) plus the
     // very first day, to keep the curve compact yet continuous.
-    if (trading || deposits || withdrawals || cursor === startKey) {
+    if (traded || deposits || withdrawals || cursor === startKey) {
       points.push({
         date: cursor,
         dailyPercent,
@@ -182,7 +185,7 @@ export function computeEquityCurve(params: {
         deposits,
         withdrawals,
         balance,
-        isTradingDay: trading,
+        isTradingDay: traded,
       });
     }
 

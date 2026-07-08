@@ -64,8 +64,6 @@ export function ReferralLinkCard({ summary }: { summary: ReferralSummary }) {
           <span>Total Referrals: <span className="font-semibold text-foreground">{summary.totalReferrals}</span></span>
           <span className="text-[#444]">|</span>
           <span>Active: <span className="font-semibold text-profit">{summary.activeReferrals}</span></span>
-          <span className="text-[#444]">|</span>
-          <span>Pending: <span className="font-semibold text-gold-300">{summary.pendingReferrals}</span></span>
         </div>
 
         {/* Tiered commission display */}
