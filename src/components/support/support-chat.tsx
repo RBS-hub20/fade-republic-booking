@@ -12,8 +12,16 @@ interface Msg {
 const GREETING: Msg = {
   role: "assistant",
   content:
-    "Hi! I'm your QuantumX assistant. Ask me about your balance, performance, deposits, tiers, or referral earnings.",
+    "Hi! I'm your QuantumX assistant. Ask me about your balance, performance, deposits, tiers, or referral earnings — or how QuantumX works.",
 };
+
+const QUICK_PROMPTS = [
+  "What is QuantumX?",
+  "How do referrals work?",
+  "What are my advantages?",
+  "How much did I earn today?",
+  "When can I withdraw?",
+];
 
 export function SupportChat() {
   const [open, setOpen] = useState(false);
@@ -32,24 +40,46 @@ export function SupportChat() {
     if (open) inputRef.current?.focus();
   }, [open]);
 
-  async function send() {
-    const text = input.trim();
-    if (!text || loading) return;
+  async function send(text?: string) {
+    const content = (text ?? input).trim();
+    if (!content || loading) return;
     setError(null);
     setInput("");
-    setMessages((m) => [...m, { role: "user", content: text }]);
+    setMessages((m) => [...m, { role: "user", content }]);
     setLoading(true);
+
     try {
       const res = await fetch("/api/support/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text }),
+        body: JSON.stringify({ message: content }),
       });
-      const data = await res.json().catch(() => ({}));
-      if (res.ok && data.reply) {
-        setMessages((m) => [...m, { role: "assistant", content: data.reply }]);
-      } else {
+
+      if (!res.ok || !res.body) {
+        const data = await res.json().catch(() => ({}));
         setError(data.error ?? "Something went wrong. Please try again.");
+        setLoading(false);
+        return;
+      }
+
+      // Stream the assistant reply token-by-token.
+      setMessages((m) => [...m, { role: "assistant", content: "" }]);
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let acc = "";
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        acc += decoder.decode(value, { stream: true });
+        setMessages((m) => {
+          const copy = m.slice();
+          copy[copy.length - 1] = { role: "assistant", content: acc };
+          return copy;
+        });
+      }
+      if (!acc.trim()) {
+        setMessages((m) => m.slice(0, -1)); // drop the empty bubble
+        setError("The assistant is having trouble right now. Please try again.");
       }
     } catch {
       setError("Network error. Please try again.");
@@ -102,10 +132,7 @@ export function SupportChat() {
           {/* Messages */}
           <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto p-4">
             {messages.map((m, i) => (
-              <div
-                key={i}
-                className={cn("flex", m.role === "user" ? "justify-end" : "justify-start")}
-              >
+              <div key={i} className={cn("flex", m.role === "user" ? "justify-end" : "justify-start")}>
                 <div
                   className={cn(
                     "max-w-[85%] whitespace-pre-wrap rounded-2xl px-3.5 py-2 text-sm",
@@ -114,24 +141,36 @@ export function SupportChat() {
                       : "rounded-bl-sm bg-secondary text-foreground"
                   )}
                 >
-                  {m.content}
+                  {m.content || (loading && i === messages.length - 1 ? "…" : "")}
                 </div>
               </div>
             ))}
-            {loading && (
+            {loading && messages[messages.length - 1]?.role === "user" && (
               <div className="flex justify-start">
                 <div className="flex items-center gap-2 rounded-2xl rounded-bl-sm bg-secondary px-3.5 py-2 text-sm text-muted-foreground">
                   <Loader2 className="h-4 w-4 animate-spin" /> Thinking…
                 </div>
               </div>
             )}
-            {error && (
-              <p className="rounded-md bg-loss/10 px-3 py-2 text-xs text-loss">{error}</p>
-            )}
+            {error && <p className="rounded-md bg-loss/10 px-3 py-2 text-xs text-loss">{error}</p>}
+          </div>
+
+          {/* Quick prompts */}
+          <div className="flex flex-wrap gap-1.5 border-t border-border px-3 pt-2.5">
+            {QUICK_PROMPTS.map((q) => (
+              <button
+                key={q}
+                onClick={() => send(q)}
+                disabled={loading}
+                className="rounded-full border border-border bg-background px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:border-gold-400/50 hover:text-gold-200 disabled:opacity-50"
+              >
+                {q}
+              </button>
+            ))}
           </div>
 
           {/* Input */}
-          <div className="border-t border-border p-3">
+          <div className="p-3 pt-2">
             <div className="flex items-end gap-2">
               <input
                 ref={inputRef}
@@ -143,7 +182,7 @@ export function SupportChat() {
                 className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-gold-400/60"
               />
               <button
-                onClick={send}
+                onClick={() => send()}
                 disabled={loading || !input.trim()}
                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gold-400 text-black transition-colors hover:bg-gold-300 disabled:opacity-50"
                 aria-label="Send"

@@ -25,6 +25,7 @@ export async function GET() {
     ETHERSCAN_API_KEY: Boolean(process.env.ETHERSCAN_API_KEY),
     BSCSCAN_API_KEY: Boolean(process.env.BSCSCAN_API_KEY),
     TRONGRID_API_KEY: Boolean(process.env.TRONGRID_API_KEY),
+    GROQ_API_KEY: Boolean(process.env.GROQ_API_KEY),
   };
 
   // Which deposit auto-verification paths are enabled.
