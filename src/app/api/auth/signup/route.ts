@@ -6,6 +6,7 @@ import { createAndSendVerification } from "@/lib/mailers";
 import { enforce } from "@/lib/rate-limit";
 import { findReferrerByCode, ensureReferralCode } from "@/lib/referrals";
 import { REFERRALS_ENABLED } from "@/lib/referrals-config";
+import { ensureReferralSchemaOnce } from "@/lib/referral-schema";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -62,6 +63,12 @@ export async function POST(req: Request) {
   // ---- Create the account (this is the only part that can fail signup) ----
   let user;
   try {
+    // The User model carries referral columns. If a lagging migration means they
+    // don't exist yet on this DB, Prisma's INSERT/SELECT RETURNING would throw
+    // (P2022) and break signup. Self-heal the schema once over the live
+    // connection before touching the User table.
+    await ensureReferralSchemaOnce(prisma);
+
     const existing = await prisma.user.findUnique({ where: { email: cleanEmail } });
     if (existing) {
       return NextResponse.json(

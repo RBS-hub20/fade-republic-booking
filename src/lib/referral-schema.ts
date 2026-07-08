@@ -59,3 +59,21 @@ export async function applyReferralSchema(
   }
   return { applied, failures };
 }
+
+// One-time-per-process runtime self-heal guard. If the build-time migration
+// never reached the DB (e.g. Vercel build can't connect over DIRECT_URL), the
+// first request that touches the User/referral schema applies the idempotent
+// DDL over the app's live connection. Shared so signup, the dashboard, and any
+// other entry point converge on the same guarantee.
+let schemaHealed = false;
+export async function ensureReferralSchemaOnce(db: RawRunner): Promise<void> {
+  if (schemaHealed) return;
+  const { failures } = await applyReferralSchema(db);
+  // Only latch as healed when everything applied cleanly; otherwise a later
+  // request retries (covers transient DB errors / partial application).
+  if (failures.length === 0) {
+    schemaHealed = true;
+  } else {
+    console.error("[referral-schema] self-heal incomplete:", failures);
+  }
+}
