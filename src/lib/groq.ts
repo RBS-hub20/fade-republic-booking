@@ -7,7 +7,7 @@
 
 export const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 // Overridable so a decommissioned model can be swapped via env without a deploy.
-export const GROQ_MODEL = process.env.GROQ_MODEL || "llama-3.1-70b-versatile";
+export const GROQ_MODEL = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
 
 export interface ChatTurn {
   role: "system" | "user" | "assistant";
