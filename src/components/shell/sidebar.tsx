@@ -12,6 +12,7 @@ import {
   CheckSquare,
   Crown,
   Activity,
+  MessageSquare,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -37,6 +38,7 @@ function navForRole(role: string, clientId: string | null): NavItem[] {
       { href: "/ledger", label: "Ledger", icon: ArrowLeftRight },
       { href: "/charts", label: "Charts", icon: CandlestickChart },
       { href: "/reports", label: "Reports", icon: FileText },
+      { href: "/admin/chats", label: "Support Logs", icon: MessageSquare },
     ];
   }
   // Client

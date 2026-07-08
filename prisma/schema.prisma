@@ -74,6 +74,20 @@ model ReferralCommission {
   @@index([referrerId])
 }
 
+// AI support chat transcript (both sides), retained for admin review.
+model ChatMessage {
+  id        String   @id @default(cuid())
+  userId    String
+  clientId  String?
+  // enum: 'user' | 'assistant'
+  role      String
+  content   String
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
 // A payout request that draws down commissionBalance only.
 model CommissionWithdrawal {
   id        String   @id @default(cuid())

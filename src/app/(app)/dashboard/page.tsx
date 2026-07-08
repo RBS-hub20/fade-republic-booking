@@ -12,6 +12,7 @@ import { getReferralSummary } from "@/lib/referrals";
 import { REFERRALS_ENABLED } from "@/lib/referrals-config";
 import { ReferralLinkCard } from "@/components/referrals/referral-link-card";
 import { ReferralHistory } from "@/components/referrals/referral-history";
+import { SupportChat } from "@/components/support/support-chat";
 
 // Always fetch fresh — balances change as the ledger is edited.
 export const dynamic = "force-dynamic";
@@ -83,6 +84,8 @@ export default async function DashboardPage() {
             />
           </div>
         )}
+        {/* AI support chat — client dashboard only */}
+        <SupportChat />
       </>
     );
   }
