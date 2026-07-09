@@ -58,7 +58,7 @@ export function QxTiersView({ currentTier }: { currentTier: TierId | null }) {
                 </p>
               </div>
               <Button
-                onClick={() => router.push(`/deposit?amount=${tier.price}`)}
+                onClick={() => router.push(`/deposit?package=${tier.id}&amount=${tier.price}&locked=1`)}
                 className="shrink-0 bg-gradient-to-r from-gold-300 to-gold-500 font-semibold text-black hover:from-gold-200 hover:to-gold-400"
               >
                 Select Package

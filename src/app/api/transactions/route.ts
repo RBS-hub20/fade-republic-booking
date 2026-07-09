@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { getDepositLimits } from "@/lib/payments";
+import { tierById } from "@/lib/tiers";
 import {
   TRANSACTION_TYPES,
   TRANSACTION_METHODS,
@@ -64,6 +65,20 @@ export async function POST(req: Request) {
     if (value < min || value > max) {
       return NextResponse.json(
         { error: `Deposit must be between $${min.toLocaleString()} and $${max.toLocaleString()}.` },
+        { status: 400 }
+      );
+    }
+  }
+
+  // Locked QX Tiers package: the amount MUST match the package price exactly.
+  if (type === "DEPOSIT" && body.package) {
+    const tier = tierById(String(body.package));
+    if (!tier) {
+      return NextResponse.json({ error: "Unknown package." }, { status: 400 });
+    }
+    if (Math.round(value * 100) !== Math.round(tier.price * 100)) {
+      return NextResponse.json(
+        { error: `${tier.name} package amount is locked at $${tier.price}.` },
         { status: 400 }
       );
     }

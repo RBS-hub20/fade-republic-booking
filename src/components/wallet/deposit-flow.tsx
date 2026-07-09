@@ -14,11 +14,13 @@ import {
   CheckCircle2,
   XCircle,
   ArrowLeft,
+  Lock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn, formatUsd } from "@/lib/utils";
+import { tierById } from "@/lib/tiers";
 
 interface DepositWallet {
   method: "USDT_BEP20" | "USDT_TRC20";
@@ -53,8 +55,13 @@ export function DepositFlow({
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // A tier "Select Package" button links here as /deposit?amount=NN — pre-fill it.
+  // A QX Tiers "Select Package" button links here as
+  // /deposit?package=gold&amount=300&locked=1 — pre-fill and (when locked) lock
+  // the amount to the package price so it can't be edited.
+  const lockedTier =
+    searchParams.get("locked") === "1" ? tierById(searchParams.get("package") ?? "") : undefined;
   const presetAmount = (() => {
+    if (lockedTier) return String(lockedTier.price);
     const raw = Number(searchParams.get("amount"));
     return Number.isFinite(raw) && raw > 0 ? String(raw) : "";
   })();
@@ -117,7 +124,8 @@ export function DepositFlow({
   async function createDeposit(e: React.FormEvent) {
     e.preventDefault();
     setFormError(null);
-    const value = Number(amount);
+    // Locked packages always use the package price — never the input value.
+    const value = lockedTier ? lockedTier.price : Number(amount);
     if (!Number.isFinite(value) || value < limits.min || value > limits.max) {
       setFormError(`Deposit must be between ${formatUsd(limits.min)} and ${formatUsd(limits.max)}.`);
       return;
@@ -130,7 +138,8 @@ export function DepositFlow({
         type: "DEPOSIT",
         amount: value,
         method,
-        notes: `Network: ${selectedWallet.networkShort}`,
+        package: lockedTier?.id,
+        notes: `Network: ${selectedWallet.networkShort}${lockedTier ? ` · ${lockedTier.name} Package` : ""}`,
       }),
     });
     const created = await res.json().catch(() => ({}));
@@ -209,23 +218,45 @@ export function DepositFlow({
           </div>
         </div>
 
-        <div className="space-y-1.5">
-          <Label htmlFor="dep-amount">Amount (USD)</Label>
-          <Input
-            id="dep-amount"
-            type="number"
-            step="0.01"
-            min={limits.min}
-            max={limits.max}
-            placeholder="0.00"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            required
-          />
-          <p className="text-xs text-muted-foreground">
-            Min {formatUsd(limits.min)} · Max {formatUsd(limits.max)} per deposit
-          </p>
-        </div>
+        {lockedTier ? (
+          <div className="space-y-1.5">
+            <p className="text-sm font-medium text-gold-200">
+              {lockedTier.name} Package — {formatUsd(lockedTier.price)}
+            </p>
+            <Label htmlFor="dep-amount">Amount (USD)</Label>
+            <div className="relative">
+              <Input
+                id="dep-amount"
+                type="text"
+                value={formatUsd(lockedTier.price)}
+                readOnly
+                aria-readonly
+                tabIndex={-1}
+                className="cursor-not-allowed bg-secondary/60 pr-9 text-muted-foreground"
+              />
+              <Lock className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            </div>
+            <p className="text-xs text-muted-foreground">Amount locked for selected package</p>
+          </div>
+        ) : (
+          <div className="space-y-1.5">
+            <Label htmlFor="dep-amount">Amount (USD)</Label>
+            <Input
+              id="dep-amount"
+              type="number"
+              step="0.01"
+              min={limits.min}
+              max={limits.max}
+              placeholder="0.00"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              required
+            />
+            <p className="text-xs text-muted-foreground">
+              Min {formatUsd(limits.min)} · Max {formatUsd(limits.max)} per deposit
+            </p>
+          </div>
+        )}
 
         {formError && <p className="rounded-md bg-loss/10 px-3 py-2 text-sm text-loss">{formError}</p>}
 

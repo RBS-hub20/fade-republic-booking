@@ -27,7 +27,7 @@ export interface Tier {
 export const TIERS: Tier[] = [
   { id: "bronze",   name: "Bronze",   price: 50,  image: "/tiers/bronze.png",   monogram: "B", accent: "text-amber-500",  ring: "ring-amber-600/50" },
   { id: "silver",   name: "Silver",   price: 100, image: "/tiers/silver.png",   monogram: "S", accent: "text-zinc-300",   ring: "ring-zinc-400/50" },
-  { id: "gold",     name: "Gold",     price: 250, image: "/tiers/gold.png",     monogram: "G", accent: "text-gold-400",   ring: "ring-gold-400/50" },
+  { id: "gold",     name: "Gold",     price: 300, image: "/tiers/gold.png",     monogram: "G", accent: "text-gold-400",   ring: "ring-gold-400/50" },
   { id: "platinum", name: "Platinum", price: 500, image: "/tiers/platinum.png", monogram: "P", accent: "text-slate-200",  ring: "ring-slate-300/50" },
 ];
 
@@ -38,4 +38,9 @@ export function tierForBalance(balance: number): Tier | null {
     if (balance >= t.price) current = t;
   }
   return current;
+}
+
+/** Look up a tier by its id (e.g. from a `?package=` param). */
+export function tierById(id: string): Tier | undefined {
+  return TIERS.find((t) => t.id === id.toLowerCase());
 }
