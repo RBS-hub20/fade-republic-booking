@@ -167,7 +167,7 @@ QUANTUMX COMPANY INFO:
 - Investment Tiers:
   • Bronze $50 — 6% target monthly
   • Silver $100 — 7% target monthly
-  • Gold $300 — 8% target monthly
+  • Gold $250 — 8% target monthly
   • Platinum $500 — 8% target monthly
 - Referral Program: Earn instant commission on the first package purchase of your referrals. Paid immediately to the Commission Balance — no approval or waiting period.
 - Daily Performance: 0.3% to 0.5% daily compounded returns, credited Mon–Sun at 23:59 PHT.
