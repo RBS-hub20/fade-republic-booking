@@ -155,25 +155,31 @@ export function computeEquityCurve(params: {
   const endKey = candidateEnds.sort().at(-1)!;
 
   const points: EquityPoint[] = [];
-  let balance = initialDeposit;
+  // Capital base = principal only (opening deposit ± cashflows). Daily P/L is a
+  // FLAT calculation on this base — earnings do NOT compound back into it
+  // (auto-compounding removed). Equity = capital base + accrued earnings.
+  let capitalBase = initialDeposit;
+  let cumulativePnl = 0;
   let cursor = startKey;
 
   while (cursor <= endKey) {
     const deposits = depositsByDay.get(cursor) ?? 0;
     const withdrawals = withdrawalsByDay.get(cursor) ?? 0;
-    balance += deposits - withdrawals;
+    capitalBase += deposits - withdrawals;
 
     // A day "trades" whenever it carries a recorded percentage. Performance is
-    // now credited every calendar day (Mon–Sun), so the presence of a stored
-    // percent — not the weekday — decides whether returns compound.
+    // credited every calendar day (Mon–Sun), so the presence of a stored
+    // percent — not the weekday — decides whether returns are calculated.
     const traded = pctByDay.has(cursor);
     let pnl = 0;
     let dailyPercent = 0;
     if (traded) {
       dailyPercent = pctByDay.get(cursor)!;
-      pnl = (balance * dailyPercent) / 100;
-      balance += pnl;
+      // Flat: daily P/L is calculated on Active Capital, not the running balance.
+      pnl = (capitalBase * dailyPercent) / 100;
+      cumulativePnl += pnl;
     }
+    const balance = capitalBase + cumulativePnl;
 
     // Only record days that carry information (cashflow or a return) plus the
     // very first day, to keep the curve compact yet continuous.
