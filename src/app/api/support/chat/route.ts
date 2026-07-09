@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { getClientPerformance } from "@/lib/data";
 import { getReferralSummary } from "@/lib/referrals";
+import { getCapitalSummary } from "@/lib/capital";
 import { tierForBalance } from "@/lib/tiers";
 import { groqStream, groqConfigured, parseSseDelta, type ChatTurn } from "@/lib/groq";
 import { ensureChatSchemaOnce } from "@/lib/chat-schema";
@@ -171,8 +172,11 @@ QUANTUMX COMPANY INFO:
 - Referral Program: Earn instant commission on the first package purchase of your referrals. Paid immediately to the Commission Balance — no approval or waiting period.
 - Daily Performance: 0.3% to 0.5% daily compounded returns, credited Mon–Sun at 23:59 PHT.
 - Trading: The server generates 1–2% daily from Forex/Crypto markets; clients receive 0.3–0.5% daily.
-- Withdrawals: Minimum $10. Commission Balance transfers to the Main Balance, then you can withdraw.
-- Dashboard: Shows the Equity Curve, Daily Performance Log, Referral Stats, and Commission Balance.
+- Withdrawals: Minimum $10, 3% fee. Support BEP20 and TRC20 USDT. Processing time is 24 hours (manually reviewed). After approval you receive a transaction hash to verify on BscScan (BEP20) or TronScan (TRC20).
+- Capital Lock: Active Capital is a 6-month time deposit — locked for 6 months from the deposit date and CANNOT be withdrawn early under any circumstances. On maturity you can withdraw it to your wallet or renew for another 6 months.
+- Available Withdrawal: your daily trading profits + referral earnings. Withdrawable anytime (subject to the $10 minimum and 3% fee) — this is separate from locked capital.
+- No auto-compound: to increase Active Capital you withdraw earnings and re-deposit.
+- Dashboard: Shows Active Capital, Available Withdrawal, Equity Curve, Daily Performance Log, Referral Stats, and Withdrawals.
 - Support: 24/7 via this AI chat.
 
 RULES:
@@ -255,10 +259,26 @@ async function buildUserContext(userId: string, clientId: string, name: string):
   if (ref) {
     lines.push(
       `Referrals: link ${ref.link}; total ${ref.totalReferrals} (active ${ref.activeReferrals}); ` +
-        `commission rate ${ref.commissionRate}%; lifetime earned ${formatUsd(ref.totalEarned)}; ` +
-        `withdrawable commission ${formatUsd(ref.commissionBalance)}.`
+        `commission rate ${ref.commissionRate}%; lifetime earned ${formatUsd(ref.totalEarned)}.`
     );
   }
 
-  return lines.join("\n");
+  // Capital lock + available withdrawal (own only).
+  const cap = await getCapitalSummary({ clientId, userId }).catch(() => null);
+  if (cap) {
+    const unlock = cap.earliestMaturity ? formatDate(cap.earliestMaturity) : null;
+    lines.push(
+      "CAPITAL & WITHDRAWALS:",
+      `- Active Capital (locked): ${formatUsd(cap.activeCapital)}` +
+        (cap.daysToMaturity != null && unlock
+          ? ` — unlocks ${unlock} (in ${cap.daysToMaturity} days)`
+          : ""),
+      cap.hasMatured ? `- Matured capital awaiting action: ${formatUsd(cap.maturedCapital)}` : "",
+      `- Available Withdrawal (withdrawable now): ${formatUsd(cap.availableWithdrawal)}`,
+      `- Total Earned (daily P/L + referrals): ${formatUsd(cap.totalEarned)}`,
+      `- Total Withdrawn: ${formatUsd(cap.totalWithdrawn)}`
+    );
+  }
+
+  return lines.filter(Boolean).join("\n");
 }

@@ -32,9 +32,12 @@ const MIN_WITHDRAWAL = 10;
 export function ReferralHistory({
   history,
   commissionBalance,
+  showWithdraw = true,
 }: {
   history: HistoryRow[];
   commissionBalance: number;
+  /** When false, hides the withdraw footer (withdrawals go via Available Withdrawal). */
+  showWithdraw?: boolean;
 }) {
   const router = useRouter();
   const [page, setPage] = useState(0);
@@ -134,6 +137,7 @@ export function ReferralHistory({
       )}
 
       {/* Withdraw commission */}
+      {showWithdraw && (
       <div className="flex flex-col gap-3 border-t border-[#2A2A2A] p-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-xs uppercase tracking-wide text-muted-foreground">
@@ -154,6 +158,7 @@ export function ReferralHistory({
           </Button>
         )}
       </div>
+      )}
 
       <WithdrawDialog
         open={dialogOpen}

@@ -88,6 +88,48 @@ model ChatMessage {
   @@index([createdAt])
 }
 
+// Earnings withdrawal request (Available Withdrawal pool = daily P/L + referral
+// commissions). Manually processed by an admin: funds are sent from an external
+// wallet and the on-chain TX hash is recorded here. 3% fee → platform revenue.
+model Withdrawal {
+  id            String    @id @default(cuid())
+  userId        String
+  clientId      String?
+  amount        Float
+  fee           Float
+  receiveAmount Float
+  // enum: USDT_BEP20 | USDT_TRC20
+  network       String
+  address       String
+  // enum: pending | processing | completed | rejected
+  status        String    @default("pending")
+  txHash        String?
+  rejectReason  String?
+  adminId       String?
+  processedAt   DateTime?
+  createdAt     DateTime  @default(now())
+
+  @@index([userId, status])
+  @@index([status])
+}
+
+// A user's action on a MATURED capital deposit (6-month time lock).
+//   renewed   → extends the deposit's maturity by another 6 months
+//   withdrawn → releases the principal into the Available Withdrawal pool
+model CapitalAction {
+  id            String   @id @default(cuid())
+  transactionId String
+  userId        String
+  clientId      String?
+  // enum: renewed | withdrawn
+  action        String
+  amount        Float    @default(0)
+  createdAt     DateTime @default(now())
+
+  @@index([transactionId])
+  @@index([userId])
+}
+
 // A payout request that draws down commissionBalance only.
 model CommissionWithdrawal {
   id        String   @id @default(cuid())

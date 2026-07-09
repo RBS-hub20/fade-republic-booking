@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
 import { cronAuthorized } from "@/lib/cron-auth";
 import { runDailyPerformance } from "@/lib/daily-performance";
 import { verifyPendingDeposits } from "@/lib/verify-deposits";
+import { runMaturityNotifications } from "@/lib/capital";
+import { ensureFinanceSchemaOnce } from "@/lib/finance-schema";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,6 +32,12 @@ async function handle(req: Request) {
     result.deposits = await verifyPendingDeposits();
   } catch (err: any) {
     result.deposits = { ok: false, error: err?.message?.split("\n")[0] ?? "failed" };
+  }
+  try {
+    await ensureFinanceSchemaOnce(prisma);
+    result.maturity = await runMaturityNotifications();
+  } catch (err: any) {
+    result.maturity = { ok: false, error: err?.message?.split("\n")[0] ?? "failed" };
   }
   return NextResponse.json(result);
 }

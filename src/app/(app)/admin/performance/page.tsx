@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
-import { TrendingUp, Wallet, Percent, PiggyBank } from "lucide-react";
+import { TrendingUp, Wallet, Percent, PiggyBank, Landmark } from "lucide-react";
 import { PageHeader } from "@/components/shell/page-header";
 import { KpiCard } from "@/components/dashboard/kpi-card";
+import { prisma } from "@/lib/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -25,12 +26,34 @@ export default async function AdminPerformancePage() {
   const perf = await getServerPerformanceSummary();
   const t = perf.today;
 
+  // Platform revenue from withdrawal fees (best-effort — table may be new).
+  let feeRevenue = 0;
+  try {
+    const agg = await prisma.withdrawal.aggregate({
+      where: { status: "completed" },
+      _sum: { fee: true },
+    });
+    feeRevenue = agg._sum.fee ?? 0;
+  } catch {
+    feeRevenue = 0;
+  }
+
   return (
     <>
       <PageHeader
         title="Fund Performance"
         subtitle="Internal server gross (1–2%/day) vs. client payout (0.3–0.5%/day) — actual vs. paid out (Asia/Manila)."
       />
+
+      <div className="mb-8">
+        <KpiCard
+          label="Platform Revenue (Withdrawal Fees)"
+          value={formatUsd(feeRevenue)}
+          sub="3% fee on completed withdrawals"
+          icon={Landmark}
+          tone="gold"
+        />
+      </div>
 
       {/* Today */}
       <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">

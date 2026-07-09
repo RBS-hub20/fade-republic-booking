@@ -10,8 +10,11 @@ import { prisma } from "@/lib/prisma";
 import { formatUsd } from "@/lib/utils";
 import { getReferralSummary } from "@/lib/referrals";
 import { REFERRALS_ENABLED } from "@/lib/referrals-config";
+import { getCapitalSummary } from "@/lib/capital";
+import { ensureFinanceSchemaOnce } from "@/lib/finance-schema";
 import { ReferralLinkCard } from "@/components/referrals/referral-link-card";
 import { ReferralHistory } from "@/components/referrals/referral-history";
+import { FinancePanel } from "@/components/finance/finance-panel";
 import { SupportChat } from "@/components/support/support-chat";
 
 // Always fetch fresh — balances change as the ledger is edited.
@@ -64,6 +67,26 @@ export default async function DashboardPage() {
       }
     }
 
+    // Capital-lock + Available Withdrawal money model (defensive: never 500 the
+    // dashboard if the finance tables aren't migrated yet).
+    let capital = null;
+    let withdrawals: any[] = [];
+    if (session.userId) {
+      try {
+        await ensureFinanceSchemaOnce(prisma);
+        capital = await getCapitalSummary({ clientId: session.clientId, userId: session.userId });
+        withdrawals = await prisma.withdrawal.findMany({
+          where: { userId: session.userId },
+          orderBy: { createdAt: "desc" },
+          take: 25,
+        });
+      } catch (err) {
+        console.error("[dashboard] capital summary unavailable:", err);
+      }
+    }
+
+    const k = perf?.kpis;
+
     return (
       <>
         <PageHeader
@@ -71,16 +94,51 @@ export default async function DashboardPage() {
           subtitle="Your account performance · compounded daily, Mon–Sun (Asia/Manila)"
         />
         {referral && <div className="mb-6"><ReferralLinkCard summary={referral} /></div>}
-        <DashboardView
-          datasets={datasets}
-          showSelector={false}
-          referralEarnings={referral ? referral.totalEarned : null}
-        />
+
+        {capital && k ? (
+          <div className="mb-6">
+            <FinancePanel
+              capital={{
+                activeCapital: capital.activeCapital,
+                maturedCapital: capital.maturedCapital,
+                hasMatured: capital.hasMatured,
+                daysToMaturity: capital.daysToMaturity,
+                earliestMaturity: capital.earliestMaturity,
+                maturedDepositIds: capital.deposits.filter((d) => d.matured).map((d) => d.id),
+                availableWithdrawal: capital.availableWithdrawal,
+                totalEarned: capital.totalEarned,
+                totalWithdrawn: capital.totalWithdrawn,
+                commissionsEarned: capital.commissionsEarned,
+              }}
+              kpis={{
+                winRate: k.winRate,
+                avgDailyPercent: k.avgDailyPercent,
+                totalNetPnl: k.totalNetPnl,
+              }}
+              withdrawals={withdrawals.map((w) => ({
+                id: w.id,
+                amount: w.amount,
+                fee: w.fee,
+                receiveAmount: w.receiveAmount,
+                network: w.network,
+                status: w.status,
+                txHash: w.txHash,
+                rejectReason: w.rejectReason,
+                createdAt: w.createdAt.toISOString(),
+              }))}
+            />
+          </div>
+        ) : null}
+
+        {/* Equity curve + daily performance log (KPI grid handled by FinancePanel) */}
+        <DashboardView datasets={datasets} showSelector={false} showKpis={!capital} />
+
         {referral && (
           <div className="mt-6">
             <ReferralHistory
               history={referral.history}
               commissionBalance={referral.commissionBalance}
+              showWithdraw={false}
             />
           </div>
         )}

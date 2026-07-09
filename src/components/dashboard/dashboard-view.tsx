@@ -28,11 +28,14 @@ export function DashboardView({
   datasets,
   showSelector = true,
   referralEarnings = null,
+  showKpis = true,
 }: {
   datasets: DashboardDataset[];
   showSelector?: boolean;
   /** Lifetime referral commissions — adds a gold KPI card when provided. */
   referralEarnings?: number | null;
+  /** Hide the built-in KPI grid (clients render their own finance cards). */
+  showKpis?: boolean;
 }) {
   const [selected, setSelected] = useState(datasets[0]?.id ?? "");
   const active = useMemo(
@@ -69,6 +72,7 @@ export function DashboardView({
       )}
 
       {/* KPI cards */}
+      {showKpis && (
       <div
         className={cn(
           "grid grid-cols-2 gap-4 lg:grid-cols-3",
@@ -120,6 +124,7 @@ export function DashboardView({
           />
         )}
       </div>
+      )}
 
       <EquityChart curve={active.curve} />
 

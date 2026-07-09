@@ -57,6 +57,91 @@ export async function notifyWithdrawalApproved(opts: {
   });
 }
 
+/** Notify a client their earnings withdrawal is complete, with the TX hash. */
+export async function notifyWithdrawalCompleted(opts: {
+  email: string;
+  name: string;
+  amount: number;
+  fee: number;
+  receiveAmount: number;
+  network: string; // USDT_BEP20 | USDT_TRC20
+  address: string;
+  txHash: string;
+}): Promise<void> {
+  const net = opts.network === "USDT_TRC20" ? "TRC20" : "BEP20";
+  const explorer =
+    net === "TRC20"
+      ? `https://tronscan.org/#/transaction/${opts.txHash}`
+      : `https://bscscan.com/tx/${opts.txHash}`;
+  const when = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Manila",
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date());
+  const body = `Your withdrawal request has been processed!<br/><br/>
+    <strong>Amount Requested:</strong> ${formatUsd(opts.amount)}<br/>
+    <strong>Fee (3%):</strong> ${formatUsd(opts.fee)}<br/>
+    <strong>Amount Sent:</strong> ${formatUsd(opts.receiveAmount)}<br/>
+    <strong>Network:</strong> ${net} USDT<br/>
+    <strong>Wallet:</strong> ${opts.address}<br/><br/>
+    <strong>Transaction Hash:</strong><br/>${opts.txHash}<br/><br/>
+    Verify on the blockchain using the button below.<br/><br/>
+    <strong>Status:</strong> Completed<br/>
+    <strong>Processed:</strong> ${when} PHT`;
+  await sendEmail({
+    to: opts.email,
+    subject: "Your Withdrawal is Complete ✅",
+    html: emailTemplate({
+      heading: `Withdrawal complete, ${opts.name.split(" ")[0]}!`,
+      body,
+      buttonLabel: "Verify on Blockchain",
+      buttonUrl: explorer,
+    }),
+  });
+}
+
+/** Notify a client their withdrawal was rejected and the amount refunded. */
+export async function notifyWithdrawalRejected(opts: {
+  email: string;
+  name: string;
+  amount: number;
+  reason: string;
+}): Promise<void> {
+  await sendEmail({
+    to: opts.email,
+    subject: "Withdrawal Rejected",
+    html: emailTemplate({
+      heading: `Withdrawal update, ${opts.name.split(" ")[0]}`,
+      body:
+        `Your withdrawal request of <strong>${formatUsd(opts.amount)}</strong> was not approved.<br/><br/>` +
+        `<strong>Reason:</strong> ${opts.reason}<br/><br/>` +
+        `The amount has been refunded to your Available Withdrawal balance.`,
+      buttonLabel: "Open dashboard",
+      buttonUrl: `${appBaseUrl()}/dashboard`,
+    }),
+  });
+}
+
+/** Notify a client that a locked capital deposit has matured. */
+export async function notifyCapitalMatured(opts: {
+  email: string;
+  name: string;
+  amount: number;
+}): Promise<void> {
+  await sendEmail({
+    to: opts.email,
+    subject: `Your ${formatUsd(opts.amount)} capital has matured 🎉`,
+    html: emailTemplate({
+      heading: `Capital matured, ${opts.name.split(" ")[0]}!`,
+      body:
+        `Your locked capital of <strong>${formatUsd(opts.amount)}</strong> has completed its ` +
+        `6-month term. You can now withdraw it to your wallet or renew it for another 6 months from your dashboard.`,
+      buttonLabel: "Choose an action",
+      buttonUrl: `${appBaseUrl()}/dashboard`,
+    }),
+  });
+}
+
 export async function createAndSendVerification(user: {
   id: string;
   email: string;
