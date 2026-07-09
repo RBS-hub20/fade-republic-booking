@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { MessageCircle, X, Send, Loader2, Sparkles } from "lucide-react";
+import { MessageCircle, X, Send, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Msg {
@@ -11,17 +11,30 @@ interface Msg {
 
 const GREETING: Msg = {
   role: "assistant",
-  content:
-    "Hi! I'm your QuantumX assistant. Ask me about your balance, performance, deposits, tiers, or referral earnings — or how QuantumX works.",
+  content: "Hi! I'm XENA, your QuantumX support assistant. How can I help you today?",
 };
 
 const QUICK_PROMPTS = [
   "What is QuantumX?",
   "How do referrals work?",
-  "What are my advantages?",
-  "How much did I earn today?",
-  "When can I withdraw?",
+  "What's my balance?",
+  "When will I see profit?",
 ];
+
+/** Circular, cropped avatar (square source → circle via object-fit: cover). */
+function XenaAvatar({ size }: { size: number }) {
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src="/xena-avatar.png"
+      alt="XENA"
+      width={size}
+      height={size}
+      style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover" }}
+      className="shrink-0 border border-gold-400/40 bg-black"
+    />
+  );
+}
 
 export function SupportChat() {
   const [open, setOpen] = useState(false);
@@ -95,6 +108,8 @@ export function SupportChat() {
     }
   }
 
+  const awaitingReply = loading && messages[messages.length - 1]?.role === "user";
+
   return (
     <>
       {/* Floating button */}
@@ -119,36 +134,52 @@ export function SupportChat() {
           )}
         >
           {/* Header */}
-          <div className="flex items-center gap-2 border-b border-border bg-background/60 px-4 py-3">
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gold-400/15 text-gold-300">
-              <Sparkles className="h-4 w-4" />
-            </span>
+          <div className="flex items-center gap-3 border-b border-border bg-background/60 px-4 py-3">
+            <XenaAvatar size={40} />
             <div className="leading-tight">
-              <p className="text-sm font-semibold">QuantumX Support</p>
-              <p className="text-[11px] text-muted-foreground">AI assistant · your account</p>
+              <p className="text-base font-bold text-white">XENA</p>
+              <p className="flex items-center gap-1.5 text-xs font-medium" style={{ color: "#10B981" }}>
+                <span className="relative inline-flex h-2 w-2">
+                  <span
+                    className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-70"
+                    style={{ backgroundColor: "#10B981" }}
+                  />
+                  <span
+                    className="relative inline-flex h-2 w-2 rounded-full"
+                    style={{ backgroundColor: "#10B981" }}
+                  />
+                </span>
+                Online
+              </p>
+              <p className="text-[11px]" style={{ color: "#9CA3AF" }}>
+                QuantumX Support Agent
+              </p>
             </div>
           </div>
 
           {/* Messages */}
           <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto p-4">
-            {messages.map((m, i) => (
-              <div key={i} className={cn("flex", m.role === "user" ? "justify-end" : "justify-start")}>
-                <div
-                  className={cn(
-                    "max-w-[85%] whitespace-pre-wrap rounded-2xl px-3.5 py-2 text-sm",
-                    m.role === "user"
-                      ? "rounded-br-sm bg-gold-400 text-black"
-                      : "rounded-bl-sm bg-secondary text-foreground"
-                  )}
-                >
-                  {m.content || (loading && i === messages.length - 1 ? "…" : "")}
+            {messages.map((m, i) =>
+              m.role === "assistant" ? (
+                <div key={i} className="flex items-end gap-2">
+                  <XenaAvatar size={32} />
+                  <div className="max-w-[80%] whitespace-pre-wrap rounded-2xl rounded-bl-sm bg-secondary px-3.5 py-2 text-sm text-foreground">
+                    {m.content || (awaitingReply && i === messages.length - 1 ? "…" : "")}
+                  </div>
                 </div>
-              </div>
-            ))}
-            {loading && messages[messages.length - 1]?.role === "user" && (
-              <div className="flex justify-start">
+              ) : (
+                <div key={i} className="flex justify-end">
+                  <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-sm bg-gold-400 px-3.5 py-2 text-sm text-black">
+                    {m.content}
+                  </div>
+                </div>
+              )
+            )}
+            {awaitingReply && (
+              <div className="flex items-end gap-2">
+                <XenaAvatar size={32} />
                 <div className="flex items-center gap-2 rounded-2xl rounded-bl-sm bg-secondary px-3.5 py-2 text-sm text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin" /> Thinking…
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> XENA is typing…
                 </div>
               </div>
             )}
@@ -177,7 +208,7 @@ export function SupportChat() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={onKeyDown}
-                placeholder="Ask about your account…"
+                placeholder="Ask XENA about your account…"
                 maxLength={2000}
                 className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-gold-400/60"
               />
