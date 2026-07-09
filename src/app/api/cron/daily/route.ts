@@ -1,18 +1,11 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
+import { cronAuthorized } from "@/lib/cron-auth";
 import { runDailyPerformance } from "@/lib/daily-performance";
 import { verifyPendingDeposits } from "@/lib/verify-deposits";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
-
-/** Authorized by the Vercel Cron secret OR an admin session. */
-function authorized(req: Request): boolean {
-  const secret = process.env.CRON_SECRET;
-  if (secret && req.headers.get("authorization") === `Bearer ${secret}`) return true;
-  return getSession()?.role === "admin";
-}
 
 /**
  * Single daily cron — scheduled for 23:59 Asia/Manila (15:59 UTC).
@@ -22,7 +15,7 @@ function authorized(req: Request): boolean {
  * sweeps pending on-chain deposits. Both steps are independent and best-effort.
  */
 async function handle(req: Request) {
-  if (!authorized(req)) {
+  if (!cronAuthorized(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
