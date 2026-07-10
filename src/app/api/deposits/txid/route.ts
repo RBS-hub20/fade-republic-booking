@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { parseTxHash } from "@/lib/chain";
+import { isValidTxHashForNetwork } from "@/lib/payments";
 import { verifyPendingDeposits } from "@/lib/verify-deposits";
 
 export const runtime = "nodejs";
@@ -23,9 +24,6 @@ export async function POST(req: Request) {
   }
 
   const clean = String(txHash).trim().slice(0, 120);
-  if (!/^[A-Za-z0-9x]{10,120}$/.test(clean)) {
-    return NextResponse.json({ error: "That doesn't look like a valid transaction hash." }, { status: 400 });
-  }
 
   const tx = await prisma.transaction.findUnique({ where: { id } });
   if (!tx || tx.clientId !== session.clientId || tx.type !== "DEPOSIT") {
@@ -33,6 +31,15 @@ export async function POST(req: Request) {
   }
   if (tx.status !== "PENDING") {
     return NextResponse.json({ ok: true, alreadyProcessed: true });
+  }
+
+  // Network-specific TX hash format: BEP20 = 0x + 64 hex; TRC20 = 64 hex (no 0x).
+  if (!isValidTxHashForNetwork(tx.method, clean)) {
+    const label = tx.method === "USDT_TRC20" ? "TRC20 (64 hex characters, no 0x)" : "BEP20 (0x + 64 hex characters)";
+    return NextResponse.json(
+      { error: `That doesn't look like a valid ${label} transaction hash.` },
+      { status: 400 }
+    );
   }
 
   // Append the TxHash if not already present.

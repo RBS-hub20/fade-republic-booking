@@ -71,6 +71,21 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Amount after fee is too low." }, { status: 400 });
     }
 
+    // No cross-chain yet: the withdrawal network must match a network the client
+    // has actually deposited from (if they've made any crypto deposits).
+    const depositMethods = await prisma.transaction.findMany({
+      where: { clientId, type: "DEPOSIT", status: "APPROVED", method: { in: NETWORKS } },
+      select: { method: true },
+      distinct: ["method"],
+    });
+    if (depositMethods.length > 0 && !depositMethods.some((d) => d.method === network)) {
+      const nets = depositMethods.map((d) => (d.method === "USDT_TRC20" ? "TRC20" : "BEP20")).join(" / ");
+      return NextResponse.json(
+        { error: `Withdrawals must use the same network you deposited from (${nets}). Cross-chain isn't supported yet.` },
+        { status: 400 }
+      );
+    }
+
     // Authoritative available balance (server-side).
     const summary = await getCapitalSummary({ clientId, userId });
     if (amount > summary.availableWithdrawal) {

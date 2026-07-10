@@ -211,11 +211,15 @@ export function DepositFlow({
               >
                 <span className="text-sm font-semibold">USDT</span>
                 <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                  {w.networkShort}
+                  {w.networkShort === "BEP20" ? "BEP20 (BSC)" : "TRC20 (TRON)"}
                 </span>
               </button>
             ))}
           </div>
+          <p className="mt-1.5 flex items-center gap-1 text-[11px] text-loss">
+            <AlertTriangle className="h-3 w-3 shrink-0" />
+            Sending to the wrong network = permanent loss of funds.
+          </p>
         </div>
 
         {lockedTier ? (
@@ -341,11 +345,12 @@ export function DepositFlow({
                 </Button>
               </div>
             </div>
-            <div className="flex items-start gap-2 rounded-md bg-gold-400/10 px-3 py-2 text-xs text-gold-200">
+            <div className="flex items-start gap-2 rounded-md bg-loss/10 px-3 py-2 text-xs text-loss">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
               <span>
-                Only send <strong>USDT ({w.networkShort})</strong> to this address. Other assets or
-                networks will be lost forever.
+                Send <strong>only USDT on the {w.networkShort} network</strong> to this address.
+                Sending to the wrong network = <strong>permanent loss of funds</strong>. Double-check
+                the network before sending.
               </span>
             </div>
             <a

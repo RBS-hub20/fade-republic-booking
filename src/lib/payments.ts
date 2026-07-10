@@ -56,12 +56,20 @@ export function getDepositWallets(): DepositWallet[] {
 /** Bank transfer is "coming soon" until enabled. */
 export const BANK_ENABLED = process.env.BANK_DEPOSITS_ENABLED === "true";
 
-/** Per-request deposit limits (USD), env-overridable. */
+/** Per-request deposit limits (USD), env-overridable. Min $50 (Bronze tier). */
 export function getDepositLimits(): { min: number; max: number } {
-  const min = Number(process.env.DEPOSIT_MIN_USD || 10);
+  const min = Number(process.env.DEPOSIT_MIN_USD || 50);
   const max = Number(process.env.DEPOSIT_MAX_USD || 10000);
   return {
-    min: Number.isFinite(min) ? min : 10,
+    min: Number.isFinite(min) ? min : 50,
     max: Number.isFinite(max) ? max : 10000,
   };
+}
+
+/** Validate a transaction hash against the network format. */
+export function isValidTxHashForNetwork(method: string, hash: string): boolean {
+  const h = hash.trim();
+  if (method === "USDT_BEP20") return /^0x[0-9a-fA-F]{64}$/.test(h);
+  if (method === "USDT_TRC20") return /^[0-9a-fA-F]{64}$/.test(h);
+  return /^[A-Za-z0-9x]{10,120}$/.test(h); // other methods: lenient
 }

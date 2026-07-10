@@ -194,8 +194,14 @@ QUANTUMX COMPANY INFO — AI-powered automated Forex + Crypto trading platform.
 
 6) WITHDRAWALS
 - Minimum $10, from Available Withdrawal only (never Active Capital).
-- Network: BEP20 or TRC20 USDT. A 3% fee is deducted from the requested amount.
+- Network: BEP20 or TRC20 USDT — you must withdraw on the SAME network you deposited from (no cross-chain yet). A 3% fee is deducted from the requested amount.
 - Manual admin approval; once sent you get a TX hash by email to verify on BscScan (BEP20) or TronScan (TRC20). The platform never auto-sends funds.
+
+6b) DEPOSITS — QuantumX accepts USDT via two networks (minimum deposit $50 on both):
+- BEP20 (BSC Network) — lower fees, ~3–5 min confirmation.
+- TRC20 (TRON Network) — lowest fees, ~1–2 min confirmation, no memo needed.
+- USDT deposit address: TNAnmDBcmmgdiAAX6GgGqV63RCrm2aqrqD (TRC20). The deposit screen shows the correct address + QR for the network you pick.
+- WARNING: sending BEP20 to a TRC20 address (or vice-versa) causes PERMANENT LOSS. Always double-check the network before sending.
 
 7) MATURITY
 - Capital unlocks 6 months after its deposit approval date. After maturity the full capital becomes withdrawable (or you can renew for another 6 months).
