@@ -328,6 +328,9 @@ export interface ReferralSummary {
   activeDirects: number;
   directsRequired: number;
   level2Earned: number;
+  // Monthly direct-referral bonus.
+  monthlyBonusEarned: number;
+  lastMonthlyBonus: { monthYear: string; amount: number } | null;
   history: {
     id: string;
     date: string;
@@ -370,7 +373,8 @@ export async function getReferralSummary(user: {
   // Each of these degrades independently; a missing table just yields zeros.
   await settlePendingCommissions(user.id).catch(() => {});
 
-  const [totalReferrals, commissions, fresh, level2Agg, unlock, monthlyBonusAgg] = await Promise.all([
+  const [totalReferrals, commissions, fresh, level2Agg, unlock, monthlyBonusAgg, lastBonus] =
+    await Promise.all([
     prisma.user.count({ where: { referredById: user.id } }).catch(() => 0),
     prisma.referralCommission
       .findMany({ where: { referrerId: user.id }, orderBy: { createdAt: "desc" } })
@@ -385,6 +389,9 @@ export async function getReferralSummary(user: {
     prisma.monthlyBonus
       .aggregate({ where: { userId: user.id }, _sum: { bonusAmount: true } })
       .catch(() => ({ _sum: { bonusAmount: 0 } as { bonusAmount: number | null } })),
+    prisma.monthlyBonus
+      .findFirst({ where: { userId: user.id }, orderBy: { monthYear: "desc" } })
+      .catch(() => null),
   ]);
 
   let balance = 0;
@@ -417,6 +424,10 @@ export async function getReferralSummary(user: {
     activeDirects: unlock?.activeDirectsCount ?? 0,
     directsRequired: DIRECTS_REQUIRED,
     level2Earned,
+    monthlyBonusEarned,
+    lastMonthlyBonus: lastBonus
+      ? { monthYear: lastBonus.monthYear, amount: Math.round(lastBonus.bonusAmount * 100) / 100 }
+      : null,
     history: commissions.map((c) => ({
       id: c.id,
       date: c.createdAt.toISOString(),

@@ -121,6 +121,18 @@ export function ReferralLinkCard({ summary }: { summary: ReferralSummary }) {
           </p>
         </div>
 
+        {/* Monthly bonus line item */}
+        {summary.lastMonthlyBonus && (
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-gold-400/25 bg-gold-400/[0.06] px-4 py-3">
+            <span className="text-sm font-medium text-foreground">
+              Monthly Referral Bonus — {formatMonth(summary.lastMonthlyBonus.monthYear)}
+            </span>
+            <span className="text-sm font-bold text-gold-300">
+              {formatUsd(summary.lastMonthlyBonus.amount)}
+            </span>
+          </div>
+        )}
+
         {/* Total earned */}
         <p className="mt-4 text-[18px] font-bold text-gold-400">
           Total Earned from Referrals: {formatUsd(summary.totalEarned)}
@@ -136,6 +148,12 @@ export function ReferralLinkCard({ summary }: { summary: ReferralSummary }) {
       )}
     </Card>
   );
+}
+
+/** 'YYYY-MM' → 'October 2026'. */
+function formatMonth(monthYear: string): string {
+  const d = new Date(`${monthYear}-01T12:00:00Z`);
+  return new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric", timeZone: "UTC" }).format(d);
 }
 
 /** Lightweight hover/focus tooltip (no external dependency). */
