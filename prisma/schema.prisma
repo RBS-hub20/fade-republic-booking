@@ -156,6 +156,22 @@ model Level2Commission {
   @@index([sourceUserId])
 }
 
+// Monthly 5% bonus on the previous calendar month's Daily P/L of a user's
+// qualifying direct referrals. One row per user per month (idempotent).
+model MonthlyBonus {
+  id             String   @id @default(cuid())
+  userId         String
+  monthYear      String   // 'YYYY-MM'
+  totalDirectsPl Float
+  bonusRate      Float    @default(5)
+  bonusAmount    Float
+  directsCount   Int
+  paidAt         DateTime @default(now())
+
+  @@unique([userId, monthYear])
+  @@index([userId])
+}
+
 // A payout request that draws down commissionBalance only.
 model CommissionWithdrawal {
   id        String   @id @default(cuid())

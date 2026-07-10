@@ -370,7 +370,7 @@ export async function getReferralSummary(user: {
   // Each of these degrades independently; a missing table just yields zeros.
   await settlePendingCommissions(user.id).catch(() => {});
 
-  const [totalReferrals, commissions, fresh, level2Agg, unlock] = await Promise.all([
+  const [totalReferrals, commissions, fresh, level2Agg, unlock, monthlyBonusAgg] = await Promise.all([
     prisma.user.count({ where: { referredById: user.id } }).catch(() => 0),
     prisma.referralCommission
       .findMany({ where: { referrerId: user.id }, orderBy: { createdAt: "desc" } })
@@ -382,6 +382,9 @@ export async function getReferralSummary(user: {
       .aggregate({ where: { earnerId: user.id }, _sum: { commissionAmount: true } })
       .catch(() => ({ _sum: { commissionAmount: 0 } as { commissionAmount: number | null } })),
     prisma.userUnlock.findUnique({ where: { userId: user.id } }).catch(() => null),
+    prisma.monthlyBonus
+      .aggregate({ where: { userId: user.id }, _sum: { bonusAmount: true } })
+      .catch(() => ({ _sum: { bonusAmount: 0 } as { bonusAmount: number | null } })),
   ]);
 
   let balance = 0;
@@ -394,6 +397,7 @@ export async function getReferralSummary(user: {
   const paid = commissions.filter((c) => c.status === "PAID");
   const pending = commissions.filter((c) => c.status === "PENDING");
   const level2Earned = Math.round((level2Agg._sum.commissionAmount ?? 0) * 100) / 100;
+  const monthlyBonusEarned = Math.round((monthlyBonusAgg._sum.bonusAmount ?? 0) * 100) / 100;
 
   return {
     code,
@@ -402,7 +406,10 @@ export async function getReferralSummary(user: {
     activeReferrals: paid.length,
     pendingReferrals: pending.length,
     commissionRate: commissionRateForBalance(balance),
-    totalEarned: Math.round((paid.reduce((s, c) => s + c.commission, 0) + level2Earned) * 100) / 100,
+    totalEarned:
+      Math.round(
+        (paid.reduce((s, c) => s + c.commission, 0) + level2Earned + monthlyBonusEarned) * 100
+      ) / 100,
     commissionBalance: fresh?.commissionBalance ?? user.commissionBalance ?? 0,
     tierName: tier?.name ?? "None",
     level2Unlocked: unlock?.level2Unlocked ?? false,
@@ -425,4 +432,150 @@ export async function getReferralSummary(user: {
 export function exampleCommission(rate: number): number {
   const silver = TIERS.find((t) => t.id === "silver")!;
   return Math.round(silver.price * (rate / 100) * 100) / 100;
+}
+
+// ===================== Monthly direct-referral bonus =====================
+
+export const MONTHLY_BONUS_RATE = 5; // % of directs' previous-month Daily P/L
+const BONUS_MIN_CAPITAL = 50;
+const round2b = (n: number) => Math.round(n * 100) / 100;
+
+/** 'YYYY-MM' Manila month key for a date. */
+function manilaMonthKey(d: Date): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Manila",
+    year: "numeric",
+    month: "2-digit",
+  }).format(d);
+}
+
+/** The previous Manila calendar month as 'YYYY-MM'. */
+export function previousManilaMonth(now = new Date()): string {
+  const [y, m] = manilaMonthKey(now).split("-").map(Number);
+  const d = new Date(Date.UTC(y, m - 1, 1));
+  d.setUTCMonth(d.getUTCMonth() - 1);
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+/** UTC instant of the 1st of `monthYear` at 00:00 Manila. */
+function manilaMonthStartUTC(monthYear: string): Date {
+  return new Date(`${monthYear}-01T00:00:00+08:00`);
+}
+/** UTC instant of the 1st of the following month at 00:00 Manila (exclusive). */
+function manilaMonthEndUTC(monthYear: string): Date {
+  const d = manilaMonthStartUTC(monthYear);
+  d.setUTCMonth(d.getUTCMonth() + 1);
+  return d;
+}
+
+/** Sum of a client's APPROVED deposits dated strictly before `before`. */
+async function approvedDepositsBefore(clientId: string | null, before: Date): Promise<number> {
+  if (!clientId) return 0;
+  const agg = await prisma.transaction.aggregate({
+    where: { clientId, type: "DEPOSIT", status: "APPROVED", date: { lt: before } },
+    _sum: { amount: true },
+  });
+  return agg._sum.amount ?? 0;
+}
+
+export interface MonthlyBonusResult {
+  month: string;
+  paid: number;
+  totalPaid: number;
+}
+
+/**
+ * Pay the monthly direct-referral bonus for `monthYear` (defaults to the
+ * previous Manila month). Idempotent per (user, month) via a unique constraint.
+ *
+ * For each earner who (a) entered the payout month with Active Capital ≥ $50 and
+ * (b) has ≥ 1 direct that held ≥ $50 Active Capital for the ENTIRE month:
+ *   bonus = 5% × SUM(those directs' Daily P/L during the month), credited to the
+ *   earner's withdrawable balance. No cap. Profit only (not capital).
+ */
+export async function runMonthlyReferralBonus(opts?: { monthYear?: string }): Promise<MonthlyBonusResult> {
+  await ensureReferralSchemaOnce(prisma);
+  const monthYear = opts?.monthYear ?? previousManilaMonth();
+  const monthStart = manilaMonthStartUTC(monthYear);
+  const monthEnd = manilaMonthEndUTC(monthYear);
+
+  const earners = await prisma.user.findMany({
+    where: { referrals: { some: {} } },
+    select: { id: true, clientId: true },
+  });
+
+  let paid = 0;
+  let totalPaid = 0;
+
+  for (const earner of earners) {
+    try {
+      // Idempotency — already paid this month?
+      const done = await prisma.monthlyBonus.findUnique({
+        where: { userId_monthYear: { userId: earner.id, monthYear } },
+      });
+      if (done) continue;
+
+      // Requirement 1: earner had Active Capital ≥ $50 entering the payout month.
+      const earnerCap = await approvedDepositsBefore(earner.clientId, monthEnd);
+      if (earnerCap < BONUS_MIN_CAPITAL) continue;
+
+      // Qualifying directs: held ≥ $50 for the ENTIRE month (i.e. funded before
+      // month start) AND their client is ACTIVE.
+      const directs = await prisma.user.findMany({
+        where: { referredById: earner.id },
+        select: { clientId: true },
+      });
+      const dClientIds = directs.map((d) => d.clientId).filter(Boolean) as string[];
+      if (dClientIds.length === 0) continue;
+
+      const activeClients = await prisma.client.findMany({
+        where: { id: { in: dClientIds }, status: "ACTIVE" },
+        select: { id: true },
+      });
+      const activeSet = new Set(activeClients.map((c) => c.id));
+
+      const qualifying: string[] = [];
+      for (const cid of dClientIds) {
+        if (!activeSet.has(cid)) continue;
+        const capBeforeMonth = await approvedDepositsBefore(cid, monthStart);
+        if (capBeforeMonth >= BONUS_MIN_CAPITAL) qualifying.push(cid);
+      }
+      // Requirement 2: ≥ 1 qualifying active direct.
+      if (qualifying.length === 0) continue;
+
+      // Sum those directs' Daily P/L generated during the month.
+      const rows = await prisma.dailyPerformance.findMany({
+        where: { clientId: { in: qualifying }, date: { gte: monthStart, lt: monthEnd } },
+        select: { pnlUsd: true },
+      });
+      const totalPl = round2b(rows.reduce((s, r) => s + r.pnlUsd, 0));
+      if (totalPl <= 0) continue;
+
+      const bonus = round2b((totalPl * MONTHLY_BONUS_RATE) / 100);
+      if (bonus <= 0) continue;
+
+      await prisma.$transaction([
+        prisma.monthlyBonus.create({
+          data: {
+            userId: earner.id,
+            monthYear,
+            totalDirectsPl: totalPl,
+            bonusRate: MONTHLY_BONUS_RATE,
+            bonusAmount: bonus,
+            directsCount: qualifying.length,
+          },
+        }),
+        prisma.user.update({
+          where: { id: earner.id },
+          data: { commissionBalance: { increment: bonus } },
+        }),
+      ]);
+      paid += 1;
+      totalPaid += bonus;
+    } catch (e) {
+      console.error(`monthly bonus failed for ${earner.id}:`, e);
+    }
+  }
+
+  return { month: monthYear, paid, totalPaid: round2b(totalPaid) };
 }

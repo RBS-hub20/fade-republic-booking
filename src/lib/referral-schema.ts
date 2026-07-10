@@ -55,6 +55,18 @@ export const REFERRAL_DDL: string[] = [
    )`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "Level2Commission_sourceUserId_key" ON "Level2Commission"("sourceUserId")`,
   `CREATE INDEX IF NOT EXISTS "Level2Commission_earnerId_idx" ON "Level2Commission"("earnerId")`,
+  `CREATE TABLE IF NOT EXISTS "MonthlyBonus" (
+     "id" TEXT NOT NULL PRIMARY KEY,
+     "userId" TEXT NOT NULL,
+     "monthYear" TEXT NOT NULL,
+     "totalDirectsPl" DOUBLE PRECISION NOT NULL,
+     "bonusRate" DOUBLE PRECISION NOT NULL DEFAULT 5,
+     "bonusAmount" DOUBLE PRECISION NOT NULL,
+     "directsCount" INTEGER NOT NULL,
+     "paidAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+   )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "MonthlyBonus_userId_monthYear_key" ON "MonthlyBonus"("userId", "monthYear")`,
+  `CREATE INDEX IF NOT EXISTS "MonthlyBonus_userId_idx" ON "MonthlyBonus"("userId")`,
 ];
 
 type RawRunner = { $executeRawUnsafe: (sql: string) => Promise<unknown> };

@@ -4,7 +4,7 @@ import { cronAuthorized } from "@/lib/cron-auth";
 import { runDailyPerformance } from "@/lib/daily-performance";
 import { verifyPendingDeposits } from "@/lib/verify-deposits";
 import { runMaturityNotifications } from "@/lib/capital";
-import { recomputeAllUnlocks } from "@/lib/referrals";
+import { recomputeAllUnlocks, runMonthlyReferralBonus } from "@/lib/referrals";
 import { ensureFinanceSchemaOnce } from "@/lib/finance-schema";
 
 export const runtime = "nodejs";
@@ -44,6 +44,14 @@ async function handle(req: Request) {
     result.unlocks = await recomputeAllUnlocks();
   } catch (err: any) {
     result.unlocks = { ok: false, error: err?.message?.split("\n")[0] ?? "failed" };
+  }
+  // Monthly direct-referral bonus for the previous month — idempotent per
+  // (user, month), so running it daily pays it once on the first run of a new
+  // month (keeps us on Hobby's single cron slot).
+  try {
+    result.monthlyBonus = await runMonthlyReferralBonus();
+  } catch (err: any) {
+    result.monthlyBonus = { ok: false, error: err?.message?.split("\n")[0] ?? "failed" };
   }
   return NextResponse.json(result);
 }

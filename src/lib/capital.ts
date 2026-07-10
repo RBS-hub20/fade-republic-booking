@@ -63,7 +63,7 @@ export async function getCapitalSummary(opts: {
   const { clientId, userId } = opts;
   const now = Date.now();
 
-  const [deposits, actions, perfAgg, commissionAgg, level2Agg, withdrawals, legacyCw] = await Promise.all([
+  const [deposits, actions, perfAgg, commissionAgg, level2Agg, monthlyBonusAgg, withdrawals, legacyCw] = await Promise.all([
     prisma.transaction.findMany({
       where: { clientId, type: "DEPOSIT", status: "APPROVED" },
       select: { id: true, amount: true, date: true },
@@ -77,6 +77,9 @@ export async function getCapitalSummary(opts: {
     prisma.level2Commission
       .aggregate({ where: { earnerId: userId }, _sum: { commissionAmount: true } })
       .catch(() => ({ _sum: { commissionAmount: 0 } as { commissionAmount: number | null } })),
+    prisma.monthlyBonus
+      .aggregate({ where: { userId }, _sum: { bonusAmount: true } })
+      .catch(() => ({ _sum: { bonusAmount: 0 } as { bonusAmount: number | null } })),
     prisma.withdrawal
       .findMany({ where: { userId }, select: { amount: true, status: true } })
       .catch(() => [] as { amount: number; status: string }[]),
@@ -123,9 +126,11 @@ export async function getCapitalSummary(opts: {
   }
 
   const dailyPnl = round2(perfAgg._sum.pnlUsd ?? 0);
-  // Referral commissions = level-1 (ReferralCommission) + level-2 (indirect).
+  // Referral earnings = level-1 + level-2 (indirect) + monthly direct bonus.
   const commissionsEarned = round2(
-    (commissionAgg._sum.commission ?? 0) + (level2Agg._sum.commissionAmount ?? 0)
+    (commissionAgg._sum.commission ?? 0) +
+      (level2Agg._sum.commissionAmount ?? 0) +
+      (monthlyBonusAgg._sum.bonusAmount ?? 0)
   );
   const totalEarned = round2(dailyPnl + commissionsEarned);
 
