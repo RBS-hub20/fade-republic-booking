@@ -201,7 +201,8 @@ QUANTUMX COMPANY INFO — AI-powered automated Forex + Crypto trading platform.
 - Capital unlocks 6 months after its deposit approval date. After maturity the full capital becomes withdrawable (or you can renew for another 6 months).
 
 8) ANTI-ABUSE POLICY
-- One unique payout wallet per user. Email must be verified. New accounts may have a short holding period before commissions are released.
+- Referral commissions are credited to your account INSTANTLY, but unlock for withdrawal after 7 DAYS as a security measure to prevent abuse. During that window they appear under "Pending Commissions" with a countdown, and are NOT part of your Available Withdrawal until they unlock. (The monthly bonus and your daily P/L are not subject to this hold.)
+- One unique payout wallet per user; email must be verified.
 
 RULES:
 1. For account-specific questions ("What's my balance?", "How much today?", "bakit locked 2nd level ko?"), use the INJECTED USER DATA below — it is the source of truth. If someone asks why their 2nd level is locked, check their active-directs count and tell them how many more qualifying directs they need to reach 3.
@@ -312,6 +313,11 @@ async function buildUserContext(userId: string, clientId: string, name: string):
           : ""),
       cap.hasMatured ? `- Matured capital awaiting action: ${formatUsd(cap.maturedCapital)}` : "",
       `- Available Withdrawal (withdrawable now): ${formatUsd(cap.availableWithdrawal)}`,
+      cap.pendingCommissions > 0
+        ? `- Pending Commissions (7-day hold): ${formatUsd(cap.pendingCommissions)}${
+            cap.pendingDays != null ? ` — unlocks in ${cap.pendingDays} day(s)` : ""
+          } (not withdrawable yet)`
+        : "",
       `- Total Earned (daily P/L + referrals): ${formatUsd(cap.totalEarned)}`,
       `- Total Withdrawn: ${formatUsd(cap.totalWithdrawn)}`
     );

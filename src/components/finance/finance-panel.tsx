@@ -44,6 +44,8 @@ export interface CapitalView {
   totalEarned: number;
   totalWithdrawn: number;
   commissionsEarned: number;
+  pendingCommissions: number;
+  pendingDays: number | null;
 }
 
 export interface WithdrawalRow {
@@ -83,6 +85,8 @@ export function FinancePanel({
         <ActiveCapitalCard capital={capital} />
         <AvailableWithdrawalCard
           available={capital.availableWithdrawal}
+          pending={capital.pendingCommissions}
+          pendingDays={capital.pendingDays}
           onWithdraw={() => setModalOpen(true)}
         />
         <KpiCard
@@ -193,9 +197,13 @@ function ActiveCapitalCard({ capital }: { capital: CapitalView }) {
 
 function AvailableWithdrawalCard({
   available,
+  pending,
+  pendingDays,
   onWithdraw,
 }: {
   available: number;
+  pending: number;
+  pendingDays: number | null;
   onWithdraw: () => void;
 }) {
   return (
@@ -210,6 +218,13 @@ function AvailableWithdrawalCard({
       </div>
       <p className="tnum mt-3 text-2xl font-bold text-profit">{formatUsd(available)}</p>
       <p className="mt-1 text-xs text-muted-foreground">Daily P/L + Referrals • $10 min</p>
+      {pending > 0 && (
+        <p className="mt-1 flex items-center gap-1 text-xs text-gold-300">
+          <Clock className="h-3 w-3" />
+          Pending Commissions: {formatUsd(pending)}
+          {pendingDays != null ? ` · unlocks in ${pendingDays} day${pendingDays === 1 ? "" : "s"}` : ""}
+        </p>
+      )}
       <Button
         size="sm"
         className="mt-2 w-full"

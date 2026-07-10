@@ -38,6 +38,8 @@ export interface CapitalDeposit {
   daysToMaturity: number;
 }
 
+export const COMMISSION_HOLD_DAYS = 7;
+
 export interface CapitalSummary {
   activeCapital: number; // locked, not yet matured
   maturedCapital: number; // matured, awaiting withdraw/renew
@@ -47,11 +49,15 @@ export interface CapitalSummary {
   deposits: CapitalDeposit[];
 
   dailyPnl: number;
-  commissionsEarned: number;
+  commissionsEarned: number; // lifetime referral earnings (incl. pending)
   totalEarned: number;
   totalWithdrawn: number;
   withdrawalsOutstanding: number;
   availableWithdrawal: number;
+  // 7-day new-account hold on referral commissions.
+  pendingCommissions: number;
+  pendingUnlockDate: string | null;
+  pendingDays: number | null;
 }
 
 const DAY_MS = 24 * 60 * 60_000;
@@ -63,7 +69,7 @@ export async function getCapitalSummary(opts: {
   const { clientId, userId } = opts;
   const now = Date.now();
 
-  const [deposits, actions, perfAgg, commissionAgg, level2Agg, monthlyBonusAgg, withdrawals, legacyCw] = await Promise.all([
+  const [deposits, actions, perfAgg, commissionRows, level2Rows, monthlyBonusAgg, withdrawals, legacyCw] = await Promise.all([
     prisma.transaction.findMany({
       where: { clientId, type: "DEPOSIT", status: "APPROVED" },
       select: { id: true, amount: true, date: true },
@@ -72,11 +78,11 @@ export async function getCapitalSummary(opts: {
     prisma.capitalAction.findMany({ where: { userId } }).catch(() => []),
     prisma.dailyPerformance.aggregate({ where: { clientId }, _sum: { pnlUsd: true } }),
     prisma.referralCommission
-      .aggregate({ where: { referrerId: userId, status: "PAID" }, _sum: { commission: true } })
-      .catch(() => ({ _sum: { commission: 0 } as { commission: number | null } })),
+      .findMany({ where: { referrerId: userId, status: "PAID" }, select: { commission: true, createdAt: true } })
+      .catch(() => [] as { commission: number; createdAt: Date }[]),
     prisma.level2Commission
-      .aggregate({ where: { earnerId: userId }, _sum: { commissionAmount: true } })
-      .catch(() => ({ _sum: { commissionAmount: 0 } as { commissionAmount: number | null } })),
+      .findMany({ where: { earnerId: userId }, select: { commissionAmount: true, createdAt: true } })
+      .catch(() => [] as { commissionAmount: number; createdAt: Date }[]),
     prisma.monthlyBonus
       .aggregate({ where: { userId }, _sum: { bonusAmount: true } })
       .catch(() => ({ _sum: { bonusAmount: 0 } as { bonusAmount: number | null } })),
@@ -126,12 +132,30 @@ export async function getCapitalSummary(opts: {
   }
 
   const dailyPnl = round2(perfAgg._sum.pnlUsd ?? 0);
-  // Referral earnings = level-1 + level-2 (indirect) + monthly direct bonus.
-  const commissionsEarned = round2(
-    (commissionAgg._sum.commission ?? 0) +
-      (level2Agg._sum.commissionAmount ?? 0) +
-      (monthlyBonusAgg._sum.bonusAmount ?? 0)
-  );
+
+  // 7-day new-account hold on referral commissions (L1 + L2): each commission
+  // unlocks for withdrawal 7 days after it was earned. Monthly bonus is a
+  // settled monthly payout and is not held.
+  const holdMs = COMMISSION_HOLD_DAYS * DAY_MS;
+  const allComms = [
+    ...commissionRows.map((r) => ({ amount: r.commission, at: r.createdAt.getTime() })),
+    ...level2Rows.map((r) => ({ amount: r.commissionAmount, at: r.createdAt.getTime() })),
+  ];
+  let unlockedComms = 0;
+  let pendingComms = 0;
+  let earliestUnlock: number | null = null;
+  for (const c of allComms) {
+    const unlockAt = c.at + holdMs;
+    if (unlockAt <= now) unlockedComms += c.amount;
+    else {
+      pendingComms += c.amount;
+      if (earliestUnlock === null || unlockAt < earliestUnlock) earliestUnlock = unlockAt;
+    }
+  }
+  const monthlyBonus = monthlyBonusAgg._sum.bonusAmount ?? 0;
+  const commissionsEarned = round2(unlockedComms + pendingComms + monthlyBonus); // lifetime
+  const availableCommissions = round2(unlockedComms + monthlyBonus); // withdrawable now
+  const pendingCommissions = round2(pendingComms);
   const totalEarned = round2(dailyPnl + commissionsEarned);
 
   // Outstanding = anything not rejected still counts against the pool.
@@ -143,9 +167,10 @@ export async function getCapitalSummary(opts: {
     withdrawals.filter((w) => w.status === "completed").reduce((s, w) => s + w.amount, 0)
   );
 
+  // Available excludes pending (held) commissions.
   const availableWithdrawal = Math.max(
     0,
-    round2(dailyPnl + commissionsEarned + releasedCapital - withdrawalsOutstanding)
+    round2(dailyPnl + availableCommissions + releasedCapital - withdrawalsOutstanding)
   );
 
   return {
@@ -161,6 +186,9 @@ export async function getCapitalSummary(opts: {
     totalWithdrawn,
     withdrawalsOutstanding,
     availableWithdrawal,
+    pendingCommissions,
+    pendingUnlockDate: earliestUnlock ? new Date(earliestUnlock).toISOString() : null,
+    pendingDays: earliestUnlock ? Math.max(0, Math.ceil((earliestUnlock - now) / DAY_MS)) : null,
   };
 }
 
