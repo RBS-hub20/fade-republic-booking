@@ -90,7 +90,7 @@ export async function notifyWithdrawalCompleted(opts: {
     <strong>Processed:</strong> ${when} PHT`;
   await sendEmail({
     to: opts.email,
-    subject: "Your Withdrawal is Complete ✅",
+    subject: "Withdrawal Approved - QuantumX",
     html: emailTemplate({
       heading: `Withdrawal complete, ${opts.name.split(" ")[0]}!`,
       body,
