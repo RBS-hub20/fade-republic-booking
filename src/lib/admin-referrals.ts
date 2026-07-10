@@ -245,3 +245,37 @@ export async function getReferralTree(userId: string, users: Map<string, UserInf
 function formatPctAmt(n: number): string {
   return `$${(Math.round(n * 100) / 100).toFixed(2)}`;
 }
+
+export interface CompensationSummary {
+  l1: number;
+  l2: number;
+  bonus: number;
+  grandTotal: number;
+  feeRevenue: number;
+  net: number;
+}
+
+/** Platform-wide compensation totals for the Commissions KPI header. */
+export async function getCompensationSummary(): Promise<CompensationSummary> {
+  const round2 = (n: number) => Math.round(n * 100) / 100;
+  const [l1Agg, l2Agg, bonusAgg, feeAgg] = await Promise.all([
+    prisma.referralCommission
+      .aggregate({ where: { status: "PAID" }, _sum: { commission: true } })
+      .catch(() => ({ _sum: { commission: 0 } })),
+    prisma.level2Commission
+      .aggregate({ _sum: { commissionAmount: true } })
+      .catch(() => ({ _sum: { commissionAmount: 0 } })),
+    prisma.monthlyBonus
+      .aggregate({ _sum: { bonusAmount: true } })
+      .catch(() => ({ _sum: { bonusAmount: 0 } })),
+    prisma.withdrawal
+      .aggregate({ where: { status: "completed" }, _sum: { fee: true } })
+      .catch(() => ({ _sum: { fee: 0 } })),
+  ]);
+  const l1 = round2(l1Agg._sum.commission ?? 0);
+  const l2 = round2(l2Agg._sum.commissionAmount ?? 0);
+  const bonus = round2(bonusAgg._sum.bonusAmount ?? 0);
+  const grandTotal = round2(l1 + l2 + bonus);
+  const feeRevenue = round2(feeAgg._sum.fee ?? 0);
+  return { l1, l2, bonus, grandTotal, feeRevenue, net: round2(feeRevenue - grandTotal) };
+}
