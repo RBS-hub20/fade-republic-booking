@@ -33,7 +33,12 @@ export function middleware(req: NextRequest) {
     // The verify route enforces its own CRON_SECRET / admin check.
     pathname.startsWith("/api/deposits/verify") ||
     pathname === "/api/health" ||
-    pathname === "/favicon.ico";
+    pathname === "/favicon.ico" ||
+    // Static files in /public (logo, icons, OG image, manifest, fonts, …) must
+    // be reachable without a session so the marketing pages render for visitors.
+    /\.(png|jpe?g|gif|svg|ico|webp|avif|webmanifest|json|txt|xml|woff2?|ttf|otf|mp4)$/.test(
+      pathname
+    );
 
   if (isPublicAsset) return NextResponse.next();
 

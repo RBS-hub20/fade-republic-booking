@@ -5,6 +5,7 @@
  * password reset, etc.) can always proceed.
  */
 import { resend, FROM_EMAIL, emailConfigured } from "./resend";
+import { appBaseUrl } from "./tokens";
 
 interface SendArgs {
   to: string;
@@ -46,11 +47,20 @@ export function emailTemplate(opts: {
   buttonLabel: string;
   buttonUrl: string;
 }): string {
+  const base = appBaseUrl();
   return `
   <div style="background:#0f1116;padding:32px;font-family:system-ui,sans-serif;color:#e5e7eb">
     <div style="max-width:480px;margin:0 auto;background:#181b21;border:1px solid #2d333d;border-radius:12px;overflow:hidden">
-      <div style="background:#e0b54a;color:#000;padding:16px 24px;font-weight:800;font-size:18px">
-        QuantumX Global Markets
+      <div style="background:#0A0A0A;padding:16px 24px;border-bottom:1px solid #2d333d">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+          <td style="padding-right:12px;vertical-align:middle">
+            <img src="${base}/logo-icon.png" width="49" height="34" alt="QuantumX" style="display:block;border:0;height:34px;width:49px" />
+          </td>
+          <td style="vertical-align:middle;line-height:1">
+            <div style="font-weight:600;font-size:18px;color:#ffffff">Quantum<span style="color:#e0b54a">X</span></div>
+            <div style="font-size:9px;letter-spacing:2px;color:#9CA3AF;text-transform:uppercase;padding-top:3px">Global Markets</div>
+          </td>
+        </tr></table>
       </div>
       <div style="padding:24px">
         <h1 style="font-size:18px;margin:0 0 12px">${opts.heading}</h1>

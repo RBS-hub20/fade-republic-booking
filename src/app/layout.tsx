@@ -5,10 +5,39 @@ import "./globals.css";
 // than next/font/google, so the app never depends on fetching fonts from Google
 // at build/runtime — important in restricted/offline environments.
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://quantumxglobal.online";
+const TITLE = "QuantumX Global Markets — Trade Beyond Limits";
+const DESCRIPTION =
+  "QuantumX Global Markets is a next-generation trading platform for secure, transparent, and intelligent access to the world's financial markets — crypto, Forex, commodities, indices and more.";
+
 export const metadata: Metadata = {
-  title: "QuantumX Global Markets — Trade Beyond Limits",
-  description:
-    "QuantumX Global Markets is a next-generation trading platform for secure, transparent, and intelligent access to the world's financial markets — crypto, Forex, commodities, indices and more.",
+  metadataBase: new URL(SITE_URL),
+  title: TITLE,
+  description: DESCRIPTION,
+  applicationName: "QuantumX Global Markets",
+  manifest: "/site.webmanifest",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "48x48" },
+      { url: "/icon.png", type: "image/png" },
+    ],
+    shortcut: "/favicon.ico",
+    apple: "/apple-touch-icon.png",
+  },
+  openGraph: {
+    type: "website",
+    siteName: "QuantumX Global Markets",
+    title: TITLE,
+    description: DESCRIPTION,
+    url: SITE_URL,
+    images: [{ url: "/og-image.png", width: 1200, height: 630, alt: "QuantumX Global Markets" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: TITLE,
+    description: DESCRIPTION,
+    images: ["/og-image.png"],
+  },
 };
 
 export default function RootLayout({
