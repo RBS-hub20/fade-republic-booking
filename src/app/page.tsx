@@ -94,22 +94,26 @@ export default function LandingPage() {
       {/* Nav */}
       <header className="sticky top-0 z-30 border-b border-border/60 bg-background/80 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
-          <Link href="/">
-            <Logo size="md" subtitle />
+          <Link href="/" className="min-w-0">
+            {/* Compact mark-only lockup on phones; full wordmark + subtitle from sm up. */}
+            <Logo size="sm" className="sm:hidden" />
+            <Logo size="md" subtitle className="hidden sm:flex" />
           </Link>
-          <nav className="flex items-center gap-2">
+          <nav className="flex items-center gap-1.5 sm:gap-2">
             {session ? (
-              <Button asChild>
+              <Button asChild size="sm" className="sm:h-10 sm:px-4">
                 <Link href="/dashboard">
-                  Go to Dashboard <ArrowRight className="h-4 w-4" />
+                  <span className="hidden sm:inline">Go to Dashboard</span>
+                  <span className="sm:hidden">Dashboard</span>
+                  <ArrowRight className="h-4 w-4" />
                 </Link>
               </Button>
             ) : (
               <>
-                <Button asChild variant="ghost">
+                <Button asChild variant="ghost" size="sm" className="sm:h-10 sm:px-4">
                   <Link href="/login">Log in</Link>
                 </Button>
-                <Button asChild>
+                <Button asChild size="sm" className="sm:h-10 sm:px-4">
                   <Link href="/signup">Sign up</Link>
                 </Button>
               </>
@@ -123,7 +127,7 @@ export default function LandingPage() {
         <span className="inline-flex items-center gap-2 rounded-full border border-gold-400/30 bg-gold-400/10 px-3 py-1 text-xs font-medium text-gold-300">
           Where innovation meets global finance
         </span>
-        <h1 className="mx-auto mt-6 max-w-4xl text-4xl font-bold leading-tight tracking-tight sm:text-6xl">
+        <h1 className="mx-auto mt-6 max-w-4xl text-[2rem] font-bold leading-tight tracking-tight sm:text-6xl">
           Welcome to Quantum<span className="text-gold-400">X</span> Global Markets
         </h1>
         <p className="mx-auto mt-5 max-w-2xl text-base text-muted-foreground sm:text-lg">

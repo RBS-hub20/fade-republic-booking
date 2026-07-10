@@ -51,18 +51,18 @@ function Sparkline({ points, up }: { points: number[]; up: boolean }) {
 function QuoteCard({ q, showSpark }: { q: Quote; showSpark?: boolean }) {
   const up = q.changePct >= 0;
   return (
-    <div className="min-w-[148px] shrink-0 rounded-lg border border-border bg-card px-3 py-2.5">
+    <div className="w-[46vw] shrink-0 snap-start rounded-lg border border-border bg-card p-3 sm:w-auto sm:min-w-[148px] sm:snap-none sm:px-3 sm:py-2.5">
       <div className="flex items-center justify-between gap-2">
         <span className="text-sm font-semibold">{q.symbol}</span>
         {showSpark && q.sparkline && q.sparkline.length > 1 && (
           <Sparkline points={q.sparkline} up={up} />
         )}
       </div>
-      <div className="tnum mt-1 text-sm font-bold">
+      <div className="tnum mt-1 text-lg font-bold sm:text-sm">
         <span className="text-muted-foreground">$</span>
         {formatPrice(q.price)}
       </div>
-      <div className={cn("tnum text-xs font-medium", up ? "text-profit" : "text-loss")}>
+      <div className={cn("tnum text-sm font-semibold sm:text-xs", up ? "text-profit" : "text-loss")}>
         {up ? "▲" : "▼"} {Math.abs(q.changePct).toFixed(2)}%
       </div>
     </div>
@@ -84,7 +84,7 @@ function Section({
       <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-gold-300">
         {title}
       </p>
-      <div className="flex gap-2.5 overflow-x-auto pb-1 [scrollbar-width:thin]">
+      <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-1 [scrollbar-width:thin] sm:snap-none sm:gap-2.5">
         {quotes.map((q) => (
           <QuoteCard key={q.symbol} q={q} showSpark={showSpark} />
         ))}
@@ -99,11 +99,11 @@ function SkeletonRow({ title, count }: { title: string; count: number }) {
       <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-gold-300">
         {title}
       </p>
-      <div className="flex gap-2.5 overflow-hidden">
+      <div className="flex gap-3 overflow-hidden sm:gap-2.5">
         {Array.from({ length: count }).map((_, i) => (
           <div
             key={i}
-            className="h-[68px] min-w-[148px] shrink-0 animate-pulse rounded-lg border border-border bg-card/60"
+            className="h-[84px] w-[46vw] shrink-0 animate-pulse rounded-lg border border-border bg-card/60 sm:h-[68px] sm:w-auto sm:min-w-[148px]"
           />
         ))}
       </div>
@@ -114,6 +114,7 @@ function SkeletonRow({ title, count }: { title: string; count: number }) {
 export function LiveMarketTicker() {
   const [data, setData] = useState<MarketData | null>(null);
   const [errored, setErrored] = useState(false);
+  const [showHint, setShowHint] = useState(true);
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -146,6 +147,12 @@ export function LiveMarketTicker() {
     };
   }, []);
 
+  // Auto-dismiss the mobile "Swipe →" hint after the first few seconds.
+  useEffect(() => {
+    const t = setTimeout(() => setShowHint(false), 5000);
+    return () => clearTimeout(t);
+  }, []);
+
   const s = data?.sections;
   const hasAny =
     !!s && s.crypto.length + s.forex.length + s.stocks.length + s.metals.length > 0;
@@ -171,12 +178,19 @@ export function LiveMarketTicker() {
             </span>
             <span className="text-sm font-semibold">Live Markets</span>
           </div>
-          <span className="text-[11px] text-muted-foreground">
-            {hasAny ? "Auto-updating · 20s" : "Loading…"}
-          </span>
+          <div className="flex items-center gap-2">
+            {hasAny && showHint && (
+              <span className="animate-pulse text-[11px] font-medium text-gold-300 md:hidden">
+                Swipe →
+              </span>
+            )}
+            <span className="text-[11px] text-muted-foreground">
+              {hasAny ? "Auto-updating · 20s" : "Loading…"}
+            </span>
+          </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           {data && hasAny ? (
             <>
               <Section title="Crypto" quotes={data.sections.crypto} showSpark />
