@@ -130,6 +130,32 @@ model CapitalAction {
   @@index([userId])
 }
 
+// 2nd-level unlock status per user (needs 3+ qualifying direct referrals).
+model UserUnlock {
+  userId             String    @id
+  level2Unlocked     Boolean   @default(false)
+  unlockedAt         DateTime?
+  activeDirectsCount Int       @default(0)
+  updatedAt          DateTime  @updatedAt
+}
+
+// 2nd-level (indirect) commission — paid once per source user's first deposit,
+// to the nearest UNLOCKED upline above the direct referrer.
+model Level2Commission {
+  id               String   @id @default(cuid())
+  earnerId         String   // who gets paid
+  sourceUserId     String   @unique // who deposited (first deposit only)
+  directUplineId   String?  // middle man (the source's direct referrer)
+  depositAmount    Float
+  commissionRate   Float
+  commissionAmount Float
+  uplineTierAtTime String?
+  createdAt        DateTime @default(now())
+
+  @@index([earnerId])
+  @@index([sourceUserId])
+}
+
 // A payout request that draws down commissionBalance only.
 model CommissionWithdrawal {
   id        String   @id @default(cuid())

@@ -63,7 +63,7 @@ export async function getCapitalSummary(opts: {
   const { clientId, userId } = opts;
   const now = Date.now();
 
-  const [deposits, actions, perfAgg, commissionAgg, withdrawals, legacyCw] = await Promise.all([
+  const [deposits, actions, perfAgg, commissionAgg, level2Agg, withdrawals, legacyCw] = await Promise.all([
     prisma.transaction.findMany({
       where: { clientId, type: "DEPOSIT", status: "APPROVED" },
       select: { id: true, amount: true, date: true },
@@ -74,6 +74,9 @@ export async function getCapitalSummary(opts: {
     prisma.referralCommission
       .aggregate({ where: { referrerId: userId, status: "PAID" }, _sum: { commission: true } })
       .catch(() => ({ _sum: { commission: 0 } as { commission: number | null } })),
+    prisma.level2Commission
+      .aggregate({ where: { earnerId: userId }, _sum: { commissionAmount: true } })
+      .catch(() => ({ _sum: { commissionAmount: 0 } as { commissionAmount: number | null } })),
     prisma.withdrawal
       .findMany({ where: { userId }, select: { amount: true, status: true } })
       .catch(() => [] as { amount: number; status: string }[]),
@@ -120,7 +123,10 @@ export async function getCapitalSummary(opts: {
   }
 
   const dailyPnl = round2(perfAgg._sum.pnlUsd ?? 0);
-  const commissionsEarned = round2(commissionAgg._sum.commission ?? 0);
+  // Referral commissions = level-1 (ReferralCommission) + level-2 (indirect).
+  const commissionsEarned = round2(
+    (commissionAgg._sum.commission ?? 0) + (level2Agg._sum.commissionAmount ?? 0)
+  );
   const totalEarned = round2(dailyPnl + commissionsEarned);
 
   // Outstanding = anything not rejected still counts against the pool.

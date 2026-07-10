@@ -28,10 +28,160 @@ export const COMMISSION_RATES: Record<"none" | TierId, number> = {
 
 export const MIN_COMMISSION_WITHDRAWAL = 10;
 
+/** 2nd-level (indirect) commission %, keyed by the EARNER's current tier. */
+export const LEVEL2_RATES: Record<"none" | TierId, number> = {
+  none: 0.5,
+  bronze: 0.5,
+  silver: 1,
+  gold: 2,
+  platinum: 3,
+};
+
+// 2nd-level unlock requirements.
+const DIRECTS_REQUIRED = 3;
+const ACTIVE_DIRECT_MIN_CAPITAL = 50;
+const MAX_UPLINE_WALK = 20; // compression cap when finding a qualified upline
+
 /** Commission % for a given balance-derived tier (None/Bronze both 5%). */
 export function commissionRateForBalance(balance: number): number {
   const tier = tierForBalance(balance);
   return COMMISSION_RATES[tier?.id ?? "none"];
+}
+
+/** 2nd-level commission % for a given balance-derived tier. */
+export function level2RateForBalance(balance: number): number {
+  const tier = tierForBalance(balance);
+  return LEVEL2_RATES[tier?.id ?? "none"];
+}
+
+async function balanceOfUser(clientId: string | null | undefined): Promise<number> {
+  if (!clientId) return 0;
+  const perf = await getClientPerformance(clientId).catch(() => null);
+  return perf?.kpis.currentBalance ?? 0;
+}
+
+/**
+ * Recompute a user's 2nd-level unlock: they qualify with 3+ DIRECT referrals
+ * that each have Active Capital ≥ $50 AND an ACTIVE client. Locks again
+ * automatically if they drop below the threshold. Returns the unlock state.
+ */
+export async function recomputeUnlock(userId: string): Promise<boolean> {
+  await ensureReferralSchemaOnce(prisma);
+  const directs = await prisma.user.findMany({
+    where: { referredById: userId },
+    select: { clientId: true },
+  });
+  const clientIds = directs.map((d) => d.clientId).filter(Boolean) as string[];
+
+  let count = 0;
+  if (clientIds.length) {
+    const [activeClients, deposits] = await Promise.all([
+      prisma.client.findMany({ where: { id: { in: clientIds }, status: "ACTIVE" }, select: { id: true } }),
+      prisma.transaction.groupBy({
+        by: ["clientId"],
+        where: { clientId: { in: clientIds }, type: "DEPOSIT", status: "APPROVED" },
+        _sum: { amount: true },
+      }),
+    ]);
+    const activeSet = new Set(activeClients.map((c) => c.id));
+    for (const d of deposits) {
+      if (activeSet.has(d.clientId) && (d._sum.amount ?? 0) >= ACTIVE_DIRECT_MIN_CAPITAL) count += 1;
+    }
+  }
+
+  const unlocked = count >= DIRECTS_REQUIRED;
+  const existing = await prisma.userUnlock.findUnique({ where: { userId } }).catch(() => null);
+  await prisma.userUnlock.upsert({
+    where: { userId },
+    update: {
+      level2Unlocked: unlocked,
+      activeDirectsCount: count,
+      unlockedAt: unlocked ? existing?.unlockedAt ?? new Date() : null,
+    },
+    create: {
+      userId,
+      level2Unlocked: unlocked,
+      activeDirectsCount: count,
+      unlockedAt: unlocked ? new Date() : null,
+    },
+  });
+  return unlocked;
+}
+
+/** Daily cron: recompute unlock status for every user who has referrals. */
+export async function recomputeAllUnlocks(): Promise<{ updated: number }> {
+  await ensureReferralSchemaOnce(prisma);
+  const uplines = await prisma.user.findMany({
+    where: { referrals: { some: {} } },
+    select: { id: true },
+  });
+  let updated = 0;
+  for (const u of uplines) {
+    await recomputeUnlock(u.id).catch(() => {});
+    updated += 1;
+  }
+  return { updated };
+}
+
+/**
+ * Credit the 2nd-level (indirect) commission for a source user's FIRST package.
+ * Walks up from the direct referrer's upline to the nearest UNLOCKED upline
+ * (compression), and pays them `level2Rate(theirTier) × packageAmount` once.
+ */
+async function creditLevel2Commission(opts: {
+  sourceUserId: string;
+  directUplineId: string;
+  startUplineId: string | null; // the direct referrer's referrer (grandparent)
+  packageAmount: number;
+}): Promise<void> {
+  if (!opts.startUplineId) return;
+  const existing = await prisma.level2Commission.findUnique({
+    where: { sourceUserId: opts.sourceUserId },
+  });
+  if (existing) return; // first deposit only
+
+  // Compression: find the nearest qualified (unlocked) upline in the chain.
+  let cursorId: string | null = opts.startUplineId;
+  let earner: { id: string; clientId: string | null } | null = null;
+  for (let i = 0; i < MAX_UPLINE_WALK && cursorId; i++) {
+    const cand: { id: string; clientId: string | null; referredById: string | null } | null =
+      await prisma.user.findUnique({
+        where: { id: cursorId },
+        select: { id: true, clientId: true, referredById: true },
+      });
+    if (!cand) break;
+    const unlock = await prisma.userUnlock.findUnique({ where: { userId: cand.id } }).catch(() => null);
+    if (unlock?.level2Unlocked) {
+      earner = { id: cand.id, clientId: cand.clientId };
+      break;
+    }
+    cursorId = cand.referredById;
+  }
+  if (!earner) return; // no qualified upline in the chain
+
+  const balance = await balanceOfUser(earner.clientId);
+  const tier = tierForBalance(balance);
+  const rate = LEVEL2_RATES[tier?.id ?? "none"];
+  const commissionAmount = Math.round(opts.packageAmount * (rate / 100) * 100) / 100;
+  if (commissionAmount <= 0) return;
+
+  await prisma.$transaction([
+    prisma.level2Commission.create({
+      data: {
+        earnerId: earner.id,
+        sourceUserId: opts.sourceUserId,
+        directUplineId: opts.directUplineId,
+        depositAmount: opts.packageAmount,
+        commissionRate: rate,
+        commissionAmount,
+        uplineTierAtTime: tier?.name ?? "None",
+      },
+    }),
+    prisma.user.update({
+      where: { id: earner.id },
+      data: { commissionBalance: { increment: commissionAmount } },
+    }),
+  ]);
 }
 
 /** Build a referral code: first 4 alpha chars of the name, uppercased, + 3 digits. */
@@ -79,6 +229,8 @@ export async function creditFirstPackageCommission(opts: {
 }): Promise<void> {
   if (!REFERRALS_ENABLED) return;
   try {
+    await ensureReferralSchemaOnce(prisma);
+
     // Which package did they activate? Must be at least Bronze ($50).
     const tier = tierForBalance(opts.amount);
     if (!tier) return; // below the lowest tier — not a package activation
@@ -95,16 +247,12 @@ export async function creditFirstPackageCommission(opts: {
     // Referrer's rate is based on THEIR tier at purchase time.
     const referrer = await prisma.user.findUnique({ where: { id: referred.referredById } });
     if (!referrer) return;
-    let referrerBalance = 0;
-    if (referrer.clientId) {
-      const perf = await getClientPerformance(referrer.clientId).catch(() => null);
-      referrerBalance = perf?.kpis.currentBalance ?? 0;
-    }
+    const referrerBalance = await balanceOfUser(referrer.clientId);
     const rate = commissionRateForBalance(referrerBalance);
     const commission = Math.round(tier.price * (rate / 100) * 100) / 100;
 
-    // INSTANT credit: record the commission as PAID and add it to the referrer's
-    // withdrawable balance immediately — no pending state, no 24h delay.
+    // INSTANT credit (level 1): record the commission as PAID and add it to the
+    // referrer's withdrawable balance immediately — no pending, no 24h delay.
     await prisma.$transaction([
       prisma.referralCommission.create({
         data: {
@@ -123,6 +271,18 @@ export async function creditFirstPackageCommission(opts: {
         data: { commissionBalance: { increment: commission } },
       }),
     ]);
+
+    // Level 2 (indirect): pay the nearest UNLOCKED upline above the referrer.
+    await creditLevel2Commission({
+      sourceUserId: referred.id,
+      directUplineId: referrer.id,
+      startUplineId: referrer.referredById,
+      packageAmount: tier.price,
+    });
+
+    // The referrer just gained a (potentially) qualifying active direct —
+    // refresh their unlock so they can start earning level-2 promptly.
+    await recomputeUnlock(referrer.id).catch(() => {});
   } catch (e) {
     // Commission crediting must never break a deposit approval.
     console.error("creditFirstPackageCommission failed (ignored):", e);
@@ -162,6 +322,12 @@ export interface ReferralSummary {
   totalEarned: number;
   commissionBalance: number;
   tierName: string;
+  // 2nd-level compensation.
+  level2Unlocked: boolean;
+  level2Rate: number;
+  activeDirects: number;
+  directsRequired: number;
+  level2Earned: number;
   history: {
     id: string;
     date: string;
@@ -204,7 +370,7 @@ export async function getReferralSummary(user: {
   // Each of these degrades independently; a missing table just yields zeros.
   await settlePendingCommissions(user.id).catch(() => {});
 
-  const [totalReferrals, commissions, fresh] = await Promise.all([
+  const [totalReferrals, commissions, fresh, level2Agg, unlock] = await Promise.all([
     prisma.user.count({ where: { referredById: user.id } }).catch(() => 0),
     prisma.referralCommission
       .findMany({ where: { referrerId: user.id }, orderBy: { createdAt: "desc" } })
@@ -212,6 +378,10 @@ export async function getReferralSummary(user: {
     prisma.user
       .findUnique({ where: { id: user.id }, select: { commissionBalance: true } })
       .catch(() => null),
+    prisma.level2Commission
+      .aggregate({ where: { earnerId: user.id }, _sum: { commissionAmount: true } })
+      .catch(() => ({ _sum: { commissionAmount: 0 } as { commissionAmount: number | null } })),
+    prisma.userUnlock.findUnique({ where: { userId: user.id } }).catch(() => null),
   ]);
 
   let balance = 0;
@@ -223,6 +393,7 @@ export async function getReferralSummary(user: {
 
   const paid = commissions.filter((c) => c.status === "PAID");
   const pending = commissions.filter((c) => c.status === "PENDING");
+  const level2Earned = Math.round((level2Agg._sum.commissionAmount ?? 0) * 100) / 100;
 
   return {
     code,
@@ -231,9 +402,14 @@ export async function getReferralSummary(user: {
     activeReferrals: paid.length,
     pendingReferrals: pending.length,
     commissionRate: commissionRateForBalance(balance),
-    totalEarned: paid.reduce((s, c) => s + c.commission, 0),
+    totalEarned: Math.round((paid.reduce((s, c) => s + c.commission, 0) + level2Earned) * 100) / 100,
     commissionBalance: fresh?.commissionBalance ?? user.commissionBalance ?? 0,
     tierName: tier?.name ?? "None",
+    level2Unlocked: unlock?.level2Unlocked ?? false,
+    level2Rate: level2RateForBalance(balance),
+    activeDirects: unlock?.activeDirectsCount ?? 0,
+    directsRequired: DIRECTS_REQUIRED,
+    level2Earned,
     history: commissions.map((c) => ({
       id: c.id,
       date: c.createdAt.toISOString(),

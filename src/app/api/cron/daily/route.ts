@@ -4,6 +4,7 @@ import { cronAuthorized } from "@/lib/cron-auth";
 import { runDailyPerformance } from "@/lib/daily-performance";
 import { verifyPendingDeposits } from "@/lib/verify-deposits";
 import { runMaturityNotifications } from "@/lib/capital";
+import { recomputeAllUnlocks } from "@/lib/referrals";
 import { ensureFinanceSchemaOnce } from "@/lib/finance-schema";
 
 export const runtime = "nodejs";
@@ -38,6 +39,11 @@ async function handle(req: Request) {
     result.maturity = await runMaturityNotifications();
   } catch (err: any) {
     result.maturity = { ok: false, error: err?.message?.split("\n")[0] ?? "failed" };
+  }
+  try {
+    result.unlocks = await recomputeAllUnlocks();
+  } catch (err: any) {
+    result.unlocks = { ok: false, error: err?.message?.split("\n")[0] ?? "failed" };
   }
   return NextResponse.json(result);
 }

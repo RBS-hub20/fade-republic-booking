@@ -93,6 +93,34 @@ export function ReferralLinkCard({ summary }: { summary: ReferralSummary }) {
           )}
         </div>
 
+        {/* 2nd-level compensation */}
+        <div className="mt-4 rounded-lg border border-border bg-background/40 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm font-semibold">
+              2nd-Level Commission{" "}
+              {summary.level2Unlocked ? (
+                <span className="ml-1 rounded-full bg-profit/15 px-2 py-0.5 text-xs font-semibold text-profit">
+                  Unlocked · {summary.level2Rate}%
+                </span>
+              ) : (
+                <span className="ml-1 rounded-full bg-secondary px-2 py-0.5 text-xs font-semibold text-muted-foreground">
+                  Locked
+                </span>
+              )}
+            </p>
+            {summary.level2Earned > 0 && (
+              <span className="text-sm font-semibold text-gold-300">
+                {formatUsd(summary.level2Earned)} earned
+              </span>
+            )}
+          </div>
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            {summary.level2Unlocked
+              ? `Earning ${summary.level2Rate}% on your indirect referrals' first packages.`
+              : `Get ${summary.directsRequired} active directs (≥ $50 each) to unlock — you have ${summary.activeDirects}/${summary.directsRequired}.`}
+          </p>
+        </div>
+
         {/* Total earned */}
         <p className="mt-4 text-[18px] font-bold text-gold-400">
           Total Earned from Referrals: {formatUsd(summary.totalEarned)}
