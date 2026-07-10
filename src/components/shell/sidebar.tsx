@@ -14,6 +14,9 @@ import {
   Activity,
   MessageSquare,
   ArrowUpFromLine,
+  Coins,
+  CalendarClock,
+  Unlock,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -37,6 +40,9 @@ function navForRole(role: string, clientId: string | null): NavItem[] {
       { href: "/clients", label: "Clients", icon: Users },
       { href: "/approvals", label: "Approvals", icon: CheckSquare },
       { href: "/admin/withdrawals", label: "Withdrawals", icon: ArrowUpFromLine },
+      { href: "/admin/commissions", label: "Commissions", icon: Coins },
+      { href: "/admin/monthly-bonus", label: "Monthly Bonus", icon: CalendarClock },
+      { href: "/admin/unlocks", label: "2nd-Level Unlocks", icon: Unlock },
       { href: "/ledger", label: "Ledger", icon: ArrowLeftRight },
       { href: "/charts", label: "Charts", icon: CandlestickChart },
       { href: "/reports", label: "Reports", icon: FileText },

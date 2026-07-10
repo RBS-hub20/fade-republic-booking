@@ -35,8 +35,10 @@ export default async function ClientsPage() {
   if (session?.role !== "admin") redirect("/dashboard");
   const clients = await getClientsWithBalance();
 
-  // Per-client capital-lock figures (Active Capital / Available / Maturity).
+  // Per-client capital-lock figures (Active Capital / Available / Maturity) +
+  // 2nd-level unlock status per client's user.
   const capitalByClient = new Map<string, CapitalSummary>();
+  const unlockByClient = new Map<string, { unlocked: boolean; active: number }>();
   try {
     await ensureFinanceSchemaOnce(prisma);
     const users = await prisma.user.findMany({
@@ -44,13 +46,17 @@ export default async function ClientsPage() {
       select: { id: true, clientId: true },
     });
     const userByClient = new Map(users.map((u) => [u.clientId as string, u.id]));
+    const unlocks = await prisma.userUnlock
+      .findMany({ where: { userId: { in: users.map((u) => u.id) } } })
+      .catch(() => [] as { userId: string; level2Unlocked: boolean; activeDirectsCount: number }[]);
+    const unlockByUser = new Map(unlocks.map((u) => [u.userId, u]));
     await Promise.all(
       clients.map(async (c) => {
-        const summary = await getCapitalSummary({
-          clientId: c.id,
-          userId: userByClient.get(c.id) ?? "",
-        }).catch(() => null);
+        const uid = userByClient.get(c.id) ?? "";
+        const summary = await getCapitalSummary({ clientId: c.id, userId: uid }).catch(() => null);
         if (summary) capitalByClient.set(c.id, summary);
+        const ul = unlockByUser.get(uid);
+        if (ul) unlockByClient.set(c.id, { unlocked: ul.level2Unlocked, active: ul.activeDirectsCount });
       })
     );
   } catch (err) {
@@ -86,6 +92,18 @@ export default async function ClientsPage() {
                 <TableCell>
                   <div className="font-medium">{c.name}</div>
                   <div className="text-xs text-muted-foreground">{c.email}</div>
+                  {(() => {
+                    const ul = unlockByClient.get(c.id);
+                    return ul?.unlocked ? (
+                      <span className="mt-1 inline-block rounded-full bg-profit/15 px-2 py-0.5 text-[10px] font-semibold text-profit">
+                        2nd Level ✅ Unlocked ({ul.active} directs)
+                      </span>
+                    ) : (
+                      <span className="mt-1 inline-block rounded-full bg-secondary px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                        2nd Level 🔒 Locked ({ul?.active ?? 0}/3)
+                      </span>
+                    );
+                  })()}
                 </TableCell>
                 <TableCell className="font-mono text-xs">{c.accountNumber}</TableCell>
                 <TableCell className="text-right">
