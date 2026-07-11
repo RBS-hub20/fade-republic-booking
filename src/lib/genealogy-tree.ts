@@ -19,6 +19,7 @@ export interface TreeNode {
   avatarType: string | null;
   directCount: number;
   teamCount: number;
+  teamVolume: number; // total approved deposits across the downline
   totalPnlPercent: number;
   joinedAt: string;
   status: string;
@@ -82,7 +83,7 @@ async function enrich(users: UserRow[]): Promise<TreeNode[]> {
   const ids = users.map((u) => u.id);
   const clientIds = users.map((u) => u.clientId).filter(Boolean) as string[];
 
-  const [directGroups, clients, depGroups, pnlGroups, teamCounts] = await Promise.all([
+  const [directGroups, clients, depGroups, pnlGroups, teamCounts, teamVolumes] = await Promise.all([
     prisma.user.groupBy({ by: ["referredById"], where: { referredById: { in: ids } }, _count: { _all: true } }),
     clientIds.length
       ? prisma.client.findMany({ where: { id: { in: clientIds } }, select: { id: true, status: true } })
@@ -106,6 +107,22 @@ async function enrich(users: UserRow[]): Promise<TreeNode[]> {
         });
       })
     ),
+    // Per-node team VOLUME: sum of approved deposits across the same downline.
+    Promise.all(
+      users.map((u) => {
+        const prefix = u.referralPath ? `${u.referralPath}/${u.id}` : u.id;
+        return prisma.transaction
+          .aggregate({
+            where: {
+              type: "DEPOSIT",
+              status: "APPROVED",
+              client: { user: { OR: [{ referralPath: prefix }, { referralPath: { startsWith: `${prefix}/` } }] } },
+            },
+            _sum: { amount: true },
+          })
+          .then((r) => r._sum.amount ?? 0);
+      })
+    ),
   ]);
 
   const directBy = new Map(directGroups.map((g) => [g.referredById as string, g._count._all]));
@@ -126,6 +143,7 @@ async function enrich(users: UserRow[]): Promise<TreeNode[]> {
       avatarType: u.avatarType,
       directCount: direct,
       teamCount: teamCounts[i],
+      teamVolume: Math.round(teamVolumes[i]),
       totalPnlPercent: Math.round(pnlPct * 10) / 10,
       joinedAt: u.createdAt.toISOString(),
       status: u.clientId && statusBy.get(u.clientId) === "ACTIVE" ? "Active" : "Inactive",

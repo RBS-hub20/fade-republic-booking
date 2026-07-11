@@ -24,6 +24,7 @@ interface TreeNode {
   avatarType: string | null;
   directCount: number;
   teamCount: number;
+  teamVolume: number;
   totalPnlPercent: number;
   joinedAt: string;
   status: string;
@@ -394,6 +395,7 @@ function NodeRow(props: {
               <Row label="Joined" value={new Date(node.joinedAt).toLocaleDateString("en-US", { month: "long", year: "numeric" })} />
               <Row label="Direct referrals" value={node.directCount.toLocaleString()} />
               <Row label="Total team" value={node.teamCount.toLocaleString()} />
+              <Row label="Team volume" value={`$${node.teamVolume.toLocaleString()}`} />
               <Row
                 label="All-time P&L"
                 value={`${node.totalPnlPercent > 0 ? "+" : ""}${node.totalPnlPercent}%`}
