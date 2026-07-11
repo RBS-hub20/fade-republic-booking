@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { ExternalLink, FileText, ImageIcon, Download, Eye } from "lucide-react";
+import { ExternalLink, FileText, ImageIcon, Download, Eye, AlertTriangle } from "lucide-react";
 import { PageHeader } from "@/components/shell/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -14,6 +14,7 @@ import {
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { ensureProofSchemaOnce } from "@/lib/proof-schema";
+import { isBlobConfigured } from "@/lib/blob";
 import { explorerTxUrl, explorerName, networkLabel } from "@/lib/tx-validation";
 import { formatDate } from "@/lib/utils";
 
@@ -21,10 +22,12 @@ export const dynamic = "force-dynamic";
 
 const LIMIT = 200;
 
-export default async function AdminProofsPage() {
+export default async function AdminProofAuditPage() {
   const session = getSession();
   if (!session) redirect("/login");
   if (session.role !== "admin") redirect("/dashboard");
+
+  const blobEnabled = isBlobConfigured();
 
   await ensureProofSchemaOnce(prisma).catch(() => {});
   const proofs = await prisma.proofFile
@@ -57,6 +60,21 @@ export default async function AdminProofsPage() {
         title="Proof Audit"
         subtitle={`USDT withdrawal & deposit proof files (Vercel Blob) · ${proofs.length} most recent. Files are private — viewable here only.`}
       />
+
+      {!blobEnabled && (
+        <div className="mb-6 flex items-start gap-2 rounded-lg border border-gold-400/40 bg-gold-400/10 px-4 py-3 text-sm text-gold-200">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <div>
+            <p className="font-semibold">⚠️ Connect Vercel Blob to enable proof storage</p>
+            <p className="mt-0.5 text-xs text-gold-200/80">
+              Set <code className="rounded bg-black/30 px-1">BLOB_READ_WRITE_TOKEN</code> (Vercel → Storage → connect a Blob
+              store, then redeploy). Until then, the proof-upload UI is hidden for admins and clients and no files are stored —
+              the withdrawal and deposit flows keep working normally.
+            </p>
+          </div>
+        </div>
+      )}
+
       <Card>
         <CardContent className="p-0">
           <div className="overflow-x-auto">

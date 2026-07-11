@@ -66,11 +66,13 @@ export function WalletView({
   wallets,
   bankEnabled,
   limits,
+  blobEnabled,
 }: {
   currentBalance: number;
   wallets: DepositWallet[];
   bankEnabled: boolean;
   limits: { min: number; max: number };
+  blobEnabled: boolean;
 }) {
   const [tab, setTab] = useState<"DEPOSIT" | "WITHDRAWAL">("DEPOSIT");
   const [txns, setTxns] = useState<Txn[]>([]);
@@ -135,7 +137,7 @@ export function WalletView({
 
             {tab === "DEPOSIT" ? (
               <>
-                <DepositFlow wallets={wallets} limits={limits} onChanged={load} />
+                <DepositFlow wallets={wallets} limits={limits} onChanged={load} blobEnabled={blobEnabled} />
                 {!bankEnabled && (
                   <p className="mt-3 text-center text-xs text-muted-foreground">
                     Bank transfers are coming soon — USDT only for now.

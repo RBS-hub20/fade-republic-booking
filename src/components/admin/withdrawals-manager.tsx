@@ -61,7 +61,13 @@ const STATUS: Record<string, "warning" | "outline" | "success" | "danger"> = {
   rejected: "danger",
 };
 
-export function WithdrawalsManager({ rows }: { rows: AdminWithdrawal[] }) {
+export function WithdrawalsManager({
+  rows,
+  blobEnabled = false,
+}: {
+  rows: AdminWithdrawal[];
+  blobEnabled?: boolean;
+}) {
   const [approve, setApprove] = useState<AdminWithdrawal | null>(null);
   const [reject, setReject] = useState<AdminWithdrawal | null>(null);
 
@@ -148,7 +154,7 @@ export function WithdrawalsManager({ rows }: { rows: AdminWithdrawal[] }) {
         </div>
       </CardContent>
 
-      {approve && <ApproveModal w={approve} onClose={() => setApprove(null)} />}
+      {approve && <ApproveModal w={approve} blobEnabled={blobEnabled} onClose={() => setApprove(null)} />}
       {reject && <RejectModal w={reject} onClose={() => setReject(null)} />}
     </Card>
   );
@@ -158,7 +164,7 @@ type VerifyState =
   | { status: "idle" | "checking" | "unknown" }
   | { status: "verified" | "pending" | "not_found"; confirmations: number };
 
-function ApproveModal({ w, onClose }: { w: AdminWithdrawal; onClose: () => void }) {
+function ApproveModal({ w, blobEnabled, onClose }: { w: AdminWithdrawal; blobEnabled: boolean; onClose: () => void }) {
   const router = useRouter();
   const [txHash, setTxHash] = useState("");
   const [busy, setBusy] = useState(false);
@@ -324,7 +330,9 @@ function ApproveModal({ w, onClose }: { w: AdminWithdrawal; onClose: () => void 
           </div>
         )}
 
-        {/* Optional screenshot proof (reference — validated client-side) */}
+        {/* Optional screenshot proof — hidden until a Vercel Blob store is
+            connected (BLOB_READ_WRITE_TOKEN). */}
+        {blobEnabled && (
         <div className="space-y-1.5">
           <Label>Screenshot (optional)</Label>
           {file ? (
@@ -358,6 +366,7 @@ function ApproveModal({ w, onClose }: { w: AdminWithdrawal; onClose: () => void 
           )}
           {fileError && <p className="text-xs text-loss">{fileError}</p>}
         </div>
+        )}
 
         {error && <p className="rounded-md bg-loss/10 px-3 py-2 text-sm text-loss">{error}</p>}
         <div className="flex gap-2">

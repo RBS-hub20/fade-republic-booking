@@ -3,6 +3,7 @@ import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { ensureProofSchemaOnce } from "@/lib/proof-schema";
+import { isBlobConfigured } from "@/lib/blob";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,6 +30,11 @@ interface ProofPayload {
  * and (2) is authenticated by the signed blob token that handleUpload verifies.
  */
 export async function POST(req: Request): Promise<NextResponse> {
+  // Graceful no-op until a Vercel Blob store is connected — never 500s.
+  if (!isBlobConfigured()) {
+    return NextResponse.json({ error: "Proof storage is not configured yet.", disabled: true }, { status: 200 });
+  }
+
   const body = (await req.json()) as HandleUploadBody;
 
   try {

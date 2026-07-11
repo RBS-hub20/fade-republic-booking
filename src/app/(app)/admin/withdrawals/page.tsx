@@ -4,6 +4,7 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { ensureFinanceSchemaOnce } from "@/lib/finance-schema";
 import { WithdrawalsManager, type AdminWithdrawal } from "@/components/admin/withdrawals-manager";
+import { isBlobConfigured } from "@/lib/blob";
 
 export const dynamic = "force-dynamic";
 
@@ -49,7 +50,7 @@ export default async function AdminWithdrawalsPage() {
         title="Withdrawals"
         subtitle={`Manual processing · ${pending} awaiting action. Send USDT externally, then record the TX hash.`}
       />
-      <WithdrawalsManager rows={rows} />
+      <WithdrawalsManager rows={rows} blobEnabled={isBlobConfigured()} />
     </>
   );
 }

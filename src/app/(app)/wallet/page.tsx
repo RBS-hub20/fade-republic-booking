@@ -4,6 +4,7 @@ import { WalletView } from "@/components/wallet/wallet-view";
 import { getSession } from "@/lib/auth";
 import { getClientPerformance } from "@/lib/data";
 import { getDepositWallets, BANK_ENABLED, getDepositLimits } from "@/lib/payments";
+import { isBlobConfigured } from "@/lib/blob";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +38,7 @@ export default async function WalletPage() {
         wallets={getDepositWallets()}
         bankEnabled={BANK_ENABLED}
         limits={getDepositLimits()}
+        blobEnabled={isBlobConfigured()}
       />
     </>
   );

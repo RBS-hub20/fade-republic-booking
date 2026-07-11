@@ -51,10 +51,12 @@ export function DepositFlow({
   wallets,
   limits,
   onChanged,
+  blobEnabled = false,
 }: {
   wallets: DepositWallet[];
   limits: { min: number; max: number };
   onChanged: () => void;
+  blobEnabled?: boolean;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -494,7 +496,9 @@ export function DepositFlow({
                   </div>
                 )}
 
-                {/* Optional deposit screenshot (PNG/JPG/PDF, ≤5MB) */}
+                {/* Optional deposit screenshot (PNG/JPG/PDF, ≤5MB) — hidden
+                    entirely until proof storage (Vercel Blob) is connected. */}
+                {blobEnabled && (
                 <div className="space-y-1">
                   {proofFile ? (
                     <div className="flex items-center gap-2 rounded-md border border-border bg-background/40 px-2 py-1.5 text-xs">
@@ -518,6 +522,7 @@ export function DepositFlow({
                   )}
                   {proofError && <p className="text-xs text-loss">{proofError}</p>}
                 </div>
+                )}
 
                 {txMsg && <p className="text-xs text-muted-foreground">{txMsg}</p>}
               </form>
