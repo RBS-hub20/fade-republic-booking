@@ -21,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn, formatUsd } from "@/lib/utils";
 import { tierById } from "@/lib/tiers";
+import { txidFeedback, explorerTxUrl, explorerName, networkLabel } from "@/lib/tx-validation";
 
 interface DepositWallet {
   method: "USDT_BEP20" | "USDT_TRC20";
@@ -79,6 +80,10 @@ export function DepositFlow({
   const [txHash, setTxHash] = useState("");
   const [txSubmitting, setTxSubmitting] = useState(false);
   const [txMsg, setTxMsg] = useState<string | null>(null);
+  const [verify, setVerify] = useState<
+    | { status: "idle" | "checking" | "unknown" }
+    | { status: "verified" | "pending" | "not_found"; confirmations: number }
+  >({ status: "idle" });
 
   const selectedWallet = wallets.find((w) => w.method === method) ?? wallets[0];
 
@@ -158,7 +163,11 @@ export function DepositFlow({
 
   async function submitTxHash(e: React.FormEvent) {
     e.preventDefault();
-    if (!active || !txHash.trim()) return;
+    if (!active) return;
+    if (txidFeedback(active.wallet.method, txHash).state !== "valid") {
+      setTxMsg(`Enter a valid ${networkLabel(active.wallet.method)} transaction hash.`);
+      return;
+    }
     setTxSubmitting(true);
     setTxMsg(null);
     const res = await fetch("/api/deposits/txid", {
@@ -174,6 +183,26 @@ export function DepositFlow({
       poll();
     } else {
       setTxMsg(data.error ?? "Could not submit transaction hash.");
+    }
+  }
+
+  // Best-effort on-chain check (mirrors the admin proof modal). Convenience
+  // only — crediting still happens via /api/deposits/txid + status polling.
+  async function runVerify(hash: string) {
+    if (!active || txidFeedback(active.wallet.method, hash).state !== "valid") return;
+    setVerify({ status: "checking" });
+    try {
+      const res = await fetch(
+        `/api/deposits/verify-tx?network=${active.wallet.method}&hash=${encodeURIComponent(hash.trim())}`
+      );
+      const d = await res.json().catch(() => ({}));
+      if (d?.status === "verified" || d?.status === "pending" || d?.status === "not_found") {
+        setVerify({ status: d.status, confirmations: Number(d.confirmations ?? 0) });
+      } else {
+        setVerify({ status: "unknown" });
+      }
+    } catch {
+      setVerify({ status: "unknown" });
     }
   }
 
@@ -363,22 +392,84 @@ export function DepositFlow({
             </a>
           </div>
 
-          {/* TxID input */}
-          <form onSubmit={submitTxHash} className="space-y-2">
-            <Label htmlFor="dep-txid">Transaction hash (recommended — for instant confirmation)</Label>
-            <div className="flex gap-2">
-              <Input
-                id="dep-txid"
-                placeholder="Paste your TxID after sending"
-                value={txHash}
-                onChange={(e) => setTxHash(e.target.value)}
-              />
-              <Button type="submit" variant="outline" disabled={txSubmitting || !txHash.trim()}>
-                {txSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Submit"}
-              </Button>
-            </div>
-            {txMsg && <p className="text-xs text-muted-foreground">{txMsg}</p>}
-          </form>
+          {/* TxID input — same validation / auto-verify / explorer as the admin proof modal */}
+          {(() => {
+            const fb = txidFeedback(w.method, txHash);
+            const canSubmit = fb.state === "valid" && !txSubmitting;
+            return (
+              <form onSubmit={submitTxHash} className="space-y-2">
+                <Label htmlFor="dep-txid">Transaction Hash (TXID) — recommended for instant confirmation</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="dep-txid"
+                    placeholder={w.method === "USDT_TRC20" ? "64 hex characters, no 0x" : "0x + 64 hex characters"}
+                    value={txHash}
+                    onChange={(e) => {
+                      setTxHash(e.target.value);
+                      setVerify({ status: "idle" });
+                    }}
+                    onBlur={(e) => runVerify(e.target.value)}
+                    className={cn(
+                      fb.state === "valid" && "border-profit/60",
+                      fb.state === "invalid" && "border-loss/60"
+                    )}
+                  />
+                  <Button type="submit" variant="outline" disabled={!canSubmit}>
+                    {txSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Submit"}
+                  </Button>
+                </div>
+
+                {fb.state === "valid" && (
+                  <p className="flex items-center gap-1 text-xs text-profit">
+                    <Check className="h-3.5 w-3.5" /> {fb.message}
+                  </p>
+                )}
+                {fb.state === "invalid" && (
+                  <p className="flex items-center gap-1 text-xs text-loss">
+                    <AlertTriangle className="h-3.5 w-3.5" /> {fb.message}
+                  </p>
+                )}
+
+                {fb.state === "valid" && (
+                  <div className="flex items-center justify-between rounded-md border border-border bg-background/40 px-3 py-2 text-xs">
+                    <span className="flex items-center gap-1.5">
+                      {verify.status === "checking" && (
+                        <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Checking blockchain…</>
+                      )}
+                      {verify.status === "verified" && (
+                        <span className="flex items-center gap-1 text-profit">
+                          <CheckCircle2 className="h-3.5 w-3.5" /> Verified — {verify.confirmations} confirmation{verify.confirmations === 1 ? "" : "s"}
+                        </span>
+                      )}
+                      {verify.status === "pending" && (
+                        <span className="flex items-center gap-1 text-gold-300">
+                          <Clock className="h-3.5 w-3.5" /> Pending — {verify.confirmations} confirmations
+                        </span>
+                      )}
+                      {verify.status === "not_found" && (
+                        <span className="flex items-center gap-1 text-loss">
+                          <AlertTriangle className="h-3.5 w-3.5" /> Not found on {explorerName(w.method)}
+                        </span>
+                      )}
+                      {(verify.status === "idle" || verify.status === "unknown") && (
+                        <span className="text-muted-foreground">On-chain check runs when you finish typing</span>
+                      )}
+                    </span>
+                    <a
+                      href={explorerTxUrl(w.method, txHash)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 font-medium text-gold-300 hover:underline"
+                    >
+                      View on {explorerName(w.method)} <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </div>
+                )}
+
+                {txMsg && <p className="text-xs text-muted-foreground">{txMsg}</p>}
+              </form>
+            );
+          })()}
 
           <p className="text-center text-xs text-muted-foreground">
             This screen updates automatically. Your balance is credited once the transfer is verified
