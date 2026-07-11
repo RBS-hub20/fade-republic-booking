@@ -11,6 +11,14 @@ export const REFERRAL_DDL: string[] = [
   `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "referredById" TEXT`,
   `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "commissionBalance" DOUBLE PRECISION NOT NULL DEFAULT 0`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "User_referralCode_key" ON "User"("referralCode")`,
+  // Genealogy / lineage (materialized-path). text_pattern_ops lets the btree
+  // serve fast prefix scans for downline queries (referralPath LIKE 'a/b/%').
+  `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "referralPath" TEXT`,
+  `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "referralDepth" INTEGER NOT NULL DEFAULT 0`,
+  `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "rootSponsorId" TEXT`,
+  `CREATE INDEX IF NOT EXISTS "User_referralPath_idx" ON "User"("referralPath" text_pattern_ops)`,
+  `CREATE INDEX IF NOT EXISTS "User_referralDepth_idx" ON "User"("referralDepth")`,
+  `CREATE INDEX IF NOT EXISTS "User_rootSponsorId_idx" ON "User"("rootSponsorId")`,
   `CREATE TABLE IF NOT EXISTS "ReferralCommission" (
      "id" TEXT NOT NULL PRIMARY KEY,
      "referrerId" TEXT NOT NULL,

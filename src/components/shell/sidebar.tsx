@@ -17,6 +17,7 @@ import {
   Coins,
   CalendarClock,
   Unlock,
+  Network,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -43,6 +44,7 @@ function navForRole(role: string, clientId: string | null): NavItem[] {
       { href: "/admin/commissions", label: "Commissions", icon: Coins },
       { href: "/admin/monthly-bonus", label: "Monthly Bonus", icon: CalendarClock },
       { href: "/admin/unlocks", label: "2nd-Level Unlocks", icon: Unlock },
+      { href: "/admin/genealogy", label: "Genealogy", icon: Network },
       { href: "/ledger", label: "Ledger", icon: ArrowLeftRight },
       { href: "/charts", label: "Charts", icon: CandlestickChart },
       { href: "/reports", label: "Reports", icon: FileText },

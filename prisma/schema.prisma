@@ -45,6 +45,12 @@ model User {
   referredById      String?
   referredBy        User?    @relation("UserReferrals", fields: [referredById], references: [id], onDelete: SetNull)
   referrals         User[]   @relation("UserReferrals")
+  // --- Genealogy / lineage (materialized-path) ------------------------------
+  // Slash-joined ancestor ids from root → direct sponsor (excludes self); null
+  // for a root user. depth = number of ancestors; rootSponsorId = topmost.
+  referralPath      String?
+  referralDepth     Int      @default(0)
+  rootSponsorId     String?
   // Withdrawable, settled referral commission (separate from trading balance).
   commissionBalance Float    @default(0)
   commissionsEarned    ReferralCommission[]   @relation("CommissionEarner")
@@ -52,6 +58,10 @@ model User {
 
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+
+  @@index([referralPath])
+  @@index([referralDepth])
+  @@index([rootSponsorId])
 }
 
 // One commission per referred user (first QX Tier activation only).

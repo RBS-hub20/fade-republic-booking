@@ -7,6 +7,7 @@ import { enforce } from "@/lib/rate-limit";
 import { findReferrerByCode, ensureReferralCode } from "@/lib/referrals";
 import { REFERRALS_ENABLED } from "@/lib/referrals-config";
 import { ensureReferralSchemaOnce } from "@/lib/referral-schema";
+import { computeGenealogyForSponsor } from "@/lib/genealogy";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -89,6 +90,13 @@ export async function POST(req: Request) {
       referredById = await findReferrerByCode(String(ref)).catch(() => null);
     }
 
+    // Materialize the new user's lineage (path/depth/root) from their sponsor.
+    const genealogy = await computeGenealogyForSponsor(referredById).catch(() => ({
+      referralPath: null,
+      referralDepth: 0,
+      rootSponsorId: null,
+    }));
+
     user = await prisma.$transaction(async (tx) => {
       const client = await tx.client.create({
         data: {
@@ -109,6 +117,9 @@ export async function POST(req: Request) {
           role: "client",
           clientId: client.id,
           referredById,
+          referralPath: genealogy.referralPath,
+          referralDepth: genealogy.referralDepth,
+          rootSponsorId: genealogy.rootSponsorId,
         },
       });
     });

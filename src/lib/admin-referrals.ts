@@ -10,6 +10,7 @@ import { ensureReferralSchemaOnce } from "./referral-schema";
 export interface UserInfo {
   userId: string;
   name: string;
+  email: string;
   account: string;
   status: string;
   activeCapital: number;
@@ -22,7 +23,7 @@ const MIN_CAPITAL = 50;
 /** Map every user id → display info (name, account, status, capital, tier). */
 export async function resolveUsers(): Promise<Map<string, UserInfo>> {
   const [users, clients] = await Promise.all([
-    prisma.user.findMany({ select: { id: true, name: true, clientId: true } }),
+    prisma.user.findMany({ select: { id: true, name: true, email: true, clientId: true } }),
     prisma.client.findMany({ select: { id: true, name: true, accountNumber: true, status: true } }),
   ]);
   const clientIds = users.map((u) => u.clientId).filter(Boolean) as string[];
@@ -43,6 +44,7 @@ export async function resolveUsers(): Promise<Map<string, UserInfo>> {
     map.set(u.id, {
       userId: u.id,
       name: c?.name ?? u.name,
+      email: u.email,
       account: c?.accountNumber ?? "—",
       status: c?.status ?? "—",
       activeCapital: cap,
