@@ -15,6 +15,8 @@ import {
   XCircle,
   ArrowLeft,
   Lock,
+  UploadCloud,
+  FileText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +24,7 @@ import { Label } from "@/components/ui/label";
 import { cn, formatUsd } from "@/lib/utils";
 import { tierById } from "@/lib/tiers";
 import { txidFeedback, explorerTxUrl, explorerName, networkLabel } from "@/lib/tx-validation";
+import { uploadProof } from "@/lib/proof-upload";
 
 interface DepositWallet {
   method: "USDT_BEP20" | "USDT_TRC20";
@@ -84,6 +87,16 @@ export function DepositFlow({
     | { status: "idle" | "checking" | "unknown" }
     | { status: "verified" | "pending" | "not_found"; confirmations: number }
   >({ status: "idle" });
+  const [proofFile, setProofFile] = useState<File | null>(null);
+  const [proofError, setProofError] = useState<string | null>(null);
+
+  function pickProof(f: File | null) {
+    setProofError(null);
+    if (!f) return;
+    if (!/^(image\/(png|jpe?g)|application\/pdf)$/.test(f.type)) return setProofError("Use PNG, JPG, or PDF.");
+    if (f.size > 5 * 1024 * 1024) return setProofError("Max file size is 5MB.");
+    setProofFile(f);
+  }
 
   const selectedWallet = wallets.find((w) => w.method === method) ?? wallets[0];
 
@@ -176,12 +189,27 @@ export function DepositFlow({
       body: JSON.stringify({ id: active.id, txHash: txHash.trim() }),
     });
     const data = await res.json().catch(() => ({}));
-    setTxSubmitting(false);
     if (res.ok) {
+      // Best-effort proof upload — never blocks confirmation.
+      if (proofFile) {
+        try {
+          await uploadProof({
+            kind: "deposit",
+            refId: active.id,
+            network: active.wallet.method,
+            txHash: txHash.trim(),
+            file: proofFile,
+          });
+        } catch {
+          /* proof is optional */
+        }
+      }
+      setTxSubmitting(false);
       setState((s) => (s === "waiting" ? "confirming" : s));
       setTxMsg("Transaction submitted — confirming on-chain…");
       poll();
     } else {
+      setTxSubmitting(false);
       setTxMsg(data.error ?? "Could not submit transaction hash.");
     }
   }
@@ -465,6 +493,31 @@ export function DepositFlow({
                     </a>
                   </div>
                 )}
+
+                {/* Optional deposit screenshot (PNG/JPG/PDF, ≤5MB) */}
+                <div className="space-y-1">
+                  {proofFile ? (
+                    <div className="flex items-center gap-2 rounded-md border border-border bg-background/40 px-2 py-1.5 text-xs">
+                      <FileText className="h-3.5 w-3.5 text-gold-300" />
+                      <span className="flex-1 truncate">{proofFile.name}</span>
+                      <button type="button" onClick={() => setProofFile(null)} className="text-muted-foreground hover:text-loss">
+                        <XCircle className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="flex cursor-pointer items-center gap-2 rounded-md border border-dashed border-border px-2 py-1.5 text-xs text-muted-foreground hover:border-gold-400/40">
+                      <UploadCloud className="h-3.5 w-3.5" />
+                      Attach screenshot (optional) — PNG/JPG/PDF, ≤5MB
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,application/pdf"
+                        className="hidden"
+                        onChange={(e) => pickProof(e.target.files?.[0] ?? null)}
+                      />
+                    </label>
+                  )}
+                  {proofError && <p className="text-xs text-loss">{proofError}</p>}
+                </div>
 
                 {txMsg && <p className="text-xs text-muted-foreground">{txMsg}</p>}
               </form>

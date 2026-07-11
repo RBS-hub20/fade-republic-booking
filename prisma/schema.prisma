@@ -85,6 +85,28 @@ model ReferralCommission {
 }
 
 // AI support chat transcript (both sides), retained for admin review.
+/// Uploaded USDT proof screenshots/PDFs (withdrawal payout proof by admins,
+/// deposit proof by clients), stored in Vercel Blob. `url` is the (unguessable)
+/// blob URL — never sent to the browser; admins view via an auth-gated stream.
+model ProofFile {
+  id           String   @id @default(cuid())
+  kind         String // "withdrawal" | "deposit"
+  refId        String // withdrawal.id or transaction.id
+  uploaderId   String?
+  clientId     String?
+  network      String?
+  txHash       String?
+  url          String
+  pathname     String
+  contentType  String
+  size         Int      @default(0)
+  originalName String?
+  createdAt    DateTime @default(now())
+
+  @@index([kind, refId])
+  @@index([createdAt])
+}
+
 model ChatMessage {
   id        String   @id @default(cuid())
   userId    String

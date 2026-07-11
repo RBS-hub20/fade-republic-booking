@@ -38,6 +38,7 @@ import {
   shortAddress,
 } from "@/lib/tx-validation";
 import { useHoldInactivityPause } from "@/lib/inactivity";
+import { uploadProof } from "@/lib/proof-upload";
 
 export interface AdminWithdrawal {
   id: string;
@@ -232,13 +233,22 @@ function ApproveModal({ w, onClose }: { w: AdminWithdrawal; onClose: () => void 
       body: JSON.stringify({ action: "approve", txHash: txHash.trim() }),
     });
     const data = await res.json().catch(() => ({}));
-    setBusy(false);
-    if (res.ok) {
-      router.refresh();
-      onClose();
-    } else {
+    if (!res.ok) {
+      setBusy(false);
       setError(data.error ?? "Failed to approve.");
+      return;
     }
+    // Best-effort proof upload (never blocks the payout confirmation).
+    if (file) {
+      try {
+        await uploadProof({ kind: "withdrawal", refId: w.id, network: w.network, txHash: txHash.trim(), file });
+      } catch {
+        /* proof is optional — the payout is already recorded */
+      }
+    }
+    setBusy(false);
+    router.refresh();
+    onClose();
   }
 
   return (

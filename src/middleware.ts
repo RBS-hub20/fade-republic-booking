@@ -32,6 +32,9 @@ export function middleware(req: NextRequest) {
     pathname.startsWith("/api/market") ||
     // Public XENA chat (marketing site visitors have no session).
     pathname.startsWith("/api/support") ||
+    // Vercel Blob upload handler — auth is enforced inside (session for the
+    // browser token request; signed blob token for the completion callback).
+    pathname === "/api/proofs/upload" ||
     // The verify route enforces its own CRON_SECRET / admin check.
     pathname.startsWith("/api/deposits/verify") ||
     pathname === "/api/health" ||
