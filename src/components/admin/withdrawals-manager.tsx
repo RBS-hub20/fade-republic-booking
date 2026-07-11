@@ -1,8 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, ExternalLink, Check, X } from "lucide-react";
+import {
+  Loader2,
+  ExternalLink,
+  Check,
+  X,
+  Copy,
+  CheckCircle2,
+  AlertTriangle,
+  Clock,
+  UploadCloud,
+  FileText,
+} from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +29,15 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn, formatUsd, formatDate } from "@/lib/utils";
+import {
+  txidFeedback,
+  explorerTxUrl,
+  explorerName,
+  networkLabel,
+  networkFeeUsd,
+  shortAddress,
+} from "@/lib/tx-validation";
+import { useHoldInactivityPause } from "@/lib/inactivity";
 
 export interface AdminWithdrawal {
   id: string;
@@ -133,14 +153,77 @@ export function WithdrawalsManager({ rows }: { rows: AdminWithdrawal[] }) {
   );
 }
 
+type VerifyState =
+  | { status: "idle" | "checking" | "unknown" }
+  | { status: "verified" | "pending" | "not_found"; confirmations: number };
+
 function ApproveModal({ w, onClose }: { w: AdminWithdrawal; onClose: () => void }) {
   const router = useRouter();
   const [txHash, setTxHash] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [verify, setVerify] = useState<VerifyState>({ status: "idle" });
+  const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [fileError, setFileError] = useState<string | null>(null);
+  const [dragOver, setDragOver] = useState(false);
+
+  // Pause the inactivity auto-logout while this proof modal is open — the admin
+  // needs time to copy the TXID from their wallet / the explorer.
+  useHoldInactivityPause(true, "withdrawal-proof");
+
+  // Revoke object URLs to avoid leaking blobs.
+  useEffect(() => {
+    return () => {
+      if (preview) URL.revokeObjectURL(preview);
+    };
+  }, [preview]);
+
+  const label = networkLabel(w.network);
+  const fb = txidFeedback(w.network, txHash);
+  const canSubmit = fb.state === "valid" && !busy;
+
+  async function runVerify(hash: string) {
+    if (txidFeedback(w.network, hash).state !== "valid") return;
+    setVerify({ status: "checking" });
+    try {
+      const res = await fetch(
+        `/api/admin/verify-tx?network=${w.network}&hash=${encodeURIComponent(hash.trim())}`
+      );
+      const d = await res.json().catch(() => ({}));
+      if (d?.status === "verified" || d?.status === "pending" || d?.status === "not_found") {
+        setVerify({ status: d.status, confirmations: Number(d.confirmations ?? 0) });
+      } else {
+        setVerify({ status: "unknown" });
+      }
+    } catch {
+      setVerify({ status: "unknown" });
+    }
+  }
+
+  function pickFile(f: File | null) {
+    setFileError(null);
+    if (!f) return;
+    const okType = /^(image\/(png|jpe?g)|application\/pdf)$/.test(f.type);
+    if (!okType) return setFileError("Use PNG, JPG, or PDF.");
+    if (f.size > 5 * 1024 * 1024) return setFileError("Max file size is 5MB.");
+    setFile(f);
+    setPreview(f.type.startsWith("image/") ? URL.createObjectURL(f) : null);
+  }
+
+  async function copyAddr() {
+    try {
+      await navigator.clipboard.writeText(w.address);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* ignore */
+    }
+  }
 
   async function confirm() {
-    if (!txHash.trim()) return setError("Transaction hash is required.");
+    if (fb.state !== "valid") return setError(`Enter a valid ${label} transaction hash.`);
     setBusy(true);
     setError(null);
     const res = await fetch(`/api/withdrawals/${w.id}`, {
@@ -162,34 +245,114 @@ function ApproveModal({ w, onClose }: { w: AdminWithdrawal; onClose: () => void 
     <Modal
       open
       onClose={onClose}
-      title="Approve & Send Email"
-      description="Send the USDT from your external wallet first, then paste the on-chain TX hash below. The platform does not send funds automatically."
+      title="Upload Withdrawal Proof"
+      description="Send the USDT from your external wallet first, then record the on-chain TX hash. The platform never sends funds automatically."
     >
       <div className="space-y-3">
+        {/* Read-only transfer summary */}
         <div className="grid grid-cols-2 gap-2 rounded-md border border-border bg-background/40 p-3 text-sm">
           <Detail label="User" value={w.client} />
-          <Detail label="Network" value={w.network === "USDT_TRC20" ? "TRC20" : "BEP20"} />
-          <Detail label="Requested" value={formatUsd(w.amount)} />
-          <Detail label="Fee (3%)" value={formatUsd(w.fee)} />
-          <Detail label="Amount to Send" value={formatUsd(w.receiveAmount)} strong />
+          <Detail label={`Network (${label})`} value={label === "TRC20" ? "Tron (TRC20)" : "BNB Smart Chain (BEP20)"} />
+          <Detail label="Amount Sent" value={`${w.receiveAmount.toFixed(2)} USDT`} strong />
+          <Detail label="Network Fee (est.)" value={`~$${networkFeeUsd(w.network).toFixed(2)}`} />
           <div className="col-span-2">
-            <p className="text-xs text-muted-foreground">Address</p>
-            <p className="break-all font-mono text-xs">{w.address}</p>
+            <p className="text-xs text-muted-foreground">Recipient Address</p>
+            <div className="flex items-center gap-2">
+              <p className="font-mono text-xs" title={w.address}>{shortAddress(w.address, 10, 8)}</p>
+              <button type="button" onClick={copyAddr} className="text-muted-foreground hover:text-gold-300" title="Copy address">
+                {copied ? <CheckCircle2 className="h-3.5 w-3.5 text-profit" /> : <Copy className="h-3.5 w-3.5" />}
+              </button>
+            </div>
+          </div>
+          <div className="col-span-2">
+            <Badge variant="warning" className="capitalize">Status: {w.status === "processing" ? "Sending" : "Sent"}</Badge>
           </div>
         </div>
+
+        {/* TXID + live validation */}
         <div className="space-y-1.5">
-          <Label htmlFor="txhash">Transaction Hash</Label>
+          <Label htmlFor="txhash">Transaction Hash (TXID)</Label>
           <Input
             id="txhash"
-            placeholder="Paste transaction hash here"
+            placeholder={label === "TRC20" ? "64 hex characters, no 0x" : "0x + 64 hex characters"}
             value={txHash}
-            onChange={(e) => setTxHash(e.target.value)}
+            onChange={(e) => {
+              setTxHash(e.target.value);
+              setVerify({ status: "idle" });
+            }}
+            onBlur={(e) => runVerify(e.target.value)}
+            className={cn(
+              fb.state === "valid" && "border-profit/60",
+              fb.state === "invalid" && "border-loss/60"
+            )}
           />
+          {fb.state === "valid" && (
+            <p className="flex items-center gap-1 text-xs text-profit">
+              <Check className="h-3.5 w-3.5" /> {fb.message}
+            </p>
+          )}
+          {fb.state === "invalid" && (
+            <p className="flex items-center gap-1 text-xs text-loss">
+              <AlertTriangle className="h-3.5 w-3.5" /> {fb.message}
+            </p>
+          )}
         </div>
+
+        {/* Auto-verify + explorer */}
+        {fb.state === "valid" && (
+          <div className="flex items-center justify-between rounded-md border border-border bg-background/40 px-3 py-2 text-xs">
+            <span className="flex items-center gap-1.5">
+              {verify.status === "checking" && <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Checking blockchain…</>}
+              {verify.status === "verified" && <span className="flex items-center gap-1 text-profit"><CheckCircle2 className="h-3.5 w-3.5" /> Verified — {verify.confirmations} confirmation{verify.confirmations === 1 ? "" : "s"}</span>}
+              {verify.status === "pending" && <span className="flex items-center gap-1 text-gold-300"><Clock className="h-3.5 w-3.5" /> Pending — {verify.confirmations} confirmations</span>}
+              {verify.status === "not_found" && <span className="flex items-center gap-1 text-loss"><AlertTriangle className="h-3.5 w-3.5" /> Not found on {explorerName(w.network)}</span>}
+              {(verify.status === "idle" || verify.status === "unknown") && <span className="text-muted-foreground">On-chain check runs on blur</span>}
+            </span>
+            <a href={explorerTxUrl(w.network, txHash)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 font-medium text-gold-300 hover:underline">
+              View on {explorerName(w.network)} <ExternalLink className="h-3 w-3" />
+            </a>
+          </div>
+        )}
+
+        {/* Optional screenshot proof (reference — validated client-side) */}
+        <div className="space-y-1.5">
+          <Label>Screenshot (optional)</Label>
+          {file ? (
+            <div className="flex items-center gap-3 rounded-md border border-border bg-background/40 p-2">
+              {preview ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={preview} alt="proof" className="h-12 w-12 rounded object-cover" />
+              ) : (
+                <FileText className="h-8 w-8 text-gold-300" />
+              )}
+              <span className="flex-1 truncate text-xs">{file.name}</span>
+              <button type="button" onClick={() => { setFile(null); setPreview(null); }} className="text-muted-foreground hover:text-loss">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          ) : (
+            <label
+              onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={(e) => { e.preventDefault(); setDragOver(false); pickFile(e.dataTransfer.files?.[0] ?? null); }}
+              className={cn(
+                "flex cursor-pointer flex-col items-center justify-center gap-1 rounded-md border border-dashed px-3 py-4 text-center text-xs text-muted-foreground transition-colors",
+                dragOver ? "border-gold-400/60 bg-gold-400/5" : "border-border hover:border-gold-400/40"
+              )}
+            >
+              <UploadCloud className="h-5 w-5" />
+              <span>Drag &amp; drop or click — PNG/JPG/PDF, max 5MB</span>
+              <span className="text-[10px]">Upload a screenshot from {explorerName(w.network)} for faster verification</span>
+              <input type="file" accept="image/png,image/jpeg,application/pdf" className="hidden" onChange={(e) => pickFile(e.target.files?.[0] ?? null)} />
+            </label>
+          )}
+          {fileError && <p className="text-xs text-loss">{fileError}</p>}
+        </div>
+
         {error && <p className="rounded-md bg-loss/10 px-3 py-2 text-sm text-loss">{error}</p>}
         <div className="flex gap-2">
           <Button variant="outline" className="flex-1" onClick={onClose}>Cancel</Button>
-          <Button className="flex-1" onClick={confirm} disabled={busy}>
+          <Button className="flex-1" onClick={confirm} disabled={!canSubmit}>
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
             Confirm &amp; Send Email
           </Button>
