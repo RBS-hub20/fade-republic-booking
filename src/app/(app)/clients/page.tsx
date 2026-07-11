@@ -18,6 +18,7 @@ import { getClientsWithBalance } from "@/lib/data";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { ensureFinanceSchemaOnce } from "@/lib/finance-schema";
+import { ensureUsernameSchemaOnce } from "@/lib/username";
 import { getCapitalSummary, type CapitalSummary } from "@/lib/capital";
 import { cn, formatUsd, formatDate } from "@/lib/utils";
 import { STATUS_LABELS, type ClientStatus } from "@/lib/constants";
@@ -39,13 +40,16 @@ export default async function ClientsPage() {
   // 2nd-level unlock status per client's user.
   const capitalByClient = new Map<string, CapitalSummary>();
   const unlockByClient = new Map<string, { unlocked: boolean; active: number }>();
+  const usernameByClient = new Map<string, string>();
   try {
     await ensureFinanceSchemaOnce(prisma);
+    await ensureUsernameSchemaOnce(prisma);
     const users = await prisma.user.findMany({
       where: { clientId: { in: clients.map((c) => c.id) } },
-      select: { id: true, clientId: true },
+      select: { id: true, clientId: true, username: true },
     });
     const userByClient = new Map(users.map((u) => [u.clientId as string, u.id]));
+    for (const u of users) if (u.clientId && u.username) usernameByClient.set(u.clientId, u.username);
     const unlocks = await prisma.userUnlock
       .findMany({ where: { userId: { in: users.map((u) => u.id) } } })
       .catch(() => [] as { userId: string; level2Unlocked: boolean; activeDirectsCount: number }[]);
@@ -90,7 +94,12 @@ export default async function ClientsPage() {
               return (
               <TableRow key={c.id}>
                 <TableCell>
-                  <div className="font-medium">{c.name}</div>
+                  <div className="font-medium">
+                    {c.name}
+                    {usernameByClient.get(c.id) && (
+                      <span className="ml-1.5 text-xs font-normal text-gold-300">@{usernameByClient.get(c.id)}</span>
+                    )}
+                  </div>
                   <div className="text-xs text-muted-foreground">{c.email}</div>
                   {(() => {
                     const ul = unlockByClient.get(c.id);

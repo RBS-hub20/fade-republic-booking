@@ -81,11 +81,13 @@ export default function LoginPage() {
             <form onSubmit={onSubmit} className="space-y-4" autoComplete="off">
               <input type="text" name="prevent_autofill" className="hidden" autoComplete="off" tabIndex={-1} aria-hidden />
               <div className="space-y-1.5">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">Email or username</Label>
                 <Input
                   id="email"
                   name="login-email"
-                  type="email"
+                  type="text"
+                  inputMode="email"
+                  placeholder="Email or username"
                   autoComplete="off"
                   autoCorrect="off"
                   autoCapitalize="none"

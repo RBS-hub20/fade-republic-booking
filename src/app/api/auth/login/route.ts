@@ -5,6 +5,7 @@ import { encodeSession } from "@/lib/session";
 import { verifyPassword, hashPassword } from "@/lib/password";
 import { enforce } from "@/lib/rate-limit";
 import { getClientPerformance } from "@/lib/data";
+import { ensureUsernameSchemaOnce, ensureUsernamesBackfilledOnce } from "@/lib/username";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -39,16 +40,26 @@ export async function POST(req: Request) {
 
   const { email, password } = await req.json().catch(() => ({}));
   if (!email || !password) {
-    return NextResponse.json({ error: "Email and password are required" }, { status: 400 });
+    return NextResponse.json({ error: "Email or username and password are required" }, { status: 400 });
   }
-  const cleanEmail = String(email).toLowerCase().trim();
+  // `email` is really an identifier now — an email OR a username. Login is
+  // case-insensitive on both.
+  const identifier = String(email).trim();
+  const cleanEmail = identifier.toLowerCase();
 
   if (!process.env.SESSION_SECRET) {
     log("WARNING: SESSION_SECRET is not set — using an insecure dev fallback secret.");
   }
 
-  let user = await prisma.user.findUnique({
-    where: { email: cleanEmail },
+  // Ensure the username column exists before we reference it in the WHERE.
+  await ensureUsernameSchemaOnce(prisma).catch(() => {});
+  let user = await prisma.user.findFirst({
+    where: {
+      OR: [
+        { email: { equals: identifier, mode: "insensitive" } },
+        { username: { equals: identifier, mode: "insensitive" } },
+      ],
+    },
     select: AUTH_SELECT,
   });
   let passOk = !!user && verifyPassword(String(password), user.passwordHash);
@@ -99,6 +110,10 @@ export async function POST(req: Request) {
       { status: 403 }
     );
   }
+
+  // One-time backfill so existing users get a username (and the claim banner).
+  // Fire-and-forget — never delays or blocks login.
+  void ensureUsernamesBackfilledOnce();
 
   const session: Session = {
     userId: user.id,

@@ -51,6 +51,11 @@ model User {
   referralPath      String?
   referralDepth     Int      @default(0)
   rootSponsorId     String?
+  // --- Username (separate from referralCode; claim-once) --------------------
+  // Always stored lowercase; case-insensitive uniqueness via a LOWER() index
+  // (see username-schema). usernameSet locks it after the one allowed change.
+  username          String?
+  usernameSet       Boolean  @default(false)
   // Withdrawable, settled referral commission (separate from trading balance).
   commissionBalance Float    @default(0)
   commissionsEarned    ReferralCommission[]   @relation("CommissionEarner")

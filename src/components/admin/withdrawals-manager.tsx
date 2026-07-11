@@ -43,6 +43,7 @@ import { uploadProof } from "@/lib/proof-upload";
 export interface AdminWithdrawal {
   id: string;
   client: string;
+  username?: string | null;
   amount: number;
   fee: number;
   receiveAmount: number;
@@ -99,7 +100,10 @@ export function WithdrawalsManager({
               ) : (
                 rows.map((w) => (
                   <TableRow key={w.id}>
-                    <TableCell className="whitespace-nowrap text-sm font-medium">{w.client}</TableCell>
+                    <TableCell className="whitespace-nowrap text-sm font-medium">
+                      {w.client}
+                      {w.username && <span className="ml-1.5 text-xs font-normal text-gold-300">@{w.username}</span>}
+                    </TableCell>
                     <TableCell className="tnum text-right">{formatUsd(w.amount)}</TableCell>
                     <TableCell className="tnum text-right text-loss">{formatUsd(w.fee)}</TableCell>
                     <TableCell className="tnum text-right font-medium text-profit">

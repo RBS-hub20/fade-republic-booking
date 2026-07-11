@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { ensureFinanceSchemaOnce } from "@/lib/finance-schema";
 import { WithdrawalsManager, type AdminWithdrawal } from "@/components/admin/withdrawals-manager";
 import { isBlobConfigured } from "@/lib/blob";
+import { ensureUsernameSchemaOnce } from "@/lib/username";
 
 export const dynamic = "force-dynamic";
 
@@ -16,18 +17,23 @@ export default async function AdminWithdrawalsPage() {
   let rows: AdminWithdrawal[] = [];
   try {
     await ensureFinanceSchemaOnce(prisma);
+    await ensureUsernameSchemaOnce(prisma);
     const withdrawals = await prisma.withdrawal.findMany({ orderBy: { createdAt: "desc" }, take: 200 });
     const clientIds = Array.from(new Set(withdrawals.map((w) => w.clientId).filter(Boolean))) as string[];
-    const clients = clientIds.length
-      ? await prisma.client.findMany({
-          where: { id: { in: clientIds } },
-          select: { id: true, name: true, accountNumber: true },
-        })
-      : [];
+    const [clients, users] = await Promise.all([
+      clientIds.length
+        ? prisma.client.findMany({ where: { id: { in: clientIds } }, select: { id: true, name: true, accountNumber: true } })
+        : Promise.resolve([]),
+      clientIds.length
+        ? prisma.user.findMany({ where: { clientId: { in: clientIds } }, select: { clientId: true, username: true } })
+        : Promise.resolve([]),
+    ]);
     const byId = new Map(clients.map((c) => [c.id, `${c.name} · ${c.accountNumber}`]));
+    const usernameByClient = new Map(users.map((u) => [u.clientId, u.username]));
     rows = withdrawals.map((w) => ({
       id: w.id,
       client: w.clientId ? byId.get(w.clientId) ?? "—" : "—",
+      username: w.clientId ? usernameByClient.get(w.clientId) ?? null : null,
       amount: w.amount,
       fee: w.fee,
       receiveAmount: w.receiveAmount,

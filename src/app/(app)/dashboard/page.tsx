@@ -87,12 +87,35 @@ export default async function DashboardPage() {
 
     const k = perf?.kpis;
 
+    // Show the "claim your @username" banner to users who haven't set one yet.
+    let showUsernameBanner = false;
+    if (session.userId) {
+      try {
+        const u = await prisma.user.findUnique({
+          where: { id: session.userId },
+          select: { usernameSet: true },
+        });
+        showUsernameBanner = u ? !u.usernameSet : false;
+      } catch {
+        /* username column not migrated yet — skip the banner */
+      }
+    }
+
     return (
       <>
         <PageHeader
           title={`Welcome, ${session.name.split(" ")[0]}`}
           subtitle="Your account performance · calculated daily, Mon–Sun (Asia/Manila)"
         />
+        {showUsernameBanner && (
+          <Link
+            href="/settings/username"
+            className="mb-6 flex items-center justify-between gap-3 rounded-lg border border-gold-400/30 bg-gold-400/10 px-4 py-3 text-sm text-gold-200 transition-colors hover:bg-gold-400/20"
+          >
+            <span>🎉 Claim your @username — you can set it once!</span>
+            <span className="shrink-0 font-semibold text-gold-300">Set username →</span>
+          </Link>
+        )}
         {referral && <div className="mb-6"><ReferralLinkCard summary={referral} /></div>}
 
         {capital && k ? (

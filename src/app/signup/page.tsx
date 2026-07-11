@@ -17,14 +17,51 @@ function SignupForm() {
   const ref = (REFERRALS_ENABLED && searchParams.get("ref")?.trim()) || "";
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
+  const [uStatus, setUStatus] = useState<
+    { state: "idle" | "checking" | "available" | "taken" | "invalid"; msg?: string }
+  >({ state: "idle" });
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const USERNAME_RE = /^[a-z0-9_]{3,30}$/;
+
+  function onUsernameChange(v: string) {
+    // Force the stored form (lowercase, [a-z0-9_], ≤30) as the user types.
+    const clean = v.toLowerCase().replace(/[^a-z0-9_]/g, "").slice(0, 30);
+    setUsername(clean);
+    setUStatus({ state: "idle" });
+  }
+
+  async function checkUsername() {
+    if (!username) return setUStatus({ state: "idle" });
+    if (!USERNAME_RE.test(username)) {
+      return setUStatus({ state: "invalid", msg: "3–30 chars: a–z, 0–9, _ only." });
+    }
+    setUStatus({ state: "checking" });
+    try {
+      const res = await fetch(`/api/auth/username-available?u=${encodeURIComponent(username)}`);
+      const data = await res.json().catch(() => ({}));
+      if (data.available) setUStatus({ state: "available", msg: "Username available" });
+      else setUStatus({ state: "taken", msg: data.reason ?? "Username not available" });
+    } catch {
+      setUStatus({ state: "idle" });
+    }
+  }
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    if (!USERNAME_RE.test(username)) {
+      setError("Please choose a valid username (3–30 chars: a–z, 0–9, _).");
+      return;
+    }
+    if (uStatus.state === "taken") {
+      setError("That username is already taken.");
+      return;
+    }
     if (password !== confirm) {
       setError("Passwords do not match");
       return;
@@ -33,7 +70,7 @@ function SignupForm() {
     const res = await fetch("/api/auth/signup", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email, password, ref }),
+      body: JSON.stringify({ name, email, username, password, ref }),
     });
     const data = await res.json().catch(() => ({}));
     if (res.ok) {
@@ -95,6 +132,37 @@ function SignupForm() {
                   onChange={(e) => setEmail(e.target.value)}
                   required
                 />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="username">Username</Label>
+                <div className="relative">
+                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">@</span>
+                  <Input
+                    id="username"
+                    name="username"
+                    autoComplete="off"
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    placeholder="yourname"
+                    className="pl-7"
+                    value={username}
+                    onChange={(e) => onUsernameChange(e.target.value)}
+                    onBlur={checkUsername}
+                    required
+                  />
+                </div>
+                {uStatus.state === "checking" && (
+                  <p className="text-xs text-muted-foreground">Checking availability…</p>
+                )}
+                {uStatus.state === "available" && (
+                  <p className="text-xs text-profit">✓ {uStatus.msg}</p>
+                )}
+                {(uStatus.state === "taken" || uStatus.state === "invalid") && (
+                  <p className="text-xs text-loss">⚠ {uStatus.msg}</p>
+                )}
+                {uStatus.state === "idle" && (
+                  <p className="text-xs text-muted-foreground">3–30 chars: a–z, 0–9, underscore. You can change it once later.</p>
+                )}
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">

@@ -8,6 +8,12 @@ import { findReferrerByCode, ensureReferralCode } from "@/lib/referrals";
 import { REFERRALS_ENABLED } from "@/lib/referrals-config";
 import { ensureReferralSchemaOnce } from "@/lib/referral-schema";
 import { computeGenealogyForSponsor } from "@/lib/genealogy";
+import {
+  normalizeUsername,
+  validateUsernameFormat,
+  isUsernameAvailable,
+  ensureUsernameSchemaOnce,
+} from "@/lib/username";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -44,7 +50,7 @@ export async function POST(req: Request) {
   const limited = enforce(req, "signup", 5, 60 * 60_000);
   if (limited) return limited;
 
-  const { name, email, password, phone, ref } = await req.json().catch(() => ({}));
+  const { name, email, password, phone, ref, username } = await req.json().catch(() => ({}));
 
   if (!name || !email || !password) {
     return NextResponse.json(
@@ -59,6 +65,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Password must be at least 6 characters" }, { status: 400 });
   }
 
+  const cleanUsername = normalizeUsername(String(username ?? ""));
+  const uFmt = validateUsernameFormat(cleanUsername);
+  if (!uFmt.ok) return NextResponse.json({ error: uFmt.error }, { status: 400 });
+
   const cleanEmail = String(email).toLowerCase().trim();
 
   // ---- Create the account (this is the only part that can fail signup) ----
@@ -69,6 +79,7 @@ export async function POST(req: Request) {
     // (P2022) and break signup. Self-heal the schema once over the live
     // connection before touching the User table.
     await ensureReferralSchemaOnce(prisma);
+    await ensureUsernameSchemaOnce(prisma);
 
     const existing = await prisma.user.findUnique({ where: { email: cleanEmail } });
     if (existing) {
@@ -76,6 +87,10 @@ export async function POST(req: Request) {
         { error: "An account with that email already exists" },
         { status: 409 }
       );
+    }
+
+    if (!(await isUsernameAvailable(cleanUsername))) {
+      return NextResponse.json({ error: "Username already taken" }, { status: 409 });
     }
 
     let accountNumber = await nextAccountNumber();
@@ -120,6 +135,8 @@ export async function POST(req: Request) {
           referralPath: genealogy.referralPath,
           referralDepth: genealogy.referralDepth,
           rootSponsorId: genealogy.rootSponsorId,
+          username: cleanUsername,
+          usernameSet: true, // new users choose their username at signup
         },
       });
     });

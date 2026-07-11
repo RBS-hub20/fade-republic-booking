@@ -25,7 +25,10 @@ export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const hasSession = Boolean(req.cookies.get(SESSION_COOKIE)?.value);
 
-  const isPublicPath = PUBLIC_PATHS.has(pathname) || pathname.startsWith("/auth/");
+  const isPublicPath =
+    PUBLIC_PATHS.has(pathname) ||
+    pathname.startsWith("/auth/") ||
+    pathname.startsWith("/u/"); // public @username profiles
   const isPublicAsset =
     pathname.startsWith("/_next") ||
     pathname.startsWith("/api/auth") ||
