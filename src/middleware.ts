@@ -30,6 +30,8 @@ export function middleware(req: NextRequest) {
     pathname.startsWith("/_next") ||
     pathname.startsWith("/api/auth") ||
     pathname.startsWith("/api/market") ||
+    // Public XENA chat (marketing site visitors have no session).
+    pathname.startsWith("/api/support") ||
     // The verify route enforces its own CRON_SECRET / admin check.
     pathname.startsWith("/api/deposits/verify") ||
     pathname === "/api/health" ||

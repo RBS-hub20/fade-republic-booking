@@ -21,6 +21,37 @@ const QUICK_PROMPTS = [
   "When will I see profit?",
 ];
 
+// Public (marketing-site) variant — sales/onboarding oriented.
+const PUBLIC_GREETING: Msg = {
+  role: "assistant",
+  content:
+    "Hi! I'm XENA 👋 Ask me about QuantumX earnings, how the compensation plan works, or if this is legit. I'm here 24/7!",
+};
+
+const PUBLIC_QUICK_PROMPTS = [
+  "How do I earn?",
+  "Is this legit?",
+  "Minimum deposit?",
+  "Show me comp plan",
+];
+
+/** Fire an analytics event to whatever provider is present (no-op otherwise). */
+function track(event: string, params?: Record<string, unknown>) {
+  if (typeof window === "undefined") return;
+  const w = window as unknown as {
+    gtag?: (...a: unknown[]) => void;
+    dataLayer?: unknown[];
+    plausible?: (e: string, o?: unknown) => void;
+  };
+  try {
+    w.gtag?.("event", event, params ?? {});
+    w.dataLayer?.push({ event, ...(params ?? {}) });
+    w.plausible?.(event, params ? { props: params } : undefined);
+  } catch {
+    /* analytics must never break the UI */
+  }
+}
+
 /** Circular, cropped avatar (square source → circle via object-fit: cover). */
 function XenaAvatar({ size }: { size: number }) {
   return (
@@ -36,9 +67,13 @@ function XenaAvatar({ size }: { size: number }) {
   );
 }
 
-export function SupportChat() {
+export function SupportChat({ mode = "client" }: { mode?: "client" | "public" } = {}) {
+  const isPublic = mode === "public";
+  const greeting = isPublic ? PUBLIC_GREETING : GREETING;
+  const quickPrompts = isPublic ? PUBLIC_QUICK_PROMPTS : QUICK_PROMPTS;
+
   const [open, setOpen] = useState(false);
-  const [messages, setMessages] = useState<Msg[]>([GREETING]);
+  const [messages, setMessages] = useState<Msg[]>([greeting]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -62,10 +97,11 @@ export function SupportChat() {
     setLoading(true);
 
     try {
+      if (isPublic) track("xena_public_message_sent");
       const res = await fetch("/api/support/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: content }),
+        body: JSON.stringify(isPublic ? { message: content, mode: "public" } : { message: content }),
       });
 
       if (!res.ok || !res.body) {
@@ -114,7 +150,12 @@ export function SupportChat() {
     <>
       {/* Floating button */}
       <button
-        onClick={() => setOpen((o) => !o)}
+        onClick={() =>
+          setOpen((o) => {
+            if (!o && isPublic) track("xena_public_chat_opened");
+            return !o;
+          })
+        }
         aria-label={open ? "Close support chat" : "Open support chat"}
         className={cn(
           "fixed bottom-5 right-5 z-50 flex h-14 w-14 items-center justify-center rounded-full",
@@ -129,8 +170,12 @@ export function SupportChat() {
       {open && (
         <div
           className={cn(
-            "fixed bottom-24 right-5 z-50 flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl",
-            "h-[70vh] max-h-[560px] w-[calc(100vw-2.5rem)] sm:w-96"
+            "fixed z-50 flex flex-col overflow-hidden border border-border bg-card shadow-2xl",
+            isPublic
+              ? // Public: full-screen on mobile, floating panel from sm up.
+                "inset-0 h-full w-full rounded-none sm:inset-auto sm:bottom-24 sm:right-5 sm:h-[70vh] sm:max-h-[560px] sm:w-96 sm:rounded-2xl"
+              : // Client: unchanged floating panel.
+                "bottom-24 right-5 h-[70vh] max-h-[560px] w-[calc(100vw-2.5rem)] rounded-2xl sm:w-96"
           )}
         >
           {/* Header */}
@@ -188,7 +233,7 @@ export function SupportChat() {
 
           {/* Quick prompts */}
           <div className="flex flex-wrap gap-1.5 border-t border-border px-3 pt-2.5">
-            {QUICK_PROMPTS.map((q) => (
+            {quickPrompts.map((q) => (
               <button
                 key={q}
                 onClick={() => send(q)}
@@ -208,7 +253,7 @@ export function SupportChat() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={onKeyDown}
-                placeholder="Ask XENA about your account…"
+                placeholder={isPublic ? "Ask XENA about QuantumX…" : "Ask XENA about your account…"}
                 maxLength={2000}
                 className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-gold-400/60"
               />

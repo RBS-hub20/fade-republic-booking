@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { PublicXena } from "@/components/support/public-xena";
 
 // NOTE: We intentionally use a system font stack (defined in globals.css) rather
 // than next/font/google, so the app never depends on fetching fonts from Google
@@ -47,7 +48,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="dark">
-      <body className="font-sans antialiased">{children}</body>
+      <body className="font-sans antialiased">
+        {children}
+        <PublicXena />
+      </body>
     </html>
   );
 }
