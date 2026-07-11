@@ -124,40 +124,83 @@ export async function recomputeAllUnlocks(): Promise<{ updated: number }> {
 }
 
 /**
+ * Uplines strictly ABOVE the direct referrer, ordered NEAREST-first
+ * (grandparent → root). Prefers the source user's materialized `referralPath`
+ * (one split, no walking); falls back to a `referredById` chain walk for users
+ * created before genealogy backfill.
+ */
+async function uplinesAboveDirect(
+  sourceUserId: string,
+  directUplineId: string,
+  sourceReferralPath: string | null
+): Promise<string[]> {
+  if (sourceReferralPath) {
+    // path = [root, …, grandparent, directUpline]; drop the direct upline and
+    // the source itself, then reverse to nearest-first.
+    return sourceReferralPath
+      .split("/")
+      .filter((id) => id && id !== directUplineId && id !== sourceUserId)
+      .reverse();
+  }
+  // Fallback: walk referredById upward from the direct referrer's parent.
+  const ids: string[] = [];
+  const seen = new Set<string>([sourceUserId, directUplineId]);
+  const direct = await prisma.user
+    .findUnique({ where: { id: directUplineId }, select: { referredById: true } })
+    .catch(() => null);
+  let cursor: string | null = direct?.referredById ?? null;
+  for (let i = 0; i < MAX_UPLINE_WALK && cursor; i++) {
+    if (seen.has(cursor)) break; // cycle guard
+    seen.add(cursor);
+    ids.push(cursor);
+    const u: { referredById: string | null } | null = await prisma.user
+      .findUnique({ where: { id: cursor }, select: { referredById: true } })
+      .catch(() => null);
+    cursor = u?.referredById ?? null;
+  }
+  return ids;
+}
+
+/**
  * Credit the 2nd-level (indirect) commission for a source user's FIRST package.
- * Walks up from the direct referrer's upline to the nearest UNLOCKED upline
- * (compression), and pays them `level2Rate(theirTier) × packageAmount` once.
+ * Uses the source user's lineage to find the nearest UNLOCKED upline above the
+ * direct referrer (compression), and pays them `level2Rate(theirTier) ×
+ * packageAmount` once.
  */
 async function creditLevel2Commission(opts: {
   sourceUserId: string;
   directUplineId: string;
-  startUplineId: string | null; // the direct referrer's referrer (grandparent)
+  sourceReferralPath: string | null; // source user's path: root → direct upline
   packageAmount: number;
 }): Promise<void> {
-  if (!opts.startUplineId) return;
   const existing = await prisma.level2Commission.findUnique({
     where: { sourceUserId: opts.sourceUserId },
   });
   if (existing) return; // first deposit only
 
-  // Compression: find the nearest qualified (unlocked) upline in the chain.
-  let cursorId: string | null = opts.startUplineId;
-  let earner: { id: string; clientId: string | null } | null = null;
-  for (let i = 0; i < MAX_UPLINE_WALK && cursorId; i++) {
-    const cand: { id: string; clientId: string | null; referredById: string | null } | null =
-      await prisma.user.findUnique({
-        where: { id: cursorId },
-        select: { id: true, clientId: true, referredById: true },
-      });
-    if (!cand) break;
-    const unlock = await prisma.userUnlock.findUnique({ where: { userId: cand.id } }).catch(() => null);
-    if (unlock?.level2Unlocked) {
-      earner = { id: cand.id, clientId: cand.clientId };
-      break;
-    }
-    cursorId = cand.referredById;
-  }
-  if (!earner) return; // no qualified upline in the chain
+  const candidates = await uplinesAboveDirect(
+    opts.sourceUserId,
+    opts.directUplineId,
+    opts.sourceReferralPath
+  );
+  if (candidates.length === 0) return; // no upline above the direct referrer
+
+  // Compression: nearest UNLOCKED upline wins — resolved in ONE batch query.
+  const unlocked = await prisma.userUnlock
+    .findMany({
+      where: { userId: { in: candidates }, level2Unlocked: true },
+      select: { userId: true },
+    })
+    .catch(() => [] as { userId: string }[]);
+  const unlockedSet = new Set(unlocked.map((u) => u.userId));
+  const earnerId = candidates.find((id) => unlockedSet.has(id));
+  if (!earnerId) return; // no qualified upline in the chain
+
+  const earner = await prisma.user.findUnique({
+    where: { id: earnerId },
+    select: { id: true, clientId: true },
+  });
+  if (!earner) return;
 
   const balance = await balanceOfUser(earner.clientId);
   const tier = tierForBalance(balance);
@@ -272,11 +315,12 @@ export async function creditFirstPackageCommission(opts: {
       }),
     ]);
 
-    // Level 2 (indirect): pay the nearest UNLOCKED upline above the referrer.
+    // Level 2 (indirect): pay the nearest UNLOCKED upline above the referrer,
+    // resolved from the source user's materialized lineage path.
     await creditLevel2Commission({
       sourceUserId: referred.id,
       directUplineId: referrer.id,
-      startUplineId: referrer.referredById,
+      sourceReferralPath: referred.referralPath,
       packageAmount: tier.price,
     });
 
