@@ -114,9 +114,35 @@ export async function GET() {
       referrals.withdrawalTable;
   }
 
+  // Genealogy readiness: username/gender/avatar columns + the downline
+  // (sponsor) index that powers the network tree.
+  const genealogy: { usernameCol: boolean; avatarCols: boolean; sponsorIndex: boolean } = {
+    usernameCol: false,
+    avatarCols: false,
+    sponsorIndex: false,
+  };
+  if (db.connected) {
+    try {
+      await prisma.user.findFirst({ select: { username: true, avatarType: true, gender: true } });
+      genealogy.usernameCol = true;
+      genealogy.avatarCols = true;
+    } catch {
+      /* columns not migrated yet */
+    }
+    try {
+      const rows = (await prisma.$queryRawUnsafe(
+        `SELECT 1 FROM pg_indexes WHERE tablename = 'User' AND indexname = 'User_referredById_idx' LIMIT 1`
+      )) as unknown[];
+      // Equivalent of the requested idx_users_sponsor_id (referredById = sponsor).
+      genealogy.sponsorIndex = Array.isArray(rows) && rows.length > 0;
+    } catch {
+      /* index check unavailable */
+    }
+  }
+
   const ok = db.connected && db.userTable;
   return NextResponse.json(
-    { ok, db, env, deposits, referrals, timestamp: new Date().toISOString() },
+    { ok, db, env, deposits, referrals, genealogy, timestamp: new Date().toISOString() },
     { status: ok ? 200 : 503 }
   );
 }

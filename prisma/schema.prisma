@@ -70,6 +70,8 @@ model User {
   @@index([referralPath])
   @@index([referralDepth])
   @@index([rootSponsorId])
+  // Sponsor/parent index powering the genealogy downline queries.
+  @@index([referredById])
 }
 
 // One commission per referred user (first QX Tier activation only).

@@ -298,15 +298,39 @@ function NodeChildren(props: {
   onExpandBranch: (id: string) => void;
   onLoadMore: (pid: string) => void;
 }) {
-  const { parentId, pages, loadingIds } = props;
+  const { parentId, pages, loadingIds, depth } = props;
   const page = pages[parentId];
+
+  // Fallback: if we've been "Loading…" for >3s with no result, show an empty
+  // state instead of spinning forever.
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    if (page || !loadingIds.has(parentId)) {
+      setSlow(false);
+      return;
+    }
+    const t = setTimeout(() => setSlow(true), 3000);
+    return () => clearTimeout(t);
+  }, [page, loadingIds, parentId]);
+
+  const emptyMsg = (
+    <p className="py-2 text-xs text-muted-foreground" style={{ paddingLeft: depth * 20 + 8 }}>
+      No downline found
+    </p>
+  );
+
   if (!page) {
-    return loadingIds.has(parentId) ? (
-      <p className="flex items-center gap-2 py-2 pl-2 text-xs text-muted-foreground">
-        <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading…
-      </p>
-    ) : null;
+    if (loadingIds.has(parentId) && !slow) {
+      return (
+        <p className="flex items-center gap-2 py-2 text-xs text-muted-foreground" style={{ paddingLeft: depth * 20 + 8 }}>
+          <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading…
+        </p>
+      );
+    }
+    return emptyMsg; // fetch failed, returned nothing, or timed out (>3s)
   }
+  if (page.nodes.length === 0) return emptyMsg;
+
   return (
     <div>
       {page.nodes.map((node) => (
