@@ -206,8 +206,8 @@ QUANTUMX COMPANY INFO — AI-powered automated Forex + Crypto trading platform.
 7) MATURITY
 - Capital unlocks 6 months after its deposit approval date. After maturity the full capital becomes withdrawable (or you can renew for another 6 months).
 
-8) ANTI-ABUSE POLICY
-- Referral commissions are credited to your account INSTANTLY, but unlock for withdrawal after 7 DAYS as a security measure to prevent abuse. During that window they appear under "Pending Commissions" with a countdown, and are NOT part of your Available Withdrawal until they unlock. (The monthly bonus and your daily P/L are not subject to this hold.)
+8) EARNINGS & WITHDRAWALS
+- All earnings are INSTANTLY available for withdrawal once you reach the $10 minimum. This includes daily P/L and referral commissions (1st level, unlocked 2nd level, and monthly bonus). There is no holding period. Withdrawals are manually approved within 24 hours for security, and a 3% withdrawal fee applies.
 - One unique payout wallet per user; email must be verified.
 
 RULES:
@@ -318,12 +318,7 @@ async function buildUserContext(userId: string, clientId: string, name: string):
           ? ` — unlocks ${unlock} (in ${cap.daysToMaturity} days)`
           : ""),
       cap.hasMatured ? `- Matured capital awaiting action: ${formatUsd(cap.maturedCapital)}` : "",
-      `- Available Withdrawal (withdrawable now): ${formatUsd(cap.availableWithdrawal)}`,
-      cap.pendingCommissions > 0
-        ? `- Pending Commissions (7-day hold): ${formatUsd(cap.pendingCommissions)}${
-            cap.pendingDays != null ? ` — unlocks in ${cap.pendingDays} day(s)` : ""
-          } (not withdrawable yet)`
-        : "",
+      `- Available Withdrawal (withdrawable now, incl. all commissions): ${formatUsd(cap.availableWithdrawal)}`,
       `- Total Earned (daily P/L + referrals): ${formatUsd(cap.totalEarned)}`,
       `- Total Withdrawn: ${formatUsd(cap.totalWithdrawn)}`
     );
