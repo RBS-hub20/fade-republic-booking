@@ -56,6 +56,9 @@ model User {
   // (see username-schema). usernameSet locks it after the one allowed change.
   username          String?
   usernameSet       Boolean  @default(false)
+  // Auto-assigned avatar (permanent). gender drives which of the 10 SVGs.
+  gender            String   @default("male")
+  avatarType        String?
   // Withdrawable, settled referral commission (separate from trading balance).
   commissionBalance Float    @default(0)
   commissionsEarned    ReferralCommission[]   @relation("CommissionEarner")

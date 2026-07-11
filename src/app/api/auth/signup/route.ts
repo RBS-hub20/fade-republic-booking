@@ -14,6 +14,7 @@ import {
   isUsernameAvailable,
   ensureUsernameSchemaOnce,
 } from "@/lib/username";
+import { normalizeGender, avatarTypeFor, ensureAvatarSchemaOnce } from "@/lib/avatar";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -50,7 +51,8 @@ export async function POST(req: Request) {
   const limited = enforce(req, "signup", 5, 60 * 60_000);
   if (limited) return limited;
 
-  const { name, email, password, phone, ref, username } = await req.json().catch(() => ({}));
+  const { name, email, password, phone, ref, username, gender } = await req.json().catch(() => ({}));
+  const cleanGender = normalizeGender(gender);
 
   if (!name || !email || !password) {
     return NextResponse.json(
@@ -80,6 +82,7 @@ export async function POST(req: Request) {
     // connection before touching the User table.
     await ensureReferralSchemaOnce(prisma);
     await ensureUsernameSchemaOnce(prisma);
+    await ensureAvatarSchemaOnce(prisma);
 
     const existing = await prisma.user.findUnique({ where: { email: cleanEmail } });
     if (existing) {
@@ -137,12 +140,18 @@ export async function POST(req: Request) {
           rootSponsorId: genealogy.rootSponsorId,
           username: cleanUsername,
           usernameSet: true, // new users choose their username at signup
+          gender: cleanGender,
         },
       });
     });
 
     // Give the new user their own referral code up front (best-effort).
     ensureReferralCode({ id: user.id, name: user.name, referralCode: null }).catch(() => {});
+    // Assign the permanent avatar (needs the generated id). Best-effort — the
+    // tree also backfills any nulls.
+    prisma.user
+      .update({ where: { id: user.id }, data: { avatarType: avatarTypeFor(cleanGender, user.id) } })
+      .catch(() => {});
   } catch (e: any) {
     if (e?.code === "P2002") {
       return NextResponse.json({ error: "That email or account already exists" }, { status: 409 });
