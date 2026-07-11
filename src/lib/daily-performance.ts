@@ -112,3 +112,105 @@ export async function runDailyPerformance(opts?: { upToKey?: string }): Promise<
 
   return { ok: true, upTo: today, daysCreated, clients: report, at: new Date().toISOString() };
 }
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Run the daily engine with in-invocation retries. Vercel Hobby only allows a
+ * single daily cron (so we can't schedule 10-minute retry crons), and each
+ * invocation is time-bounded — so we retry a few times within the same run to
+ * ride out transient DB blips. Any night that still fails is self-healed on the
+ * next run, since the engine always backfills from the last logged day.
+ */
+export async function runDailyPerformanceResilient(opts?: {
+  upToKey?: string;
+  attempts?: number;
+  delayMs?: number;
+}): Promise<DailyPerfResult> {
+  const attempts = opts?.attempts ?? 3;
+  const delayMs = opts?.delayMs ?? 1500;
+  let lastErr: unknown;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await runDailyPerformance({ upToKey: opts?.upToKey });
+    } catch (e) {
+      lastErr = e;
+      if (i < attempts - 1) await sleep(delayMs * (i + 1));
+    }
+  }
+  throw lastErr;
+}
+
+/** Days between two `yyyy-MM-dd` keys (b − a), positive when b is later. */
+function dayDiff(aKey: string, bKey: string): number {
+  const a = new Date(`${aKey}T12:00:00Z`).getTime();
+  const b = new Date(`${bKey}T12:00:00Z`).getTime();
+  return Math.round((b - a) / (24 * 60 * 60_000));
+}
+
+export interface DailyPerfHealth {
+  ok: boolean;
+  lastPostedKey: string | null; // newest posted day across funded clients
+  expectedKey: string; // today (Manila)
+  yesterdayKey: string; // last day that should already be posted
+  stale: boolean; // ≥1 funded client is missing yesterday's post
+  daysBehind: number; // how far the newest post lags behind yesterday
+  fundedClients: number; // clients due at least one post
+  clientsBehind: number; // funded clients missing yesterday
+  at: string;
+}
+
+/**
+ * Monitoring snapshot for the daily P/L job. "Stale" means at least one funded
+ * client is missing YESTERDAY's entry — today's is allowed to be absent until
+ * the 23:59 PHT run.
+ */
+export async function getDailyPerfHealth(): Promise<DailyPerfHealth> {
+  const today = manilaToday();
+  const yesterday = addDays(today, -1);
+
+  const clients = await prisma.client.findMany({
+    where: { status: "ACTIVE" },
+    select: {
+      transactions: {
+        where: { status: "APPROVED", type: "DEPOSIT" },
+        select: { date: true },
+        orderBy: { date: "asc" },
+        take: 1,
+      },
+      dailyPerformances: { select: { date: true }, orderBy: { date: "desc" }, take: 1 },
+    },
+  });
+
+  let lastPostedKey: string | null = null;
+  let fundedClients = 0;
+  let clientsBehind = 0;
+  for (const c of clients) {
+    const firstDep = c.transactions[0]?.date;
+    if (!firstDep) continue; // not funded → nothing due
+    if (toManilaDateKey(firstDep) > yesterday) continue; // funded today, nothing due yet
+    fundedClients += 1;
+    const last = c.dailyPerformances[0] ? toManilaDateKey(c.dailyPerformances[0].date) : null;
+    if (last && (lastPostedKey === null || last > lastPostedKey)) lastPostedKey = last;
+    if (!last || last < yesterday) clientsBehind += 1;
+  }
+
+  const stale = clientsBehind > 0;
+  const daysBehind = lastPostedKey
+    ? Math.max(0, dayDiff(lastPostedKey, yesterday))
+    : fundedClients > 0
+    ? Math.max(1, dayDiff(addDays(yesterday, -1), yesterday))
+    : 0;
+
+  return {
+    ok: !stale,
+    lastPostedKey,
+    expectedKey: today,
+    yesterdayKey: yesterday,
+    stale,
+    daysBehind,
+    fundedClients,
+    clientsBehind,
+    at: new Date().toISOString(),
+  };
+}

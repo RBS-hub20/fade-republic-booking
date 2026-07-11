@@ -142,6 +142,35 @@ export async function notifyCapitalMatured(opts: {
   });
 }
 
+/**
+ * Alert the admin when the daily P/L job fails or leaves a gap. Sent to
+ * ADMIN_ALERT_EMAIL (falls back to the platform admin address). Best-effort.
+ */
+export async function notifyDailyPerfIssue(opts: {
+  detail: string;
+  lastPosted: string | null;
+  expected: string;
+  clientsAffected: number;
+}): Promise<void> {
+  const to = process.env.ADMIN_ALERT_EMAIL || "admin@quantumxglobal.com";
+  await sendEmail({
+    to,
+    subject: `⚠️ Daily P/L alert — ${opts.clientsAffected} client(s) missing an entry`,
+    html: emailTemplate({
+      heading: "Daily P/L posting issue",
+      body:
+        `${opts.detail}<br><br>` +
+        `Last posted: <strong>${opts.lastPosted ?? "never"}</strong> · ` +
+        `Expected through: <strong>${opts.expected}</strong> · ` +
+        `Clients affected: <strong>${opts.clientsAffected}</strong>.<br><br>` +
+        `The nightly engine auto-backfills gaps on its next run. To fill it now, ` +
+        `open Admin → Fund Performance and click “Backfill now”.`,
+      buttonLabel: "Open Fund Performance",
+      buttonUrl: `${appBaseUrl()}/admin/performance`,
+    }),
+  });
+}
+
 export async function createAndSendVerification(user: {
   id: string;
   email: string;

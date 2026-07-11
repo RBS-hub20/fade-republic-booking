@@ -188,6 +188,7 @@ KNOWLEDGE BASE — QuantumX is an AI-powered automated Forex + Crypto trading pl
 - Active Capital = sum of your approved deposits, locked. It cannot be withdrawn early under any circumstances.
 - Available Withdrawal = daily P/L + referral commissions − completed withdrawals. This is what you can withdraw anytime.
 - Daily P/L is a FLAT calculation on Active Capital (0.3%–0.5% per day, NOT compounded), credited Mon–Sun at 23:59 PHT.
+- POSTING SCHEDULE: Daily P/L posts every night at 11:59 PM PHT. If you don't see today's entry yet, please wait about 1 hour or contact support. We post a 0.00% entry even on non-trading days for full transparency — so your log never has gaps.
 
 2) TIERS (set by your FIRST deposit amount; upgrading requires a new deposit):
 - Bronze  — $50  · 5% direct (1st-level) commission · 0.5% indirect (2nd-level)

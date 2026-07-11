@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { cronAuthorized } from "@/lib/cron-auth";
-import { runDailyPerformance } from "@/lib/daily-performance";
+import { runDailyPerformanceResilient, getDailyPerfHealth } from "@/lib/daily-performance";
 import { verifyPendingDeposits } from "@/lib/verify-deposits";
 import { runMaturityNotifications } from "@/lib/capital";
 import { recomputeAllUnlocks, runMonthlyReferralBonus } from "@/lib/referrals";
 import { ensureFinanceSchemaOnce } from "@/lib/finance-schema";
+import { notifyDailyPerfIssue } from "@/lib/mailers";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,10 +25,31 @@ async function handle(req: Request) {
   }
 
   const result: Record<string, unknown> = { at: new Date().toISOString() };
+  let perfFailed = false;
   try {
-    result.performance = await runDailyPerformance();
+    // Retries within the invocation; any residual gap self-heals next run.
+    result.performance = await runDailyPerformanceResilient();
   } catch (err: any) {
+    perfFailed = true;
     result.performance = { ok: false, error: err?.message?.split("\n")[0] ?? "failed" };
+  }
+  // Health check + admin alert: if the run errored or any funded client is
+  // still missing yesterday's entry, email the admin so it never goes unnoticed.
+  try {
+    const health = await getDailyPerfHealth();
+    result.perfHealth = health;
+    if (perfFailed || health.stale) {
+      await notifyDailyPerfIssue({
+        detail: perfFailed
+          ? "The daily P/L job threw an error during this run (retries exhausted)."
+          : "Some funded clients are still missing yesterday's P/L entry after this run.",
+        lastPosted: health.lastPostedKey,
+        expected: health.yesterdayKey,
+        clientsAffected: health.clientsBehind,
+      }).catch(() => {});
+    }
+  } catch (err: any) {
+    result.perfHealth = { ok: false, error: err?.message?.split("\n")[0] ?? "failed" };
   }
   try {
     result.deposits = await verifyPendingDeposits();

@@ -14,6 +14,8 @@ import {
 } from "@/components/ui/table";
 import { getSession } from "@/lib/auth";
 import { getServerPerformanceSummary, type PeriodTotals } from "@/lib/server-performance";
+import { getDailyPerfHealth } from "@/lib/daily-performance";
+import { PerfHealthBanner } from "@/components/admin/perf-health-banner";
 import { formatUsd, formatPct, formatDateKey, cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -25,6 +27,7 @@ export default async function AdminPerformancePage() {
 
   const perf = await getServerPerformanceSummary();
   const t = perf.today;
+  const perfHealth = await getDailyPerfHealth().catch(() => null);
 
   // Platform revenue from withdrawal fees (best-effort — table may be new).
   let feeRevenue = 0;
@@ -44,6 +47,19 @@ export default async function AdminPerformancePage() {
         title="Fund Performance"
         subtitle="Internal server gross (1–2%/day) vs. client payout (0.3–0.5%/day) — actual vs. paid out (Asia/Manila)."
       />
+
+      {perfHealth && (
+        <PerfHealthBanner
+          health={{
+            ok: perfHealth.ok,
+            lastPostedKey: perfHealth.lastPostedKey,
+            yesterdayKey: perfHealth.yesterdayKey,
+            stale: perfHealth.stale,
+            daysBehind: perfHealth.daysBehind,
+            clientsBehind: perfHealth.clientsBehind,
+          }}
+        />
+      )}
 
       <div className="mb-8">
         <KpiCard

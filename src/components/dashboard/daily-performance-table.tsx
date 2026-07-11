@@ -12,25 +12,69 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn, formatUsd, formatDateKey } from "@/lib/utils";
-import type { EquityPoint } from "@/lib/performance";
+import { addDays, manilaToday, type EquityPoint } from "@/lib/performance";
 
 const PAGE = 15;
+
+interface LogRow {
+  date: string;
+  dailyPercent: number;
+  pnl: number;
+  balance: number;
+  placeholder: boolean;
+}
+
+// Guard against runaway placeholder insertion on very sparse histories.
+const MAX_FILL_SPAN = 370;
+
+/**
+ * Build a gap-free log: every calendar day between the first recorded day and
+ * yesterday gets a row. Days without a recorded entry render as a transparent
+ * "0.00% — No trading activity" placeholder (carrying the prior balance), so a
+ * missed cron never shows up as an alarming gap in the user's history.
+ */
+function buildRows(curve: EquityPoint[]): LogRow[] {
+  const recorded = curve
+    .filter((p) => p.isTradingDay && p.dailyPercent !== 0)
+    .slice()
+    .sort((a, b) => (a.date < b.date ? -1 : 1));
+  if (recorded.length === 0) return [];
+
+  const byDate = new Map(recorded.map((p) => [p.date, p]));
+  const yesterday = addDays(manilaToday(), -1);
+  const lastRecorded = recorded[recorded.length - 1].date;
+  let start = recorded[0].date;
+  const end = lastRecorded > yesterday ? lastRecorded : yesterday;
+  // Cap the span we fill so a long-dormant account can't generate huge output.
+  if (start < addDays(end, -MAX_FILL_SPAN)) start = addDays(end, -MAX_FILL_SPAN);
+
+  const filled: LogRow[] = [];
+  let prevBalance = recorded[0].balance;
+  for (let k = start; k <= end; k = addDays(k, 1)) {
+    const rec = byDate.get(k);
+    if (rec) {
+      filled.push({ date: k, dailyPercent: rec.dailyPercent, pnl: rec.pnl, balance: rec.balance, placeholder: false });
+      prevBalance = rec.balance;
+    } else {
+      filled.push({ date: k, dailyPercent: 0, pnl: 0, balance: prevBalance, placeholder: true });
+    }
+  }
+  return filled.reverse(); // newest first
+}
 
 export function DailyPerformanceTable({ curve }: { curve: EquityPoint[] }) {
   const [limit, setLimit] = useState(PAGE);
 
-  // Most recent trading days first.
-  const rows = curve
-    .filter((p) => p.isTradingDay && p.dailyPercent !== 0)
-    .slice()
-    .reverse();
-
+  const rows = buildRows(curve);
   const shown = rows.slice(0, limit);
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Daily Performance Log</CardTitle>
+        <p className="text-xs text-muted-foreground">
+          P/L posts nightly at 11:59 PM PHT. Non-trading days show 0.00% for transparency.
+        </p>
       </CardHeader>
       <CardContent>
         <Table>
@@ -45,11 +89,22 @@ export function DailyPerformanceTable({ curve }: { curve: EquityPoint[] }) {
           <TableBody>
             {shown.map((p) => (
               <TableRow key={p.date}>
-                <TableCell className="font-medium">{formatDateKey(p.date)}</TableCell>
+                <TableCell className="font-medium">
+                  {formatDateKey(p.date)}
+                  {p.placeholder && (
+                    <span className="ml-2 text-xs font-normal text-muted-foreground">
+                      No trading activity
+                    </span>
+                  )}
+                </TableCell>
                 <TableCell
                   className={cn(
                     "tnum text-right font-medium",
-                    p.dailyPercent >= 0 ? "text-profit" : "text-loss"
+                    p.placeholder
+                      ? "text-muted-foreground"
+                      : p.dailyPercent >= 0
+                      ? "text-profit"
+                      : "text-loss"
                   )}
                 >
                   {p.dailyPercent.toFixed(2)}%
@@ -57,10 +112,10 @@ export function DailyPerformanceTable({ curve }: { curve: EquityPoint[] }) {
                 <TableCell
                   className={cn(
                     "tnum text-right",
-                    p.pnl >= 0 ? "text-profit" : "text-loss"
+                    p.placeholder ? "text-muted-foreground" : p.pnl >= 0 ? "text-profit" : "text-loss"
                   )}
                 >
-                  {p.pnl >= 0 ? "+" : ""}
+                  {p.placeholder ? "" : p.pnl >= 0 ? "+" : ""}
                   {formatUsd(p.pnl)}
                 </TableCell>
                 <TableCell className="tnum text-right font-medium">
