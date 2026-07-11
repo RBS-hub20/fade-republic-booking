@@ -4,6 +4,8 @@ import { useState } from "react";
 import { Sidebar } from "./sidebar";
 import { Topbar } from "./topbar";
 import { VerifyBanner } from "./verify-banner";
+import { InactivityGuard } from "@/components/security/inactivity-guard";
+import type { Role } from "@/lib/auth-config";
 
 /** Compact tier descriptor shown in the header (clients only). */
 export type HeaderTier = { name: string; monogram: string; accent: string };
@@ -14,6 +16,7 @@ export function AppShell({
   clientId,
   emailVerified,
   tier,
+  sessionIat,
   children,
 }: {
   role: string;
@@ -21,6 +24,7 @@ export function AppShell({
   clientId: string | null;
   emailVerified: boolean;
   tier?: HeaderTier | null;
+  sessionIat: number | null;
   children: React.ReactNode;
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -40,10 +44,12 @@ export function AppShell({
           name={name}
           emailVerified={emailVerified}
           tier={tier ?? null}
+          sessionIat={sessionIat}
         />
         {!emailVerified && <VerifyBanner />}
         <main className="terminal-bg flex-1 p-4 lg:p-6">{children}</main>
       </div>
+      <InactivityGuard role={(role as Role) === "admin" ? "admin" : "client"} sessionIat={sessionIat} />
     </div>
   );
 }

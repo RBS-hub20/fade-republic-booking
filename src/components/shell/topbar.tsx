@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { HeaderTier } from "./app-shell";
+import { SessionCountdown } from "@/components/security/session-countdown";
+import type { Role } from "@/lib/auth-config";
 
 export function Topbar({
   onMenu,
@@ -15,12 +17,14 @@ export function Topbar({
   name,
   emailVerified,
   tier,
+  sessionIat,
 }: {
   onMenu: () => void;
   role: string;
   name: string;
   emailVerified: boolean;
   tier?: HeaderTier | null;
+  sessionIat: number | null;
 }) {
   const router = useRouter();
   const [clock, setClock] = useState("");
@@ -61,6 +65,7 @@ export function Topbar({
       </div>
 
       <div className="ml-auto flex items-center gap-3">
+        <SessionCountdown role={role === "admin" ? "admin" : "client"} sessionIat={sessionIat} />
         {/* Current tier (clients only) — shows the active package or an Upgrade nudge. */}
         {role === "client" &&
           (tier ? (

@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Loader2, ArrowLeft } from "lucide-react";
+import { Loader2, ArrowLeft, ShieldAlert } from "lucide-react";
 import { LogoMark } from "@/components/brand/logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,6 +17,15 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [unverified, setUnverified] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  // Surface why the user landed here (idle timeout / hard session cap). Read
+  // from location (not useSearchParams) to avoid a Suspense boundary at build.
+  useEffect(() => {
+    const reason = new URLSearchParams(window.location.search).get("reason");
+    if (reason === "timeout") setNotice("You were signed out due to inactivity. Please log in again.");
+    else if (reason === "expired") setNotice("Your session reached its time limit. Please log in again.");
+  }, []);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -59,6 +68,12 @@ export default function LoginPage() {
           </h1>
           <p className="text-sm text-muted-foreground">Trade Beyond Limits.</p>
         </div>
+
+        {notice && (
+          <div className="mb-4 flex items-center gap-2 rounded-lg border border-gold-400/30 bg-gold-400/10 px-3 py-2.5 text-sm text-gold-200">
+            <ShieldAlert className="h-4 w-4 shrink-0" /> {notice}
+          </div>
+        )}
 
         <Card>
           <CardContent className="pt-6">

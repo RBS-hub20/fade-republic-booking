@@ -107,6 +107,7 @@ export async function POST(req: Request) {
     name: user.name,
     clientId: user.clientId,
     emailVerified: user.emailVerified,
+    iat: Date.now(), // immutable login time → drives the hard session cap
   };
 
   // Landing target: a client who hasn't funded yet (balance $0 → no tier) lands

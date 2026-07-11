@@ -36,6 +36,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       clientId={session.clientId ?? null}
       emailVerified={emailVerified}
       tier={tier}
+      sessionIat={session.iat ?? null}
     >
       {children}
     </AppShell>

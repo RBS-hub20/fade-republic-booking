@@ -4,13 +4,17 @@
  * the cookie name and types from auth-config.ts instead.
  */
 import { cookies } from "next/headers";
-import { SESSION_COOKIE, type Session } from "./auth-config";
+import { SESSION_COOKIE, isSessionHardExpired, type Session } from "./auth-config";
 import { decodeSession } from "./session";
 
 export function getSession(): Session | null {
   const raw = cookies().get(SESSION_COOKIE)?.value;
   if (!raw) return null;
-  return decodeSession(raw);
+  const session = decodeSession(raw);
+  if (!session) return null;
+  // Absolute (hard) session cap — cannot be bypassed by client-side activity.
+  if (isSessionHardExpired(session)) return null;
+  return session;
 }
 
 /** Convenience guards. */
