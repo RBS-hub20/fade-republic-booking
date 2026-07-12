@@ -16,6 +16,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Logo, LogoMark } from "@/components/brand/logo";
 import { LiveMarketTicker } from "@/components/market/live-market-ticker";
+import { FloatingCoins } from "@/components/landing/floating-coins";
 import { getSession } from "@/lib/auth";
 
 // Public marketing landing page. No auth required (see middleware PUBLIC_PATHS).
@@ -123,7 +124,16 @@ export default function LandingPage() {
       </header>
 
       {/* Hero */}
-      <section className="mx-auto max-w-6xl px-4 pb-16 pt-20 text-center sm:px-6 sm:pt-28">
+      <section className="relative overflow-hidden px-4 pb-16 pt-20 text-center sm:px-6 sm:pt-28">
+        {/* Decorative floating coins (behind content; hidden on mobile / reduced-motion) */}
+        <FloatingCoins />
+
+        <div className="relative z-10 mx-auto max-w-6xl">
+        {/* Slowly spinning 3D QuantumX mark */}
+        <div className="qx-logo-3d mb-8">
+          <LogoMark size="lg" />
+        </div>
+
         <span className="inline-flex items-center gap-2 rounded-full border border-gold-400/30 bg-gold-400/10 px-3 py-1 text-xs font-medium text-gold-300">
           Where innovation meets global finance
         </span>
@@ -137,7 +147,7 @@ export default function LandingPage() {
           ecosystem built for speed, performance and reliability.
         </p>
         <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-          <Button asChild size="lg" className="w-full sm:w-auto">
+          <Button asChild size="lg" className="btn-3d w-full sm:w-auto">
             <Link href="/signup">
               Get started <ArrowRight className="h-4 w-4" />
             </Link>
@@ -176,6 +186,7 @@ export default function LandingPage() {
               <p className="mt-1 text-xs text-muted-foreground">{s.label}</p>
             </div>
           ))}
+        </div>
         </div>
       </section>
 
@@ -248,7 +259,7 @@ export default function LandingPage() {
             Create an account in seconds, or explore the platform with a demo login.
           </p>
           <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <Button asChild size="lg">
+            <Button asChild size="lg" className="btn-3d">
               <Link href="/signup">
                 Create your account <ArrowRight className="h-4 w-4" />
               </Link>

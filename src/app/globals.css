@@ -54,6 +54,98 @@
   background-size: 28px 28px;
 }
 
+/* ==========================================================================
+   Landing-page-only 3D flourishes.
+
+   All rules are scoped under classes used exclusively on the marketing page
+   (.qx-logo-3d, .qx-coin, .btn-3d) so the dashboard / app shell stays 2D.
+   Everything is pure CSS transforms (zero added JS), disabled on phones
+   (<768px) and fully honouring prefers-reduced-motion.
+   ========================================================================== */
+
+/* 1. Hero: slowly spinning 3D QuantumX mark (20s per loop). */
+.qx-logo-3d {
+  perspective: 900px;
+  display: inline-block;
+}
+.qx-logo-3d img {
+  height: 92px !important;
+  width: auto !important;
+  transform-style: preserve-3d;
+  will-change: transform;
+  animation: qx-spin-y 20s linear infinite;
+  filter: drop-shadow(0 10px 26px hsl(43 74% 58% / 0.28));
+}
+@keyframes qx-spin-y {
+  from { transform: rotateY(0deg); }
+  to { transform: rotateY(360deg); }
+}
+
+/* 2. Floating crypto-coin backdrop. */
+.qx-coins {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.qx-coin {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  font-weight: 700;
+  color: #fff;
+  opacity: 0.3;
+  filter: blur(1px);
+  will-change: transform;
+  animation-name: qx-float;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+@keyframes qx-float {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-30px) rotate(10deg); }
+}
+
+/* 3. CTA button: subtle 3D press. */
+.btn-3d {
+  transition: transform 130ms ease, box-shadow 130ms ease;
+  box-shadow: 0 4px 14px hsl(43 74% 58% / 0.25);
+}
+.btn-3d:hover {
+  transform: translateY(-2px) translateZ(10px);
+  box-shadow: 0 10px 28px hsl(43 74% 58% / 0.45);
+}
+.btn-3d:active {
+  transform: translateY(2px) translateZ(0);
+  box-shadow: 0 2px 8px hsl(43 74% 58% / 0.3);
+}
+
+/* Phones: drop the coin field and stop the logo spin (perf + focus). */
+@media (max-width: 767px) {
+  .qx-coins { display: none; }
+  .qx-logo-3d img {
+    height: 68px !important;
+    animation: none;
+  }
+}
+
+/* Accessibility: kill all landing motion when reduced motion is requested. */
+@media (prefers-reduced-motion: reduce) {
+  .qx-logo-3d img,
+  .qx-coin {
+    animation: none !important;
+  }
+  .btn-3d {
+    transition: none;
+  }
+  .btn-3d:hover {
+    transform: none;
+  }
+}
+
 /* Thin custom scrollbars to match the terminal aesthetic. */
 ::-webkit-scrollbar {
   width: 8px;
