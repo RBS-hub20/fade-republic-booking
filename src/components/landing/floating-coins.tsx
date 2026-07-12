@@ -28,7 +28,7 @@ const COINS: Coin[] = [
   { symbol: "Ξ", color: "#627eea", top: "24%", left: "89%", size: 52, delay: "2.4s", duration: "21s" },
   { symbol: "₮", color: "#26a17b", top: "68%", left: "9%", size: 48, delay: "4.1s", duration: "23s" },
   { symbol: "BNB", color: "#f3ba2f", top: "72%", left: "85%", size: 56, delay: "1.2s", duration: "17s" },
-  { symbol: "SOL", color: "#9945ff", top: "46%", left: "2%", size: 44, delay: "3.3s", duration: "24s" },
+  { symbol: "SOL", color: "#9945ff", top: "46%", left: "calc(2% - 20px)", size: 44, delay: "3.3s", duration: "24s" },
   { symbol: "XRP", color: "#5b6570", top: "8%", left: "62%", size: 46, delay: "5s", duration: "19s" },
 ];
 

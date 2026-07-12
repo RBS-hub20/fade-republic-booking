@@ -73,7 +73,7 @@
   width: auto !important;
   transform-style: preserve-3d;
   will-change: transform;
-  animation: qx-spin-y 20s linear infinite;
+  animation: qx-spin-y 30s linear infinite;
   filter: drop-shadow(0 10px 26px hsl(43 74% 58% / 0.28));
 }
 @keyframes qx-spin-y {
@@ -112,11 +112,11 @@
 /* 3. CTA button: subtle 3D press. */
 .btn-3d {
   transition: transform 130ms ease, box-shadow 130ms ease;
-  box-shadow: 0 4px 14px hsl(43 74% 58% / 0.25);
+  box-shadow: 0 4px 14px hsl(43 74% 58% / 0.4);
 }
 .btn-3d:hover {
   transform: translateY(-2px) translateZ(10px);
-  box-shadow: 0 10px 28px hsl(43 74% 58% / 0.45);
+  box-shadow: 0 10px 28px hsl(43 74% 58% / 0.55);
 }
 .btn-3d:active {
   transform: translateY(2px) translateZ(0);
