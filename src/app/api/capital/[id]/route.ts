@@ -4,6 +4,7 @@ import { getSession } from "@/lib/auth";
 import { ensureFinanceSchemaOnce } from "@/lib/finance-schema";
 import { addMonths, LOCK_MONTHS } from "@/lib/capital";
 import { creditPackageCommission } from "@/lib/referrals";
+import { refreshPayoutTrackingByClient } from "@/lib/payout-cap";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -78,6 +79,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         amount: deposit.amount,
         event: "renewal",
       }).catch(() => {});
+      // Re-locking capital refreshes the renewer's own 5x cap tracking.
+      await refreshPayoutTrackingByClient(deposit.clientId).catch(() => {});
       const newUnlockAt = addMonths(new Date(), LOCK_MONTHS);
       return NextResponse.json({ ok: true, unlockAt: newUnlockAt.toISOString() });
     }

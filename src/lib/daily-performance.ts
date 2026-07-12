@@ -58,6 +58,36 @@ export async function runDailyPerformance(opts?: { upToKey?: string }): Promise<
     .catch(() => [] as { transactionId: string }[]);
   const withdrawnSet = new Set(withdrawnActions.map((a) => a.transactionId));
 
+  // 5x payout-cap inputs (one batch): map each client to its user and that
+  // user's lifetime commission earnings, so we can stop ROI for CAPPED accounts
+  // (earned across ALL income ≥ remaining capital × 5).
+  const clientUsers = await prisma.user
+    .findMany({ where: { clientId: { in: clients.map((c) => c.id) } }, select: { id: true, clientId: true } })
+    .catch(() => [] as { id: string; clientId: string | null }[]);
+  const userByClient = new Map(clientUsers.map((u) => [u.clientId, u.id]));
+  const userIds = clientUsers.map((u) => u.id);
+  const [l1g, l2g, mbg] = await Promise.all([
+    userIds.length
+      ? prisma.referralCommission
+          .groupBy({ by: ["referrerId"], where: { referrerId: { in: userIds }, status: "PAID" }, _sum: { commission: true } })
+          .catch(() => [] as { referrerId: string; _sum: { commission: number | null } }[])
+      : [],
+    userIds.length
+      ? prisma.level2Commission
+          .groupBy({ by: ["earnerId"], where: { earnerId: { in: userIds } }, _sum: { commissionAmount: true } })
+          .catch(() => [] as { earnerId: string; _sum: { commissionAmount: number | null } }[])
+      : [],
+    userIds.length
+      ? prisma.monthlyBonus
+          .groupBy({ by: ["userId"], where: { userId: { in: userIds } }, _sum: { bonusAmount: true } })
+          .catch(() => [] as { userId: string; _sum: { bonusAmount: number | null } }[])
+      : [],
+  ]);
+  const commByUser = new Map<string, number>();
+  for (const g of l1g) commByUser.set(g.referrerId, (commByUser.get(g.referrerId) ?? 0) + (g._sum.commission ?? 0));
+  for (const g of l2g) commByUser.set(g.earnerId, (commByUser.get(g.earnerId) ?? 0) + (g._sum.commissionAmount ?? 0));
+  for (const g of mbg) commByUser.set(g.userId, (commByUser.get(g.userId) ?? 0) + (g._sum.bonusAmount ?? 0));
+
   let daysCreated = 0;
   const report: { name: string; added: number }[] = [];
 
@@ -68,6 +98,13 @@ export async function runDailyPerformance(opts?: { upToKey?: string }): Promise<
       0
     );
     if (remainingPrincipal <= 0) continue;
+
+    // CAPPED gate: total earned (daily ROI so far + all commissions) has hit the
+    // 5x cap → stop earning until they add/renew capital.
+    const uid = userByClient.get(c.id);
+    const priorPnl = c.dailyPerformances.reduce((s, p) => s + p.pnlUsd, 0);
+    const totalEarned = priorPnl + (uid ? commByUser.get(uid) ?? 0 : 0);
+    if (remainingPrincipal * 5 <= totalEarned) continue;
 
     // A client only earns once funded — anchor the backfill to their first
     // approved deposit (or, if seeded, their existing performance history).

@@ -18,6 +18,7 @@ import {
 } from "./chain";
 import { notifyDepositApproved } from "./mailers";
 import { creditPackageCommission } from "./referrals";
+import { refreshPayoutTrackingByClient } from "./payout-cap";
 
 const AMOUNT_TOLERANCE = 0.99; // allow 1% slippage below requested
 
@@ -111,6 +112,8 @@ export async function verifyPendingDeposits(opts?: { clientId?: string }): Promi
 
     // Credit referral commissions for this package purchase (unlimited).
     await creditPackageCommission({ clientId: tx.clientId, amount: credited, event: "purchase" });
+    // New capital raises the depositor's 5x cap (un-caps them if applicable).
+    await refreshPayoutTrackingByClient(tx.clientId).catch(() => {});
 
     // Best-effort notification (never blocks verification).
     if (tx.client) {

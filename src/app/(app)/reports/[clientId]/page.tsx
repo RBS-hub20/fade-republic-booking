@@ -9,6 +9,7 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getCapitalSummary, addMonths, LOCK_MONTHS } from "@/lib/capital";
 import { getReferralBonusEvents } from "@/lib/referrals";
+import { getPayoutState } from "@/lib/payout-cap";
 import { toManilaDateKey } from "@/lib/performance";
 import type { ReportTxn } from "@/lib/pdf";
 import {
@@ -79,6 +80,13 @@ export default async function ReportPage({
     ? await getReferralBonusEvents(owner.id).catch(() => [])
     : [];
 
+  // 5x payout cap state — drives the "CAPPED — $0.00" notice in the daily log.
+  const payoutCapped = owner?.id
+    ? await getPayoutState(owner.id, params.clientId)
+        .then((s) => s.capped)
+        .catch(() => false)
+    : false;
+
   return (
     <>
       <PageHeader
@@ -109,6 +117,7 @@ export default async function ReportPage({
         transactions={transactions}
         packages={packages}
         referralBonuses={referralBonuses}
+        capped={payoutCapped}
         canWithdraw={!isAdmin}
         isAdmin={isAdmin}
       />

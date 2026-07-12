@@ -44,6 +44,7 @@ export function ReportView({
   transactions,
   packages,
   referralBonuses,
+  capped,
   canWithdraw,
   isAdmin,
 }: {
@@ -53,6 +54,7 @@ export function ReportView({
   transactions: ReportTxn[];
   packages: PackageRow[];
   referralBonuses: ReferralBonusEvent[];
+  capped: boolean;
   canWithdraw: boolean;
   isAdmin: boolean;
 }) {
@@ -205,6 +207,12 @@ export function ReportView({
       <Card>
         <CardHeader>
           <CardTitle>Daily Performance Log</CardTitle>
+          {capped && (
+            <div className="mt-1 flex items-center gap-2 rounded-md border border-loss/40 bg-loss/10 px-3 py-1.5 text-xs font-medium text-loss">
+              <span className="rounded bg-loss/15 px-1.5 py-0.5 font-bold uppercase tracking-wide">Capped</span>
+              — $0.00 · 5x payout limit reached. Daily ROI is paused until you add or renew capital.
+            </div>
+          )}
           {isAdmin && (
             <p className="text-xs text-muted-foreground">
               Admin: click the pencil to enter an actual daily % (blank = random 0.3–0.6% estimate).

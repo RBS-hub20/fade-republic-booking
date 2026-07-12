@@ -11,6 +11,7 @@ import { formatUsd } from "@/lib/utils";
 import { getReferralSummary } from "@/lib/referrals";
 import { REFERRALS_ENABLED } from "@/lib/referrals-config";
 import { getCapitalSummary } from "@/lib/capital";
+import { getPayoutState, syncPayoutTracking, type PayoutState } from "@/lib/payout-cap";
 import { ensureFinanceSchemaOnce } from "@/lib/finance-schema";
 import { ReferralLinkCard } from "@/components/referrals/referral-link-card";
 import { ReferralHistory } from "@/components/referrals/referral-history";
@@ -94,6 +95,20 @@ export default async function DashboardPage() {
     const isInactive =
       remainingPrincipal !== null && remainingPrincipal <= 0 && (k?.totalDeposits ?? 0) > 0;
 
+    // 5x payout-cap state (all earnings vs remaining capital × 5). Derived and
+    // synced to the tracking cache; degrades to null so the dashboard never
+    // breaks if the payout table isn't migrated yet.
+    let payout: PayoutState | null = null;
+    if (session.userId && session.clientId) {
+      try {
+        payout = await getPayoutState(session.userId, session.clientId);
+        void syncPayoutTracking(session.userId, payout);
+      } catch {
+        payout = null;
+      }
+    }
+    const showCapWarning = payout != null && !payout.capped && payout.status === "ACTIVE" && payout.pct >= 80;
+
     // Show the "claim your @username" banner to users who haven't set one yet.
     let showUsernameBanner = false;
     if (session.userId) {
@@ -125,6 +140,17 @@ export default async function DashboardPage() {
             </span>
             <span className="shrink-0 font-semibold">Reactivate →</span>
           </Link>
+        )}
+        {showCapWarning && payout && (
+          <div className="mb-6 flex flex-col gap-2 rounded-lg border border-gold-400/40 bg-gold-400/10 px-4 py-3 text-sm text-gold-200 sm:flex-row sm:items-center sm:justify-between">
+            <span className="font-medium">
+              ⚠️ You&apos;re at {payout.pct}% of your Max Payout Cap. Renew or add capital to continue
+              earning.
+            </span>
+            <Link href="/qx-tiers" className="shrink-0 font-semibold text-gold-300 hover:text-gold-200">
+              Add capital →
+            </Link>
+          </div>
         )}
         {showUsernameBanner && (
           <Link
@@ -168,6 +194,8 @@ export default async function DashboardPage() {
                 rejectReason: w.rejectReason,
                 createdAt: w.createdAt.toISOString(),
               }))}
+              payout={payout}
+              clientId={session.clientId}
             />
           </div>
         ) : null}

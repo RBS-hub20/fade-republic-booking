@@ -32,6 +32,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn, formatUsd, formatPct, formatDate } from "@/lib/utils";
+import { PayoutCapCard } from "@/components/finance/payout-cap-card";
+import type { PayoutState } from "@/lib/payout-cap";
 
 export interface CapitalView {
   activeCapital: number;
@@ -69,15 +71,26 @@ export function FinancePanel({
   capital,
   kpis,
   withdrawals,
+  payout,
+  clientId,
 }: {
   capital: CapitalView;
   kpis: { winRate: number; avgDailyPercent: number; totalNetPnl: number };
   withdrawals: WithdrawalRow[];
+  payout: PayoutState | null;
+  clientId: string | null;
 }) {
   const [modalOpen, setModalOpen] = useState(false);
 
   return (
     <div className="space-y-4">
+      {/* Payout-cap card (spans the Active Capital + Available columns) */}
+      {payout && (
+        <div className="grid gap-4 lg:grid-cols-2">
+          <PayoutCapCard payout={payout} clientId={clientId} />
+        </div>
+      )}
+
       {/* Row 1 */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <ActiveCapitalCard capital={capital} />

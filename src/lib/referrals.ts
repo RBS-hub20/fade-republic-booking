@@ -16,7 +16,7 @@ import { getClientPerformance } from "./data";
 import { TIERS, tierForBalance, type TierId } from "./tiers";
 import { REFERRALS_ENABLED } from "./referrals-config";
 import { ensureReferralSchemaOnce } from "./referral-schema";
-import { isCapitalActive } from "./capital";
+import { canEarn } from "./payout-cap";
 
 /** Commission percentage a referrer earns, keyed by their current tier. */
 export const COMMISSION_RATES: Record<"none" | TierId, number> = {
@@ -199,8 +199,10 @@ async function creditLevel2Commission(opts: {
   });
   if (!earner) return;
 
-  // Inactive upline (all capital withdrawn) forfeits commissions.
-  if (!(await isCapitalActive(earner.clientId))) return;
+  // Earning gate: an INACTIVE (no capital) or CAPPED (5x reached) upline
+  // forfeits the L2 commission.
+  const gate = await canEarn(earner.id, earner.clientId);
+  if (!gate.allowed) return;
 
   const balance = await balanceOfUser(earner.clientId);
   const tier = tierForBalance(balance);
@@ -292,8 +294,10 @@ export async function creditPackageCommission(opts: {
     const referrer = await prisma.user.findUnique({ where: { id: referred.referredById } });
     if (!referrer) return;
 
-    // Inactive referrer (all capital withdrawn) forfeits commissions.
-    if (await isCapitalActive(referrer.clientId)) {
+    // Earning gate: an INACTIVE (no capital) or CAPPED (5x reached) referrer
+    // forfeits the L1 commission.
+    const gate = await canEarn(referrer.id, referrer.clientId);
+    if (gate.allowed) {
       const referrerBalance = await balanceOfUser(referrer.clientId);
       const rate = commissionRateForBalance(referrerBalance);
       const commission = Math.round(tier.price * (rate / 100) * 100) / 100;
@@ -684,6 +688,10 @@ export async function runMonthlyReferralBonus(opts?: { monthYear?: string }): Pr
 
       const bonus = round2b((totalPl * MONTHLY_BONUS_RATE) / 100);
       if (bonus <= 0) continue;
+
+      // Earning gate: skip the bonus if the earner is INACTIVE or CAPPED (5x).
+      const gate = await canEarn(earner.id, earner.clientId);
+      if (!gate.allowed) continue;
 
       await prisma.$transaction([
         prisma.monthlyBonus.create({

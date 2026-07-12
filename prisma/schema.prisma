@@ -231,6 +231,21 @@ model CommissionWithdrawal {
   @@index([userId])
 }
 
+// Per-user 5x payout cap tracking (cache; the authoritative values are derived
+// from actual earnings + remaining capital — see src/lib/payout-cap.ts).
+// Max Payout = remaining locked principal × 5. All earnings (daily ROI, L1/L2
+// commissions, monthly bonus) count toward totalEarnedAll; once it reaches the
+// cap the account is CAPPED and earns nothing until it adds/renews capital.
+model UserPayoutTracking {
+  userId             String   @id
+  totalActiveCapital Float    @default(0)
+  maxPayoutCap       Float    @default(0)
+  totalEarnedAll     Float    @default(0)
+  // enum: ACTIVE | CAPPED | INACTIVE
+  status             String   @default("ACTIVE")
+  updatedAt          DateTime @updatedAt
+}
+
 model AuthToken {
   id        String   @id @default(cuid())
   userId    String

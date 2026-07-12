@@ -4,6 +4,7 @@ import { getSession } from "@/lib/auth";
 import { TRANSACTION_STATUSES } from "@/lib/constants";
 import { notifyDepositApproved, notifyWithdrawalApproved } from "@/lib/mailers";
 import { creditPackageCommission } from "@/lib/referrals";
+import { refreshPayoutTrackingByClient } from "@/lib/payout-cap";
 
 /** Update a transaction (e.g. approve a pending one). Admin only. */
 export async function PATCH(
@@ -42,6 +43,8 @@ export async function PATCH(
       }).catch(() => {});
       // Credit referral commissions for this package purchase (unlimited).
       await creditPackageCommission({ clientId: before.clientId, amount: tx.amount, event: "purchase" });
+      // New capital raises the depositor's 5x cap (un-caps them if applicable).
+      await refreshPayoutTrackingByClient(before.clientId).catch(() => {});
     } else if (before.type === "WITHDRAWAL") {
       notifyWithdrawalApproved({
         email: before.client.email,
