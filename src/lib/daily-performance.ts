@@ -47,10 +47,28 @@ export async function runDailyPerformance(opts?: { upToKey?: string }): Promise<
     },
   });
 
+  // Released-capital lookup (one batch) so we can skip INACTIVE accounts: a
+  // client whose entire principal has been withdrawn earns no daily ROI until
+  // they fund a new package.
+  const withdrawnActions = await prisma.capitalAction
+    .findMany({
+      where: { clientId: { in: clients.map((c) => c.id) }, action: "withdrawn" },
+      select: { transactionId: true },
+    })
+    .catch(() => [] as { transactionId: string }[]);
+  const withdrawnSet = new Set(withdrawnActions.map((a) => a.transactionId));
+
   let daysCreated = 0;
   const report: { name: string; added: number }[] = [];
 
   for (const c of clients) {
+    // INACTIVE gate: no remaining locked principal → no daily ROI.
+    const remainingPrincipal = c.transactions.reduce(
+      (s, t) => s + (t.type === "DEPOSIT" && !withdrawnSet.has(t.id) ? t.amount : 0),
+      0
+    );
+    if (remainingPrincipal <= 0) continue;
+
     // A client only earns once funded — anchor the backfill to their first
     // approved deposit (or, if seeded, their existing performance history).
     const firstDeposit = c.transactions.find((t) => t.type === "DEPOSIT");

@@ -23,8 +23,9 @@ import { METHOD_LABELS } from "@/lib/constants";
 import { generateClientStatement, type ReportTxn } from "@/lib/pdf";
 import type { EquityPoint, PerformanceKpis } from "@/lib/performance";
 import type { PackageRow } from "@/lib/packages";
+import type { ReferralBonusEvent } from "@/lib/referrals";
 import { Modal } from "@/components/ui/modal";
-import { Lock, Loader2, RefreshCw, ArrowDownToLine, CheckCircle2 } from "lucide-react";
+import { Lock, Loader2, RefreshCw, ArrowDownToLine, CheckCircle2, Users } from "lucide-react";
 
 interface ReportClient {
   id: string;
@@ -42,6 +43,7 @@ export function ReportView({
   curve,
   transactions,
   packages,
+  referralBonuses,
   canWithdraw,
   isAdmin,
 }: {
@@ -50,6 +52,7 @@ export function ReportView({
   curve: EquityPoint[];
   transactions: ReportTxn[];
   packages: PackageRow[];
+  referralBonuses: ReferralBonusEvent[];
   canWithdraw: boolean;
   isAdmin: boolean;
 }) {
@@ -73,6 +76,21 @@ export function ReportView({
     .filter((p) => p.isTradingDay && p.dailyPercent !== 0)
     .slice()
     .reverse();
+
+  // Merge the daily P/L rows with referral-bonus events into one newest-first
+  // log, so "+$X.XX Referral Bonus from @user" appears on the day it landed.
+  const logEntries: Array<
+    | { kind: "daily"; sortKey: string; point: EquityPoint }
+    | { kind: "bonus"; sortKey: string; id: string; bonus: ReferralBonusEvent }
+  > = [
+    ...dailyRows.map((p) => ({ kind: "daily" as const, sortKey: p.date, point: p })),
+    ...referralBonuses.map((b, i) => ({
+      kind: "bonus" as const,
+      sortKey: b.dateKey,
+      id: `bonus-${b.date}-${i}`,
+      bonus: b,
+    })),
+  ].sort((a, b) => (a.sortKey < b.sortKey ? 1 : a.sortKey > b.sortKey ? -1 : 0));
 
   return (
     <div className="space-y-6">
@@ -205,15 +223,26 @@ export function ReportView({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {dailyRows.map((p) => (
-                <DailyRow
-                  key={p.date}
-                  clientId={client.id}
-                  point={p}
-                  isAdmin={isAdmin}
-                  onSaved={() => router.refresh()}
-                />
-              ))}
+              {logEntries.map((e) =>
+                e.kind === "daily" ? (
+                  <DailyRow
+                    key={e.point.date}
+                    clientId={client.id}
+                    point={e.point}
+                    isAdmin={isAdmin}
+                    onSaved={() => router.refresh()}
+                  />
+                ) : (
+                  <BonusRow key={e.id} bonus={e.bonus} isAdmin={isAdmin} />
+                )
+              )}
+              {logEntries.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={isAdmin ? 5 : 4} className="py-8 text-center text-muted-foreground">
+                    No performance recorded yet.
+                  </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </CardContent>
@@ -302,6 +331,29 @@ function DailyRow({
           )}
         </TableCell>
       )}
+    </TableRow>
+  );
+}
+
+/** A referral-bonus entry interleaved into the Daily Performance Log. */
+function BonusRow({ bonus, isAdmin }: { bonus: ReferralBonusEvent; isAdmin: boolean }) {
+  return (
+    <TableRow className="bg-profit/5">
+      <TableCell className="font-medium">{formatDateKey(bonus.dateKey)}</TableCell>
+      <TableCell>
+        <span className="inline-flex items-center gap-1.5 text-xs font-medium text-profit">
+          <Users className="h-3.5 w-3.5" />
+          Referral Bonus from @{bonus.fromName}
+          {bonus.level === 2 && (
+            <span className="rounded bg-profit/15 px-1 text-[10px] uppercase tracking-wide">L2</span>
+          )}
+        </span>
+      </TableCell>
+      <TableCell className="tnum text-right font-medium text-profit">
+        +{formatUsd(bonus.amount)}
+      </TableCell>
+      <TableCell className="text-right text-muted-foreground">—</TableCell>
+      {isAdmin && <TableCell />}
     </TableRow>
   );
 }

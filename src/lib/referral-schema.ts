@@ -31,7 +31,10 @@ export const REFERRAL_DDL: string[] = [
      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
      "paidAt" TIMESTAMP(3)
    )`,
-  `CREATE UNIQUE INDEX IF NOT EXISTS "ReferralCommission_referredUserId_key" ON "ReferralCommission"("referredUserId")`,
+  // Commissions are UNLIMITED (repeat on every purchase/renewal), so the old
+  // one-per-referred-user unique index must be dropped; a plain index replaces it.
+  `DROP INDEX IF EXISTS "ReferralCommission_referredUserId_key"`,
+  `CREATE INDEX IF NOT EXISTS "ReferralCommission_referredUserId_idx" ON "ReferralCommission"("referredUserId")`,
   `CREATE INDEX IF NOT EXISTS "ReferralCommission_referrerId_idx" ON "ReferralCommission"("referrerId")`,
   `CREATE TABLE IF NOT EXISTS "CommissionWithdrawal" (
      "id" TEXT NOT NULL PRIMARY KEY,
@@ -61,7 +64,10 @@ export const REFERRAL_DDL: string[] = [
      "uplineTierAtTime" TEXT,
      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
    )`,
-  `CREATE UNIQUE INDEX IF NOT EXISTS "Level2Commission_sourceUserId_key" ON "Level2Commission"("sourceUserId")`,
+  // 2nd-level commissions are UNLIMITED too — drop the one-per-source unique
+  // index in favour of a plain index.
+  `DROP INDEX IF EXISTS "Level2Commission_sourceUserId_key"`,
+  `CREATE INDEX IF NOT EXISTS "Level2Commission_sourceUserId_idx" ON "Level2Commission"("sourceUserId")`,
   `CREATE INDEX IF NOT EXISTS "Level2Commission_earnerId_idx" ON "Level2Commission"("earnerId")`,
   `CREATE TABLE IF NOT EXISTS "MonthlyBonus" (
      "id" TEXT NOT NULL PRIMARY KEY,

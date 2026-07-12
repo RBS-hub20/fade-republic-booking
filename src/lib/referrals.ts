@@ -4,18 +4,19 @@
  * Model:
  *  - Every user has a unique `referralCode` (first 4 letters of name + 3 digits).
  *  - New signups may pass `?ref=CODE`, tagging them to a referrer.
- *  - When a referred user activates their FIRST QX Tier (their first approved
- *    tier-sized deposit), the referrer earns a commission based on the
- *    referrer's OWN tier at that moment (5/6/7/8%). Only the first package per
- *    referral ever counts — enforced by the unique `referredUserId`.
- *  - Commissions land as PENDING and auto-settle to PAID after 24h, at which
- *    point they credit the referrer's withdrawable `commissionBalance`.
+ *  - Whenever a referred user activates a QX Tier package — a new purchase OR a
+ *    renewal — the referrer earns a commission based on the referrer's OWN tier
+ *    at that moment. Commissions are UNLIMITED (one per event, not one per
+ *    referral). An INACTIVE referrer (all capital withdrawn) is skipped.
+ *  - Commissions are credited INSTANTLY as PAID to the referrer's withdrawable
+ *    `commissionBalance` (no pending / 24h hold).
  */
 import { prisma } from "./prisma";
 import { getClientPerformance } from "./data";
 import { TIERS, tierForBalance, type TierId } from "./tiers";
 import { REFERRALS_ENABLED } from "./referrals-config";
 import { ensureReferralSchemaOnce } from "./referral-schema";
+import { isCapitalActive } from "./capital";
 
 /** Commission percentage a referrer earns, keyed by their current tier. */
 export const COMMISSION_RATES: Record<"none" | TierId, number> = {
@@ -162,10 +163,11 @@ async function uplinesAboveDirect(
 }
 
 /**
- * Credit the 2nd-level (indirect) commission for a source user's FIRST package.
- * Uses the source user's lineage to find the nearest UNLOCKED upline above the
- * direct referrer (compression), and pays them `level2Rate(theirTier) ×
- * packageAmount` once.
+ * Credit the 2nd-level (indirect) commission for a source user's package
+ * (purchase OR renewal). UNLIMITED — paid on every qualifying event, not just
+ * the first. Uses the source user's lineage to find the nearest UNLOCKED upline
+ * above the direct referrer (compression), and pays them `level2Rate(theirTier)
+ * × packageAmount`. Skips the payout if that upline is INACTIVE (no capital).
  */
 async function creditLevel2Commission(opts: {
   sourceUserId: string;
@@ -173,11 +175,6 @@ async function creditLevel2Commission(opts: {
   sourceReferralPath: string | null; // source user's path: root → direct upline
   packageAmount: number;
 }): Promise<void> {
-  const existing = await prisma.level2Commission.findUnique({
-    where: { sourceUserId: opts.sourceUserId },
-  });
-  if (existing) return; // first deposit only
-
   const candidates = await uplinesAboveDirect(
     opts.sourceUserId,
     opts.directUplineId,
@@ -201,6 +198,9 @@ async function creditLevel2Commission(opts: {
     select: { id: true, clientId: true },
   });
   if (!earner) return;
+
+  // Inactive upline (all capital withdrawn) forfeits commissions.
+  if (!(await isCapitalActive(earner.clientId))) return;
 
   const balance = await balanceOfUser(earner.clientId);
   const tier = tierForBalance(balance);
@@ -263,12 +263,19 @@ export async function findReferrerByCode(code: string): Promise<string | null> {
 }
 
 /**
- * Credit a referral commission when a client's FIRST tier-sized deposit is
- * approved. Idempotent and safe to call from every approval path.
+ * Credit referral commissions when a client activates a package — on EVERY
+ * qualifying event (new purchase OR renewal), not just the first. Level 1 pays
+ * the direct referrer; level 2 pays the nearest unlocked upline. Both credit
+ * INSTANTLY to the withdrawable commissionBalance (unchanged credit flow).
+ *
+ * Skips a payout when the would-be earner is INACTIVE (all capital withdrawn).
+ * Best-effort and fully guarded: crediting must never break the trigger.
  */
-export async function creditFirstPackageCommission(opts: {
+export async function creditPackageCommission(opts: {
   clientId: string;
   amount: number;
+  /** What triggered this — for labelling only. Defaults to "purchase". */
+  event?: "purchase" | "renewal";
 }): Promise<void> {
   if (!REFERRALS_ENABLED) return;
   try {
@@ -281,42 +288,45 @@ export async function creditFirstPackageCommission(opts: {
     const referred = await prisma.user.findUnique({ where: { clientId: opts.clientId } });
     if (!referred || !referred.referredById) return; // not referred
 
-    // First package only — bail if this referral already generated a commission.
-    const existing = await prisma.referralCommission.findUnique({
-      where: { referredUserId: referred.id },
-    });
-    if (existing) return;
-
     // Referrer's rate is based on THEIR tier at purchase time.
     const referrer = await prisma.user.findUnique({ where: { id: referred.referredById } });
     if (!referrer) return;
-    const referrerBalance = await balanceOfUser(referrer.clientId);
-    const rate = commissionRateForBalance(referrerBalance);
-    const commission = Math.round(tier.price * (rate / 100) * 100) / 100;
 
-    // INSTANT credit (level 1): record the commission as PAID and add it to the
-    // referrer's withdrawable balance immediately — no pending, no 24h delay.
-    await prisma.$transaction([
-      prisma.referralCommission.create({
-        data: {
-          referrerId: referrer.id,
-          referredUserId: referred.id,
-          referredName: referred.name,
-          packageLabel: `${tier.name} $${tier.price}`,
-          packageAmount: tier.price,
-          commission,
-          status: "PAID",
-          paidAt: new Date(),
-        },
-      }),
-      prisma.user.update({
-        where: { id: referrer.id },
-        data: { commissionBalance: { increment: commission } },
-      }),
-    ]);
+    // Inactive referrer (all capital withdrawn) forfeits commissions.
+    if (await isCapitalActive(referrer.clientId)) {
+      const referrerBalance = await balanceOfUser(referrer.clientId);
+      const rate = commissionRateForBalance(referrerBalance);
+      const commission = Math.round(tier.price * (rate / 100) * 100) / 100;
+      const label = `${tier.name} $${tier.price}${opts.event === "renewal" ? " · Renewal" : ""}`;
+
+      // INSTANT credit (level 1): record the commission as PAID and add it to the
+      // referrer's withdrawable balance immediately — no pending, no 24h delay.
+      if (commission > 0) {
+        await prisma.$transaction([
+          prisma.referralCommission.create({
+            data: {
+              referrerId: referrer.id,
+              referredUserId: referred.id,
+              referredName: referred.name,
+              packageLabel: label,
+              packageAmount: tier.price,
+              commission,
+              status: "PAID",
+              paidAt: new Date(),
+            },
+          }),
+          prisma.user.update({
+            where: { id: referrer.id },
+            data: { commissionBalance: { increment: commission } },
+          }),
+        ]);
+      }
+    }
 
     // Level 2 (indirect): pay the nearest UNLOCKED upline above the referrer,
-    // resolved from the source user's materialized lineage path.
+    // resolved from the source user's materialized lineage path. Independent of
+    // the level-1 skip — a qualified upline still earns even if the direct
+    // referrer is inactive.
     await creditLevel2Commission({
       sourceUserId: referred.id,
       directUplineId: referrer.id,
@@ -329,7 +339,7 @@ export async function creditFirstPackageCommission(opts: {
     await recomputeUnlock(referrer.id).catch(() => {});
   } catch (e) {
     // Commission crediting must never break a deposit approval.
-    console.error("creditFirstPackageCommission failed (ignored):", e);
+    console.error("creditPackageCommission failed (ignored):", e);
   }
 }
 
@@ -447,6 +457,10 @@ export async function getReferralSummary(user: {
 
   const paid = commissions.filter((c) => c.status === "PAID");
   const pending = commissions.filter((c) => c.status === "PENDING");
+  // Commissions are unlimited (repeats per referral), so "active/pending
+  // referrals" must count DISTINCT referred users, not commission rows.
+  const activeReferralCount = new Set(paid.map((c) => c.referredUserId)).size;
+  const pendingReferralCount = new Set(pending.map((c) => c.referredUserId)).size;
   const level2Earned = Math.round((level2Agg._sum.commissionAmount ?? 0) * 100) / 100;
   const monthlyBonusEarned = Math.round((monthlyBonusAgg._sum.bonusAmount ?? 0) * 100) / 100;
 
@@ -454,8 +468,8 @@ export async function getReferralSummary(user: {
     code,
     link: `${APP_ORIGIN}/signup?ref=${code}`,
     totalReferrals,
-    activeReferrals: paid.length,
-    pendingReferrals: pending.length,
+    activeReferrals: activeReferralCount,
+    pendingReferrals: pendingReferralCount,
     commissionRate: commissionRateForBalance(balance),
     totalEarned:
       Math.round(
@@ -481,6 +495,68 @@ export async function getReferralSummary(user: {
       status: c.status === "PAID" ? "PAID" : "PENDING",
     })),
   };
+}
+
+export interface ReferralBonusEvent {
+  /** Manila date key (YYYY-MM-DD) for interleaving into the daily log. */
+  dateKey: string;
+  /** ISO timestamp. */
+  date: string;
+  amount: number;
+  /** Downline the bonus came from (username, falling back to display name). */
+  fromName: string;
+  level: 1 | 2;
+}
+
+/**
+ * All referral commission events a user has EARNED (level 1 + level 2), newest
+ * first, with the source downline's username resolved — for interleaving
+ * "+$X.XX Referral Bonus from @user" rows into the Daily Performance Log.
+ * Fully defensive: any missing table degrades to an empty list.
+ */
+export async function getReferralBonusEvents(userId: string): Promise<ReferralBonusEvent[]> {
+  const { toManilaDateKey } = await import("./performance");
+  const [l1, l2] = await Promise.all([
+    prisma.referralCommission
+      .findMany({
+        where: { referrerId: userId, status: "PAID" },
+        select: { createdAt: true, commission: true, referredUserId: true, referredName: true },
+      })
+      .catch(() => [] as { createdAt: Date; commission: number; referredUserId: string; referredName: string }[]),
+    prisma.level2Commission
+      .findMany({
+        where: { earnerId: userId },
+        select: { createdAt: true, commissionAmount: true, sourceUserId: true },
+      })
+      .catch(() => [] as { createdAt: Date; commissionAmount: number; sourceUserId: string }[]),
+  ]);
+
+  const ids = Array.from(new Set([...l1.map((r) => r.referredUserId), ...l2.map((r) => r.sourceUserId)]));
+  const users = ids.length
+    ? await prisma.user
+        .findMany({ where: { id: { in: ids } }, select: { id: true, username: true, name: true } })
+        .catch(() => [] as { id: string; username: string | null; name: string }[])
+    : [];
+  const nameById = new Map(users.map((u) => [u.id, u.username || u.name]));
+
+  const events: ReferralBonusEvent[] = [
+    ...l1.map((r) => ({
+      dateKey: toManilaDateKey(r.createdAt),
+      date: r.createdAt.toISOString(),
+      amount: Math.round(r.commission * 100) / 100,
+      fromName: nameById.get(r.referredUserId) || r.referredName,
+      level: 1 as const,
+    })),
+    ...l2.map((r) => ({
+      dateKey: toManilaDateKey(r.createdAt),
+      date: r.createdAt.toISOString(),
+      amount: Math.round(r.commissionAmount * 100) / 100,
+      fromName: nameById.get(r.sourceUserId) || "a downline",
+      level: 2 as const,
+    })),
+  ];
+  events.sort((a, b) => (a.date < b.date ? 1 : -1));
+  return events;
 }
 
 /** Example-calculator amount for the "Silver $100" illustration. */

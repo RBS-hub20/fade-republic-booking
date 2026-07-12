@@ -8,6 +8,7 @@ import { getClientPerformance } from "@/lib/data";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getCapitalSummary, addMonths, LOCK_MONTHS } from "@/lib/capital";
+import { getReferralBonusEvents } from "@/lib/referrals";
 import { toManilaDateKey } from "@/lib/performance";
 import type { ReportTxn } from "@/lib/pdf";
 import {
@@ -72,6 +73,12 @@ export default async function ReportPage({
     };
   });
 
+  // Referral bonus events (L1 + L2) to interleave into the Daily Performance
+  // Log as "+$X.XX Referral Bonus from @user" entries.
+  const referralBonuses = owner?.id
+    ? await getReferralBonusEvents(owner.id).catch(() => [])
+    : [];
+
   return (
     <>
       <PageHeader
@@ -101,6 +108,7 @@ export default async function ReportPage({
         curve={curve}
         transactions={transactions}
         packages={packages}
+        referralBonuses={referralBonuses}
         canWithdraw={!isAdmin}
         isAdmin={isAdmin}
       />

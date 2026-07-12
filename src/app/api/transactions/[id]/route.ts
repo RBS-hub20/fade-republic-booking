@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { TRANSACTION_STATUSES } from "@/lib/constants";
 import { notifyDepositApproved, notifyWithdrawalApproved } from "@/lib/mailers";
-import { creditFirstPackageCommission } from "@/lib/referrals";
+import { creditPackageCommission } from "@/lib/referrals";
 
 /** Update a transaction (e.g. approve a pending one). Admin only. */
 export async function PATCH(
@@ -40,8 +40,8 @@ export async function PATCH(
         method: tx.method,
         auto: false,
       }).catch(() => {});
-      // Credit the referrer if this is the client's first tier activation.
-      await creditFirstPackageCommission({ clientId: before.clientId, amount: tx.amount });
+      // Credit referral commissions for this package purchase (unlimited).
+      await creditPackageCommission({ clientId: before.clientId, amount: tx.amount, event: "purchase" });
     } else if (before.type === "WITHDRAWAL") {
       notifyWithdrawalApproved({
         email: before.client.email,

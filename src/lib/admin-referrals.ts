@@ -198,11 +198,21 @@ export async function getReferralTree(userId: string, users: Map<string, UserInf
     prisma.userUnlock.findUnique({ where: { userId } }).catch(() => null),
     prisma.level2Commission.findMany({ where: { earnerId: userId } }).catch(() => []),
   ]);
-  const l2BySource = new Map(l2.map((c) => [c.sourceUserId, c]));
+  // Commissions are unlimited (repeat per purchase/renewal), so SUM per source
+  // to show the total each downline has generated on the edge label.
+  const l2BySource = new Map<string, { total: number; rate: number }>();
+  for (const c of l2) {
+    const prev = l2BySource.get(c.sourceUserId);
+    l2BySource.set(c.sourceUserId, {
+      total: (prev?.total ?? 0) + c.commissionAmount,
+      rate: c.commissionRate,
+    });
+  }
 
-  // Level-1 commissions this user earned, keyed by the referred (source) name.
+  // Level-1 commissions this user earned, summed per referred (source) user.
   const l1 = await prisma.referralCommission.findMany({ where: { referrerId: userId } }).catch(() => []);
-  const l1BySource = new Map(l1.map((c) => [c.referredUserId, c]));
+  const l1BySource = new Map<string, number>();
+  for (const c of l1) l1BySource.set(c.referredUserId, (l1BySource.get(c.referredUserId) ?? 0) + c.commission);
 
   const directNodes = await Promise.all(
     directs.map(async (d) => {
@@ -216,7 +226,7 @@ export async function getReferralTree(userId: string, users: Map<string, UserInf
           tier: di?.tier ?? "None",
           activeCapital: di?.activeCapital ?? 0,
           status: di?.status ?? "—",
-          edgeLabel: l1c ? `L1 ${formatPctAmt(l1c.commission)}` : undefined,
+          edgeLabel: l1c !== undefined ? `L1 ${formatPctAmt(l1c)}` : undefined,
         } as TreeNode,
         indirects: indirects.map((ind) => {
           const ii = users.get(ind.id);
@@ -227,7 +237,7 @@ export async function getReferralTree(userId: string, users: Map<string, UserInf
             tier: ii?.tier ?? "None",
             activeCapital: ii?.activeCapital ?? 0,
             status: ii?.status ?? "—",
-            edgeLabel: l2c ? `L2 ${l2c.commissionRate}% · ${formatPctAmt(l2c.commissionAmount)}` : undefined,
+            edgeLabel: l2c ? `L2 ${l2c.rate}% · ${formatPctAmt(l2c.total)}` : undefined,
           } as TreeNode;
         }),
       };

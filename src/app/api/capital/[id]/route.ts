@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { ensureFinanceSchemaOnce } from "@/lib/finance-schema";
 import { addMonths, LOCK_MONTHS } from "@/lib/capital";
+import { creditPackageCommission } from "@/lib/referrals";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -70,6 +71,13 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     // renewal action's timestamp). Return the new unlock date so the UI can
     // show an accurate toast without a round-trip.
     if (action === "renew") {
+      // A renewal is a qualifying package event: pay the upline referral
+      // commissions again (unlimited). Best-effort — never block the renew.
+      await creditPackageCommission({
+        clientId: deposit.clientId,
+        amount: deposit.amount,
+        event: "renewal",
+      }).catch(() => {});
       const newUnlockAt = addMonths(new Date(), LOCK_MONTHS);
       return NextResponse.json({ ok: true, unlockAt: newUnlockAt.toISOString() });
     }

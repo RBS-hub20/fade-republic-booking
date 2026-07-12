@@ -173,6 +173,37 @@ export async function getCapitalSummary(opts: {
   };
 }
 
+/**
+ * A client's remaining locked principal = SUM(approved deposits) minus any
+ * deposit whose capital has been released ('withdrawn' CapitalAction). This is
+ * `activeCapital + maturedCapital` from getCapitalSummary, computed cheaply.
+ */
+export async function getRemainingPrincipal(clientId: string | null | undefined): Promise<number> {
+  if (!clientId) return 0;
+  const [deposits, withdrawnActions] = await Promise.all([
+    prisma.transaction.findMany({
+      where: { clientId, type: "DEPOSIT", status: "APPROVED" },
+      select: { id: true, amount: true },
+    }),
+    prisma.capitalAction
+      .findMany({ where: { clientId, action: "withdrawn" }, select: { transactionId: true } })
+      .catch(() => [] as { transactionId: string }[]),
+  ]);
+  const withdrawn = new Set(withdrawnActions.map((a) => a.transactionId));
+  const remaining = deposits.reduce((s, d) => s + (withdrawn.has(d.id) ? 0 : d.amount), 0);
+  return round2(remaining);
+}
+
+/**
+ * Account activity gate. A client is ACTIVE while any capital remains; once all
+ * capital has been withdrawn (remaining principal = $0) the account is INACTIVE
+ * and loses benefits (daily ROI, referral commissions) until it funds a new
+ * package (min Bronze $50). Derived — no stored flag to keep in sync.
+ */
+export async function isCapitalActive(clientId: string | null | undefined): Promise<boolean> {
+  return (await getRemainingPrincipal(clientId)) > 0;
+}
+
 /** Validate a USDT payout address for the given network. */
 export function isValidPayoutAddress(network: string, address: string): boolean {
   const a = address.trim();

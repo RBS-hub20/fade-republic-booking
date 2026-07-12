@@ -79,8 +79,9 @@ model ReferralCommission {
   id             String    @id @default(cuid())
   referrerId     String
   referrer       User      @relation("CommissionEarner", fields: [referrerId], references: [id], onDelete: Cascade)
-  // The referred user whose first package generated this commission (unique).
-  referredUserId String    @unique
+  // The referred user whose package (purchase OR renewal) generated this
+  // commission. NOT unique: commissions are unlimited — one row per event.
+  referredUserId String
   referredName   String
   // e.g. "Silver $100" — the tier the referral activated.
   packageLabel   String
@@ -92,6 +93,7 @@ model ReferralCommission {
   paidAt         DateTime?
 
   @@index([referrerId])
+  @@index([referredUserId])
 }
 
 // AI support chat transcript (both sides), retained for admin review.
@@ -186,7 +188,7 @@ model UserUnlock {
 model Level2Commission {
   id               String   @id @default(cuid())
   earnerId         String   // who gets paid
-  sourceUserId     String   @unique // who deposited (first deposit only)
+  sourceUserId     String   // who deposited/renewed (unlimited — one row per event)
   directUplineId   String?  // middle man (the source's direct referrer)
   depositAmount    Float
   commissionRate   Float

@@ -87,6 +87,13 @@ export default async function DashboardPage() {
 
     const k = perf?.kpis;
 
+    // INACTIVE account: funded before but all locked capital has since been
+    // withdrawn (remaining principal = $0). Such accounts earn no daily ROI and
+    // no referral commissions until they fund a new package (min Bronze $50).
+    const remainingPrincipal = capital ? capital.activeCapital + capital.maturedCapital : null;
+    const isInactive =
+      remainingPrincipal !== null && remainingPrincipal <= 0 && (k?.totalDeposits ?? 0) > 0;
+
     // Show the "claim your @username" banner to users who haven't set one yet.
     let showUsernameBanner = false;
     if (session.userId) {
@@ -107,6 +114,18 @@ export default async function DashboardPage() {
           title={`Welcome, ${session.name.split(" ")[0]}`}
           subtitle="Your account performance · calculated daily, Mon–Sun (Asia/Manila)"
         />
+        {isInactive && (
+          <Link
+            href="/qx-tiers"
+            className="mb-6 flex items-center justify-between gap-3 rounded-lg border border-loss/40 bg-loss/10 px-4 py-3 text-sm text-loss transition-colors hover:bg-loss/20"
+          >
+            <span className="font-medium">
+              🔴 INACTIVE — Purchase a minimum $50 package to reactivate. No daily ROI or referral
+              commissions while inactive.
+            </span>
+            <span className="shrink-0 font-semibold">Reactivate →</span>
+          </Link>
+        )}
         {showUsernameBanner && (
           <Link
             href="/settings/username"

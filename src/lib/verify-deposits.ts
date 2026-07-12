@@ -17,7 +17,7 @@ import {
   type OnChainTransfer,
 } from "./chain";
 import { notifyDepositApproved } from "./mailers";
-import { creditFirstPackageCommission } from "./referrals";
+import { creditPackageCommission } from "./referrals";
 
 const AMOUNT_TOLERANCE = 0.99; // allow 1% slippage below requested
 
@@ -109,8 +109,8 @@ export async function verifyPendingDeposits(opts?: { clientId?: string }): Promi
     approved += 1;
     details.push({ id: tx.id, result: "approved", amount: credited });
 
-    // Credit the referrer if this is the client's first tier activation.
-    await creditFirstPackageCommission({ clientId: tx.clientId, amount: credited });
+    // Credit referral commissions for this package purchase (unlimited).
+    await creditPackageCommission({ clientId: tx.clientId, amount: credited, event: "purchase" });
 
     // Best-effort notification (never blocks verification).
     if (tx.client) {
