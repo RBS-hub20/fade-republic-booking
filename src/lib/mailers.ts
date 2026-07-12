@@ -142,6 +142,32 @@ export async function notifyCapitalMatured(opts: {
   });
 }
 
+/** Security notice sent after a self-service password change. Best-effort. */
+export async function notifyPasswordChanged(opts: {
+  email: string;
+  name: string;
+}): Promise<void> {
+  const when = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Manila",
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date());
+  await sendEmail({
+    to: opts.email,
+    subject: "Your QuantumX password was changed",
+    html: emailTemplate({
+      heading: `Password changed, ${opts.name.split(" ")[0]}`,
+      body:
+        `This is a confirmation that your QuantumX Global Markets password was just changed ` +
+        `(${when} PHT).<br/><br/>` +
+        `If this was you, no action is needed. <strong>If you did not make this change</strong>, ` +
+        `reset your password immediately and contact support — your account may be compromised.`,
+      buttonLabel: "Reset your password",
+      buttonUrl: `${appBaseUrl()}/forgot-password`,
+    }),
+  });
+}
+
 /**
  * Alert the admin when the daily P/L job fails or leaves a gap. Sent to
  * ADMIN_ALERT_EMAIL (falls back to the platform admin address). Best-effort.

@@ -19,6 +19,7 @@ import {
   Unlock,
   Network,
   ShieldCheck,
+  KeyRound,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -51,6 +52,7 @@ function navForRole(role: string, clientId: string | null): NavItem[] {
       { href: "/charts", label: "Charts", icon: CandlestickChart },
       { href: "/reports", label: "Reports", icon: FileText },
       { href: "/admin/chats", label: "Support Logs", icon: MessageSquare },
+      { href: "/settings/change-password", label: "Change Password", icon: KeyRound, divider: true },
     ];
   }
   // Client
@@ -62,6 +64,7 @@ function navForRole(role: string, clientId: string | null): NavItem[] {
     ...(clientId
       ? [{ href: `/reports/${clientId}`, label: "My Statement", icon: FileText }]
       : []),
+    { href: "/settings/change-password", label: "Change Password", icon: KeyRound, divider: true },
   ];
 }
 
