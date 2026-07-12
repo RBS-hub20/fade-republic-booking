@@ -5,8 +5,8 @@ import { KpiCard } from "@/components/dashboard/kpi-card";
 import { getSession } from "@/lib/auth";
 import {
   resolveUsers, getDirectCommissions, getIndirectCommissions, getMonthlyBonuses,
-  getCompensationSummary,
-  type DirectRow, type IndirectRow, type BonusRow, type CompensationSummary,
+  getCompensationSummary, getDownlineLedger,
+  type DirectRow, type IndirectRow, type BonusRow, type CompensationSummary, type DownlineLedgerRow,
 } from "@/lib/admin-referrals";
 import { CommissionsTabs } from "@/components/admin/commissions-tabs";
 import { formatUsd } from "@/lib/utils";
@@ -19,13 +19,15 @@ export default async function AdminCommissionsPage() {
   if (session.role !== "admin") redirect("/dashboard");
 
   let direct: DirectRow[] = [], indirect: IndirectRow[] = [], bonus: BonusRow[] = [];
+  let ledger: DownlineLedgerRow[] = [];
   let comp: CompensationSummary = { l1: 0, l2: 0, bonus: 0, grandTotal: 0, feeRevenue: 0, net: 0 };
   try {
     const users = await resolveUsers();
-    [direct, indirect, bonus, comp] = await Promise.all([
+    [direct, indirect, bonus, ledger, comp] = await Promise.all([
       getDirectCommissions(users),
       getIndirectCommissions(users),
       getMonthlyBonuses(users),
+      getDownlineLedger(users),
       getCompensationSummary(),
     ]);
   } catch (err) {
@@ -55,7 +57,7 @@ export default async function AdminCommissionsPage() {
         />
       </div>
 
-      <CommissionsTabs direct={direct} indirect={indirect} bonus={bonus} />
+      <CommissionsTabs direct={direct} indirect={indirect} bonus={bonus} ledger={ledger} />
     </>
   );
 }

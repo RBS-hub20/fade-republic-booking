@@ -7,7 +7,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { cn, formatUsd, formatDate } from "@/lib/utils";
-import type { DirectRow, IndirectRow, BonusRow } from "@/lib/admin-referrals";
+import type { DirectRow, IndirectRow, BonusRow, DownlineLedgerRow } from "@/lib/admin-referrals";
 
 function monthLabel(m: string) {
   return new Intl.DateTimeFormat("en-US", { month: "short", year: "numeric", timeZone: "UTC" }).format(
@@ -16,12 +16,13 @@ function monthLabel(m: string) {
 }
 
 export function CommissionsTabs({
-  direct, indirect, bonus,
+  direct, indirect, bonus, ledger,
 }: {
-  direct: DirectRow[]; indirect: IndirectRow[]; bonus: BonusRow[];
+  direct: DirectRow[]; indirect: IndirectRow[]; bonus: BonusRow[]; ledger: DownlineLedgerRow[];
 }) {
-  const [tab, setTab] = useState<"direct" | "indirect" | "bonus">("direct");
+  const [tab, setTab] = useState<"downline" | "direct" | "indirect" | "bonus">("downline");
   const tabs = [
+    { id: "downline", label: `By Downline`, n: ledger.length },
     { id: "direct", label: `Direct (1st Level)`, n: direct.length },
     { id: "indirect", label: `Indirect (2nd Level)`, n: indirect.length },
     { id: "bonus", label: `Monthly Bonus`, n: bonus.length },
@@ -46,6 +47,34 @@ export function CommissionsTabs({
 
       <Card>
         <CardContent className="overflow-x-auto p-0">
+          {tab === "downline" && (
+            <Table>
+              <TableHeader><TableRow>
+                <TableHead>Downline</TableHead>
+                <TableHead className="text-right">Total Purchases</TableHead>
+                <TableHead className="text-right">Total Renews</TableHead>
+                <TableHead className="text-right">Lifetime Commission</TableHead>
+                <TableHead>Status</TableHead>
+              </TableRow></TableHeader>
+              <TableBody>
+                {ledger.length === 0 ? <Empty cols={5} /> : ledger.map((r) => (
+                  <TableRow key={r.userId}>
+                    <TableCell className="text-sm font-medium">
+                      {r.downline}
+                      <span className="ml-2 font-mono text-xs text-muted-foreground">{r.account}</span>
+                    </TableCell>
+                    <TableCell className="tnum text-right">{r.totalPurchases}</TableCell>
+                    <TableCell className="tnum text-right">{r.totalRenews}</TableCell>
+                    <TableCell className="tnum text-right font-semibold text-gold-300">{formatUsd(r.lifetimeCommission)}</TableCell>
+                    <TableCell>
+                      <Badge variant={r.active ? "success" : "danger"}>{r.active ? "Active" : "Inactive"}</Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+
           {tab === "direct" && (
             <Table>
               <TableHeader><TableRow>

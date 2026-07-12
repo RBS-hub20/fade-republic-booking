@@ -258,6 +258,103 @@ function formatPctAmt(n: number): string {
   return `$${(Math.round(n * 100) / 100).toFixed(2)}`;
 }
 
+export interface DownlineLedgerRow {
+  userId: string;
+  downline: string;
+  account: string;
+  totalPurchases: number;
+  totalRenews: number;
+  lifetimeCommission: number;
+  active: boolean;
+}
+
+/**
+ * Per-downline lifetime commission ledger. Since commissions now repeat on
+ * every purchase/renewal, this rolls each downline up to one row: how many
+ * packages they've purchased vs renewed, the TOTAL commission their activity
+ * has generated across the network (L1 + L2), and whether they're currently
+ * ACTIVE (remaining locked principal > $0, net of withdrawals). Newest earners
+ * on top by lifetime commission.
+ */
+export async function getDownlineLedger(users: Map<string, UserInfo>): Promise<DownlineLedgerRow[]> {
+  await ensureReferralSchemaOnce(prisma);
+  const [l1, l2] = await Promise.all([
+    prisma.referralCommission
+      .findMany({ where: { status: "PAID" }, select: { referredUserId: true, commission: true } })
+      .catch(() => [] as { referredUserId: string; commission: number }[]),
+    prisma.level2Commission
+      .findMany({ select: { sourceUserId: true, commissionAmount: true } })
+      .catch(() => [] as { sourceUserId: string; commissionAmount: number }[]),
+  ]);
+
+  // Lifetime commission each downline generated (their L1 + any L2 above them).
+  const lifetime = new Map<string, number>();
+  for (const r of l1) lifetime.set(r.referredUserId, (lifetime.get(r.referredUserId) ?? 0) + r.commission);
+  for (const r of l2) lifetime.set(r.sourceUserId, (lifetime.get(r.sourceUserId) ?? 0) + r.commissionAmount);
+
+  const ids = Array.from(lifetime.keys());
+  if (ids.length === 0) return [];
+
+  const downUsers = await prisma.user
+    .findMany({ where: { id: { in: ids } }, select: { id: true, clientId: true } })
+    .catch(() => [] as { id: string; clientId: string | null }[]);
+  const clientIds = downUsers.map((u) => u.clientId).filter(Boolean) as string[];
+
+  // Actual activity counts + capital, straight from the ledger (independent of
+  // which events happened to pay a commission).
+  const [purchaseGroups, renewGroups, depSums, withdrawnActions] = await Promise.all([
+    clientIds.length
+      ? prisma.transaction.groupBy({
+          by: ["clientId"],
+          where: { clientId: { in: clientIds }, type: "DEPOSIT", status: "APPROVED" },
+          _count: { _all: true },
+        })
+      : [],
+    clientIds.length
+      ? prisma.capitalAction
+          .groupBy({ by: ["clientId"], where: { clientId: { in: clientIds }, action: "renewed" }, _count: { _all: true } })
+          .catch(() => [] as { clientId: string | null; _count: { _all: number } }[])
+      : [],
+    clientIds.length
+      ? prisma.transaction.groupBy({
+          by: ["clientId"],
+          where: { clientId: { in: clientIds }, type: "DEPOSIT", status: "APPROVED" },
+          _sum: { amount: true },
+        })
+      : [],
+    clientIds.length
+      ? prisma.capitalAction
+          .findMany({ where: { clientId: { in: clientIds }, action: "withdrawn" }, select: { clientId: true, amount: true } })
+          .catch(() => [] as { clientId: string | null; amount: number }[])
+      : [],
+  ]);
+
+  const purchasesByClient = new Map(purchaseGroups.map((g) => [g.clientId, g._count._all]));
+  const renewsByClient = new Map(renewGroups.map((g) => [g.clientId, g._count._all]));
+  const grossByClient = new Map(depSums.map((g) => [g.clientId, g._sum.amount ?? 0]));
+  const withdrawnByClient = new Map<string, number>();
+  for (const w of withdrawnActions) {
+    if (w.clientId) withdrawnByClient.set(w.clientId, (withdrawnByClient.get(w.clientId) ?? 0) + w.amount);
+  }
+  const clientByUser = new Map(downUsers.map((u) => [u.id, u.clientId]));
+
+  const rows: DownlineLedgerRow[] = ids.map((id) => {
+    const cid = clientByUser.get(id) ?? null;
+    const remaining = cid ? (grossByClient.get(cid) ?? 0) - (withdrawnByClient.get(cid) ?? 0) : 0;
+    return {
+      userId: id,
+      downline: users.get(id)?.name ?? "—",
+      account: users.get(id)?.account ?? "—",
+      totalPurchases: cid ? purchasesByClient.get(cid) ?? 0 : 0,
+      totalRenews: cid ? renewsByClient.get(cid) ?? 0 : 0,
+      lifetimeCommission: Math.round((lifetime.get(id) ?? 0) * 100) / 100,
+      active: remaining > 0,
+    };
+  });
+  rows.sort((a, b) => b.lifetimeCommission - a.lifetimeCommission);
+  return rows;
+}
+
 export interface CompensationSummary {
   l1: number;
   l2: number;
