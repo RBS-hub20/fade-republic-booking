@@ -23,7 +23,8 @@ import { METHOD_LABELS } from "@/lib/constants";
 import { generateClientStatement, type ReportTxn } from "@/lib/pdf";
 import type { EquityPoint, PerformanceKpis } from "@/lib/performance";
 import type { PackageRow } from "@/lib/packages";
-import { Lock, Loader2 } from "lucide-react";
+import { Modal } from "@/components/ui/modal";
+import { Lock, Loader2, RefreshCw, ArrowDownToLine, CheckCircle2 } from "lucide-react";
 
 interface ReportClient {
   id: string;
@@ -314,6 +315,9 @@ function ActivePackagesSection({
   canWithdraw: boolean;
   onWithdrawn: () => void;
 }) {
+  const [renewTarget, setRenewTarget] = useState<PackageRow | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+
   const locked = packages.filter((p) => p.locked);
   const totalLocked = locked.reduce((s, p) => s + p.amount, 0);
   const earliestUnlock = locked.reduce<string | null>(
@@ -321,8 +325,14 @@ function ActivePackagesSection({
     null
   );
 
+  function showRenewedToast(unlockDate: string) {
+    setToast(`Package renewed! New unlock date: ${formatDate(unlockDate)}`);
+    window.setTimeout(() => setToast(null), 4500);
+    onWithdrawn();
+  }
+
   return (
-    <Card>
+    <Card className="relative">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Lock className="h-4 w-4 text-gold-300" /> Active Packages
@@ -378,7 +388,11 @@ function ActivePackagesSection({
                       {canWithdraw && (
                         <TableCell className="text-right">
                           {!p.locked && (
-                            <WithdrawButton id={p.id} onDone={onWithdrawn} />
+                            <PackageActions
+                              pkg={p}
+                              onWithdrawn={onWithdrawn}
+                              onRenewClick={() => setRenewTarget(p)}
+                            />
                           )}
                         </TableCell>
                       )}
@@ -411,7 +425,12 @@ function ActivePackagesSection({
                   </div>
                   {canWithdraw && !p.locked && (
                     <div className="mt-3">
-                      <WithdrawButton id={p.id} onDone={onWithdrawn} full />
+                      <PackageActions
+                        pkg={p}
+                        onWithdrawn={onWithdrawn}
+                        onRenewClick={() => setRenewTarget(p)}
+                        full
+                      />
                     </div>
                   )}
                 </div>
@@ -434,7 +453,165 @@ function ActivePackagesSection({
           </>
         )}
       </CardContent>
+
+      {/* Renew confirmation modal */}
+      {renewTarget && (
+        <RenewModal
+          pkg={renewTarget}
+          onClose={() => setRenewTarget(null)}
+          onRenewed={(unlockDate) => {
+            setRenewTarget(null);
+            showRenewedToast(unlockDate);
+          }}
+        />
+      )}
+
+      {/* Success toast */}
+      {toast && (
+        <div className="pointer-events-none fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-lg border border-profit/40 bg-[#12261c] px-4 py-3 text-sm font-medium text-profit shadow-xl">
+          <CheckCircle2 className="h-4 w-4" />
+          {toast}
+        </div>
+      )}
     </Card>
+  );
+}
+
+/** Action buttons for an UNLOCKED package: Withdraw (green) + Renew (blue). */
+function PackageActions({
+  pkg,
+  onWithdrawn,
+  onRenewClick,
+  full,
+}: {
+  pkg: PackageRow;
+  onWithdrawn: () => void;
+  onRenewClick: () => void;
+  full?: boolean;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function withdraw() {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/capital/${pkg.id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "withdraw" }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setError(body?.error || "Withdraw failed.");
+        return;
+      }
+      onWithdrawn();
+    } catch {
+      setError("Network error.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className={cn(full ? "w-full" : "inline-flex flex-col items-end")}>
+      <div className={cn("flex gap-2", full ? "w-full" : "justify-end")}>
+        <button
+          type="button"
+          onClick={withdraw}
+          disabled={busy}
+          title="Withdraw to cashout"
+          className={cn(
+            "inline-flex items-center justify-center gap-1.5 rounded-md bg-profit px-3 py-1.5 text-xs font-semibold text-black transition-colors hover:bg-profit/85 disabled:opacity-60",
+            full && "flex-1"
+          )}
+        >
+          {busy ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <ArrowDownToLine className="h-3.5 w-3.5" />
+          )}
+          Withdraw
+        </button>
+        <button
+          type="button"
+          onClick={onRenewClick}
+          disabled={busy}
+          title="Renew to keep earning"
+          className={cn(
+            "inline-flex items-center justify-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-blue-500 disabled:opacity-60",
+            full && "flex-1"
+          )}
+        >
+          <RefreshCw className="h-3.5 w-3.5" />
+          Renew
+        </button>
+      </div>
+      {error && <p className="mt-1 text-xs text-loss">{error}</p>}
+    </div>
+  );
+}
+
+/** Confirmation dialog for renewing a matured package. */
+function RenewModal({
+  pkg,
+  onClose,
+  onRenewed,
+}: {
+  pkg: PackageRow;
+  onClose: () => void;
+  onRenewed: (unlockDate: string) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function confirm() {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/capital/${pkg.id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "renew" }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(body?.error || "Renew failed. Please try again.");
+        return;
+      }
+      onRenewed(body?.unlockAt || pkg.renewUnlockDate);
+    } catch {
+      setError("Network error.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Modal open onClose={onClose} title="Renew Package">
+      <p className="text-sm text-muted-foreground">
+        Renew <span className="font-semibold text-foreground">{pkg.emoji} {pkg.label}</span>{" "}
+        <span className="font-semibold text-foreground">{formatUsd(pkg.amount)}</span> for another
+        6 months? Your capital will be locked again until{" "}
+        <span className="font-semibold text-gold-300">{formatDate(pkg.renewUnlockDate)}</span> and
+        continue earning daily ROI.
+      </p>
+      {error && <p className="mt-3 text-sm text-loss">{error}</p>}
+      <div className="mt-5 flex justify-end gap-2">
+        <Button variant="outline" onClick={onClose} disabled={busy}>
+          Cancel
+        </Button>
+        <Button
+          onClick={confirm}
+          disabled={busy}
+          className="bg-blue-600 text-white hover:bg-blue-500"
+        >
+          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+          Renew for 6 months
+        </Button>
+      </div>
+    </Modal>
   );
 }
 
@@ -479,56 +656,6 @@ function ProgressBar({ pct }: { pct: number }) {
         />
       </div>
       <span className="tnum w-9 text-right text-xs text-muted-foreground">{pct}%</span>
-    </div>
-  );
-}
-
-function WithdrawButton({
-  id,
-  onDone,
-  full,
-}: {
-  id: string;
-  onDone: () => void;
-  full?: boolean;
-}) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function withdraw() {
-    setBusy(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/capital/${id}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "withdraw" }),
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        setError(body?.error || "Withdraw failed.");
-        return;
-      }
-      onDone();
-    } catch {
-      setError("Network error.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <div className={cn(full && "w-full")}>
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={withdraw}
-        disabled={busy}
-        className={cn(full && "w-full")}
-      >
-        {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Withdraw"}
-      </Button>
-      {error && <p className="mt-1 text-xs text-loss">{error}</p>}
     </div>
   );
 }

@@ -7,7 +7,7 @@ import { ReportView } from "@/components/reports/report-view";
 import { getClientPerformance } from "@/lib/data";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getCapitalSummary } from "@/lib/capital";
+import { getCapitalSummary, addMonths, LOCK_MONTHS } from "@/lib/capital";
 import { toManilaDateKey } from "@/lib/performance";
 import type { ReportTxn } from "@/lib/pdf";
 import {
@@ -64,6 +64,8 @@ export default async function ReportPage({
       amount: d.amount,
       purchaseDate: d.depositedAt,
       unlockDate: d.maturityDate,
+      // Renewing starts a fresh 6-month lock from now (today + 6 months).
+      renewUnlockDate: addMonths(new Date(), LOCK_MONTHS).toISOString(),
       locked: !d.matured,
       daysLeft: d.daysToMaturity,
       progressPct: packageProgress(d.daysToMaturity),

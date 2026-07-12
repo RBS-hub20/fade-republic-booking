@@ -23,6 +23,8 @@ export interface PackageRow {
   /** ISO strings. */
   purchaseDate: string;
   unlockDate: string;
+  /** Projected unlock date if renewed now (current unlock + 6 months). */
+  renewUnlockDate: string;
   locked: boolean;
   daysLeft: number;
   /** 0–100, clamped. */

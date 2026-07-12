@@ -38,8 +38,12 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     if (actions.some((a) => a.action === "withdrawn")) {
       return NextResponse.json({ error: "This capital was already released." }, { status: 409 });
     }
-    const renewals = actions.filter((a) => a.action === "renewed").length;
-    const maturity = addMonths(new Date(deposit.date), LOCK_MONTHS * (1 + renewals));
+    // Maturity anchors to the latest renewal (fresh 6-month lock each renew),
+    // falling back to the deposit date when never renewed.
+    const lastRenewAt = actions
+      .filter((a) => a.action === "renewed")
+      .reduce((max, a) => Math.max(max, new Date(a.createdAt).getTime()), 0);
+    const maturity = addMonths(lastRenewAt ? new Date(lastRenewAt) : new Date(deposit.date), LOCK_MONTHS);
     if (maturity.getTime() > Date.now()) {
       return NextResponse.json(
         { error: "Capital is still locked and cannot be actioned before maturity." },
@@ -62,6 +66,13 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       },
     });
 
+    // On renew, the lock resets for a fresh 6-month cycle starting now (the
+    // renewal action's timestamp). Return the new unlock date so the UI can
+    // show an accurate toast without a round-trip.
+    if (action === "renew") {
+      const newUnlockAt = addMonths(new Date(), LOCK_MONTHS);
+      return NextResponse.json({ ok: true, unlockAt: newUnlockAt.toISOString() });
+    }
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("[capital action] error:", err);

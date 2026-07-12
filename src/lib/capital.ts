@@ -88,12 +88,17 @@ export async function getCapitalSummary(opts: {
       .catch(() => [] as { amount: number; status: string }[]),
   ]);
 
-  const renewCount = new Map<string, number>();
+  // A renewal starts a FRESH 6-month lock from the moment it was made, so we
+  // anchor maturity to the latest 'renewed' action's timestamp (not the
+  // original deposit date). Track the most recent renewal per deposit.
+  const lastRenewAt = new Map<string, number>();
   const withdrawnIds = new Set<string>();
   for (const a of actions) {
     if (a.action === "withdrawn") withdrawnIds.add(a.transactionId);
-    else if (a.action === "renewed")
-      renewCount.set(a.transactionId, (renewCount.get(a.transactionId) ?? 0) + 1);
+    else if (a.action === "renewed") {
+      const t = new Date(a.createdAt).getTime();
+      if (t > (lastRenewAt.get(a.transactionId) ?? 0)) lastRenewAt.set(a.transactionId, t);
+    }
   }
 
   let activeCapital = 0;
@@ -107,7 +112,8 @@ export async function getCapitalSummary(opts: {
       releasedCapital += d.amount;
       continue;
     }
-    const maturity = addMonths(new Date(d.date), LOCK_MONTHS * (1 + (renewCount.get(d.id) ?? 0)));
+    const renewAt = lastRenewAt.get(d.id);
+    const maturity = addMonths(renewAt ? new Date(renewAt) : new Date(d.date), LOCK_MONTHS);
     const maturedMs = maturity.getTime();
     const matured = maturedMs <= now;
     if (matured) maturedCapital += d.amount;
@@ -197,18 +203,21 @@ export async function runMaturityNotifications(): Promise<{ notified: number }> 
     prisma.capitalAction.findMany().catch(() => []),
   ]);
 
-  const renew = new Map<string, number>();
+  const lastRenewAt = new Map<string, number>();
   const withdrawn = new Set<string>();
   const notified = new Set<string>();
   for (const a of actions) {
     if (a.action === "withdrawn") withdrawn.add(a.transactionId);
-    else if (a.action === "renewed") renew.set(a.transactionId, (renew.get(a.transactionId) ?? 0) + 1);
-    else if (a.action === "notified") notified.add(a.transactionId);
+    else if (a.action === "renewed") {
+      const t = new Date(a.createdAt).getTime();
+      if (t > (lastRenewAt.get(a.transactionId) ?? 0)) lastRenewAt.set(a.transactionId, t);
+    } else if (a.action === "notified") notified.add(a.transactionId);
   }
 
   const due = deposits.filter((d) => {
     if (withdrawn.has(d.id) || notified.has(d.id)) return false;
-    const maturity = addMonths(new Date(d.date), LOCK_MONTHS * (1 + (renew.get(d.id) ?? 0)));
+    const renewAt = lastRenewAt.get(d.id);
+    const maturity = addMonths(renewAt ? new Date(renewAt) : new Date(d.date), LOCK_MONTHS);
     return maturity.getTime() <= now;
   });
   if (due.length === 0) return { notified: 0 };
