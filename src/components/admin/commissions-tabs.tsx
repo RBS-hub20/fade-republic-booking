@@ -7,7 +7,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { cn, formatUsd, formatDate } from "@/lib/utils";
-import type { DirectRow, IndirectRow, BonusRow, DownlineLedgerRow } from "@/lib/admin-referrals";
+import type { DirectRow, IndirectRow, BonusRow, DownlineLedgerRow, PayoutCapRow } from "@/lib/admin-referrals";
 
 function monthLabel(m: string) {
   return new Intl.DateTimeFormat("en-US", { month: "short", year: "numeric", timeZone: "UTC" }).format(
@@ -16,13 +16,15 @@ function monthLabel(m: string) {
 }
 
 export function CommissionsTabs({
-  direct, indirect, bonus, ledger,
+  direct, indirect, bonus, ledger, payoutCap,
 }: {
   direct: DirectRow[]; indirect: IndirectRow[]; bonus: BonusRow[]; ledger: DownlineLedgerRow[];
+  payoutCap: PayoutCapRow[];
 }) {
-  const [tab, setTab] = useState<"downline" | "direct" | "indirect" | "bonus">("downline");
+  const [tab, setTab] = useState<"downline" | "payout" | "direct" | "indirect" | "bonus">("downline");
   const tabs = [
     { id: "downline", label: `By Downline`, n: ledger.length },
+    { id: "payout", label: `Payout Cap`, n: payoutCap.length },
     { id: "direct", label: `Direct (1st Level)`, n: direct.length },
     { id: "indirect", label: `Indirect (2nd Level)`, n: indirect.length },
     { id: "bonus", label: `Monthly Bonus`, n: bonus.length },
@@ -69,6 +71,53 @@ export function CommissionsTabs({
                     <TableCell>
                       <Badge variant={r.active ? "success" : "danger"}>{r.active ? "Active" : "Inactive"}</Badge>
                     </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+
+          {tab === "payout" && (
+            <Table>
+              <TableHeader><TableRow>
+                <TableHead>User</TableHead>
+                <TableHead className="text-right">Total Capital</TableHead>
+                <TableHead className="text-right">Max Cap</TableHead>
+                <TableHead className="text-right">Total Earned</TableHead>
+                <TableHead className="w-40">% Used</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Remaining</TableHead>
+              </TableRow></TableHeader>
+              <TableBody>
+                {payoutCap.length === 0 ? <Empty cols={7} /> : payoutCap.map((r) => (
+                  <TableRow key={r.userId}>
+                    <TableCell className="text-sm font-medium">
+                      {r.user}
+                      <span className="ml-2 font-mono text-xs text-muted-foreground">{r.account}</span>
+                    </TableCell>
+                    <TableCell className="tnum text-right">{formatUsd(r.totalCapital)}</TableCell>
+                    <TableCell className="tnum text-right">{formatUsd(r.maxCap)}</TableCell>
+                    <TableCell className="tnum text-right font-medium text-gold-300">{formatUsd(r.totalEarned)}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <div className="h-2 flex-1 overflow-hidden rounded-full bg-secondary">
+                          <div
+                            className={cn(
+                              "h-full rounded-full",
+                              r.pctUsed >= 90 ? "bg-loss" : r.pctUsed >= 70 ? "bg-gold-400" : "bg-profit"
+                            )}
+                            style={{ width: `${Math.max(r.pctUsed, 2)}%` }}
+                          />
+                        </div>
+                        <span className="tnum w-9 text-right text-xs text-muted-foreground">{r.pctUsed}%</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={r.status === "CAPPED" ? "danger" : r.status === "INACTIVE" ? "warning" : "success"}>
+                        {r.status === "CAPPED" ? "Capped" : r.status === "INACTIVE" ? "Inactive" : "Active"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="tnum text-right">{formatUsd(r.remaining)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

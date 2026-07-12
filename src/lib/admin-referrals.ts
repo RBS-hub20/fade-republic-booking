@@ -6,6 +6,7 @@
 import { prisma } from "./prisma";
 import { tierForBalance } from "./tiers";
 import { ensureReferralSchemaOnce } from "./referral-schema";
+import { PAYOUT_MULTIPLIER } from "./payout-cap";
 
 export interface UserInfo {
   userId: string;
@@ -352,6 +353,93 @@ export async function getDownlineLedger(users: Map<string, UserInfo>): Promise<D
     };
   });
   rows.sort((a, b) => b.lifetimeCommission - a.lifetimeCommission);
+  return rows;
+}
+
+export interface PayoutCapRow {
+  userId: string;
+  user: string;
+  account: string;
+  totalCapital: number;
+  maxCap: number;
+  totalEarned: number;
+  pctUsed: number;
+  status: "ACTIVE" | "CAPPED" | "INACTIVE";
+  remaining: number;
+}
+
+/**
+ * Platform-wide 5x payout-cap view: one row per funded/earning user. Same
+ * derivation as the per-user cap (remaining principal × 5 vs all lifetime
+ * earnings), computed in a handful of batched aggregates. Sorted by % used so
+ * accounts at/near their cap surface first.
+ */
+export async function getPayoutCapRows(users: Map<string, UserInfo>): Promise<PayoutCapRow[]> {
+  const round2 = (n: number) => Math.round(n * 100) / 100;
+  const clientUsers = await prisma.user.findMany({
+    where: { clientId: { not: null } },
+    select: { id: true, clientId: true },
+  });
+  const clientIds = clientUsers.map((u) => u.clientId).filter(Boolean) as string[];
+  if (clientIds.length === 0) return [];
+  const userIds = clientUsers.map((u) => u.id);
+
+  const [depSums, withdrawn, pnlSums, l1, l2, mb] = await Promise.all([
+    prisma.transaction.groupBy({
+      by: ["clientId"],
+      where: { clientId: { in: clientIds }, type: "DEPOSIT", status: "APPROVED" },
+      _sum: { amount: true },
+    }),
+    prisma.capitalAction
+      .findMany({ where: { clientId: { in: clientIds }, action: "withdrawn" }, select: { clientId: true, amount: true } })
+      .catch(() => [] as { clientId: string | null; amount: number }[]),
+    prisma.dailyPerformance.groupBy({ by: ["clientId"], where: { clientId: { in: clientIds } }, _sum: { pnlUsd: true } }),
+    prisma.referralCommission
+      .groupBy({ by: ["referrerId"], where: { referrerId: { in: userIds }, status: "PAID" }, _sum: { commission: true } })
+      .catch(() => [] as { referrerId: string; _sum: { commission: number | null } }[]),
+    prisma.level2Commission
+      .groupBy({ by: ["earnerId"], where: { earnerId: { in: userIds } }, _sum: { commissionAmount: true } })
+      .catch(() => [] as { earnerId: string; _sum: { commissionAmount: number | null } }[]),
+    prisma.monthlyBonus
+      .groupBy({ by: ["userId"], where: { userId: { in: userIds } }, _sum: { bonusAmount: true } })
+      .catch(() => [] as { userId: string; _sum: { bonusAmount: number | null } }[]),
+  ]);
+
+  const grossByClient = new Map(depSums.map((d) => [d.clientId, d._sum.amount ?? 0]));
+  const pnlByClient = new Map(pnlSums.map((d) => [d.clientId, d._sum.pnlUsd ?? 0]));
+  const withdrawnByClient = new Map<string, number>();
+  for (const w of withdrawn) {
+    if (w.clientId) withdrawnByClient.set(w.clientId, (withdrawnByClient.get(w.clientId) ?? 0) + w.amount);
+  }
+  const commByUser = new Map<string, number>();
+  for (const g of l1) commByUser.set(g.referrerId, (commByUser.get(g.referrerId) ?? 0) + (g._sum.commission ?? 0));
+  for (const g of l2) commByUser.set(g.earnerId, (commByUser.get(g.earnerId) ?? 0) + (g._sum.commissionAmount ?? 0));
+  for (const g of mb) commByUser.set(g.userId, (commByUser.get(g.userId) ?? 0) + (g._sum.bonusAmount ?? 0));
+
+  const rows: PayoutCapRow[] = [];
+  for (const u of clientUsers) {
+    const cid = u.clientId!;
+    const totalCapital = round2((grossByClient.get(cid) ?? 0) - (withdrawnByClient.get(cid) ?? 0));
+    const totalEarned = round2((pnlByClient.get(cid) ?? 0) + (commByUser.get(u.id) ?? 0));
+    // Only show accounts that have money in play.
+    if (totalCapital <= 0 && totalEarned <= 0) continue;
+    const maxCap = round2(totalCapital * PAYOUT_MULTIPLIER);
+    const status: PayoutCapRow["status"] =
+      totalCapital <= 0 ? "INACTIVE" : maxCap > 0 && totalEarned >= maxCap ? "CAPPED" : "ACTIVE";
+    const pctUsed = maxCap > 0 ? Math.min(100, Math.round((totalEarned / maxCap) * 100)) : 0;
+    rows.push({
+      userId: u.id,
+      user: users.get(u.id)?.name ?? "—",
+      account: users.get(u.id)?.account ?? "—",
+      totalCapital,
+      maxCap,
+      totalEarned,
+      pctUsed,
+      status,
+      remaining: round2(Math.max(0, maxCap - totalEarned)),
+    });
+  }
+  rows.sort((a, b) => b.pctUsed - a.pctUsed || b.totalEarned - a.totalEarned);
   return rows;
 }
 

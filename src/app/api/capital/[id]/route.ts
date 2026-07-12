@@ -84,6 +84,9 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       const newUnlockAt = addMonths(new Date(), LOCK_MONTHS);
       return NextResponse.json({ ok: true, unlockAt: newUnlockAt.toISOString() });
     }
+    // On withdraw, capital drops → the cap drops with it. Refresh tracking so a
+    // now-over-cap account flips ACTIVE → CAPPED (lifetime earnings never reset).
+    await refreshPayoutTrackingByClient(deposit.clientId).catch(() => {});
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("[capital action] error:", err);
