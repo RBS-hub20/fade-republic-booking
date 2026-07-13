@@ -32,6 +32,8 @@ export interface EquityPoint {
   /** Balance at end of day after deposits/withdrawals and trading P/L. */
   balance: number;
   isTradingDay: boolean;
+  /** True when this 0.00% day was an admin-marked "No Trading Day" (holiday). */
+  noTrading?: boolean;
 }
 
 export interface LedgerEntry {
@@ -44,6 +46,8 @@ export interface LedgerEntry {
 export interface PerformanceEntry {
   date: Date | string;
   dailyPercent: number;
+  /** Admin-marked "No Trading Day" (holiday/maintenance) — a deliberate 0.00%. */
+  noTrading?: boolean;
 }
 
 /**
@@ -149,8 +153,11 @@ export function computeEquityCurve(params: {
   }
 
   const pctByDay = new Map<string, number>();
+  const noTradingByDay = new Map<string, boolean>();
   for (const p of performances) {
-    pctByDay.set(toManilaDateKey(p.date), p.dailyPercent);
+    const key = toManilaDateKey(p.date);
+    pctByDay.set(key, p.dailyPercent);
+    if (p.noTrading) noTradingByDay.set(key, true);
   }
 
   // Determine the end date.
@@ -216,6 +223,7 @@ export function computeEquityCurve(params: {
         withdrawals,
         balance,
         isTradingDay: traded,
+        noTrading: noTradingByDay.get(cursor) ?? false,
       });
     }
 

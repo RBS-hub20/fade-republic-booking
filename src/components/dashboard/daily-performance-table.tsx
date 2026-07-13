@@ -22,6 +22,7 @@ interface LogRow {
   pnl: number;
   balance: number;
   placeholder: boolean;
+  noTrading: boolean;
 }
 
 // Guard against runaway placeholder insertion on very sparse histories.
@@ -41,6 +42,9 @@ function buildRows(curve: EquityPoint[]): LogRow[] {
   if (recorded.length === 0) return [];
 
   const byDate = new Map(recorded.map((p) => [p.date, p]));
+  // Admin-marked "No Trading Day" holidays (posted 0.00%) — surfaced as a
+  // richer tooltip on the otherwise-identical placeholder row.
+  const noTradingSet = new Set(curve.filter((p) => p.noTrading).map((p) => p.date));
   const yesterday = addDays(manilaToday(), -1);
   const lastRecorded = recorded[recorded.length - 1].date;
   let start = recorded[0].date;
@@ -53,10 +57,10 @@ function buildRows(curve: EquityPoint[]): LogRow[] {
   for (let k = start; k <= end; k = addDays(k, 1)) {
     const rec = byDate.get(k);
     if (rec) {
-      filled.push({ date: k, dailyPercent: rec.dailyPercent, pnl: rec.pnl, balance: rec.balance, placeholder: false });
+      filled.push({ date: k, dailyPercent: rec.dailyPercent, pnl: rec.pnl, balance: rec.balance, placeholder: false, noTrading: false });
       prevBalance = rec.balance;
     } else {
-      filled.push({ date: k, dailyPercent: 0, pnl: 0, balance: prevBalance, placeholder: true });
+      filled.push({ date: k, dailyPercent: 0, pnl: 0, balance: prevBalance, placeholder: true, noTrading: noTradingSet.has(k) });
     }
   }
   return filled.reverse(); // newest first
@@ -92,8 +96,16 @@ export function DailyPerformanceTable({ curve }: { curve: EquityPoint[] }) {
                 <TableCell className="font-medium">
                   {formatDateKey(p.date)}
                   {p.placeholder && (
-                    <span className="ml-2 text-xs font-normal text-muted-foreground">
+                    <span
+                      className="ml-2 text-xs font-normal text-muted-foreground"
+                      title={
+                        p.noTrading ? "No trading activity - Market closed for holiday" : undefined
+                      }
+                    >
                       No trading activity
+                      {p.noTrading && (
+                        <span className="text-amber-500/90"> · Market closed for holiday</span>
+                      )}
                     </span>
                   )}
                 </TableCell>

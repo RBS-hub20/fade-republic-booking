@@ -95,6 +95,8 @@ export async function getClientPerformance(clientId: string): Promise<ClientPerf
     performances: client.dailyPerformances.map((p) => ({
       date: p.date,
       dailyPercent: p.dailyPercent,
+      // Admin-marked holiday/maintenance days carry a "no-trading" note.
+      noTrading: /no-trading/.test(p.notes ?? ""),
     })),
   });
   const kpis = computeKpis({ initialDeposit: client.initialDeposit, ledger, curve });
