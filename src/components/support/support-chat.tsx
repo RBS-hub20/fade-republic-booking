@@ -179,27 +179,40 @@ export function SupportChat({ mode = "client" }: { mode?: "client" | "public" } 
           )}
         >
           {/* Header */}
-          <div className="flex items-center gap-3 border-b border-border bg-background/60 px-4 py-3">
-            <XenaAvatar size={40} />
-            <div className="leading-tight">
-              <p className="text-base font-bold text-white">XENA</p>
-              <p className="flex items-center gap-1.5 text-xs font-medium" style={{ color: "#10B981" }}>
-                <span className="relative inline-flex h-2 w-2">
-                  <span
-                    className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-70"
-                    style={{ backgroundColor: "#10B981" }}
-                  />
-                  <span
-                    className="relative inline-flex h-2 w-2 rounded-full"
-                    style={{ backgroundColor: "#10B981" }}
-                  />
-                </span>
-                Online
-              </p>
-              <p className="text-[11px]" style={{ color: "#9CA3AF" }}>
-                QuantumX Support Agent
-              </p>
+          <div className="flex items-center justify-between gap-3 border-b border-border bg-background/60 px-4 py-3">
+            <div className="flex items-center gap-3">
+              <XenaAvatar size={40} />
+              <div className="leading-tight">
+                <p className="text-base font-bold text-white">XENA</p>
+                <p className="flex items-center gap-1.5 text-xs font-medium" style={{ color: "#10B981" }}>
+                  <span className="relative inline-flex h-2 w-2">
+                    <span
+                      className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-70"
+                      style={{ backgroundColor: "#10B981" }}
+                    />
+                    <span
+                      className="relative inline-flex h-2 w-2 rounded-full"
+                      style={{ backgroundColor: "#10B981" }}
+                    />
+                  </span>
+                  Online
+                </p>
+                <p className="text-[11px]" style={{ color: "#9CA3AF" }}>
+                  QuantumX Support Agent
+                </p>
+              </div>
             </div>
+
+            {/* Close button. Essential on mobile, where the panel goes full-screen
+                and covers the floating toggle; hidden from sm up (the toggle is
+                visible there). */}
+            <button
+              onClick={() => setOpen(false)}
+              aria-label="Close chat"
+              className="-mr-1 shrink-0 rounded-full p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground sm:hidden"
+            >
+              <X className="h-5 w-5" />
+            </button>
           </div>
 
           {/* Messages */}
