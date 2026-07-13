@@ -144,6 +144,40 @@ export async function canEarn(
   }
 }
 
+/** Start of the new-system launch day (Manila) — boundary for legacy vs new. */
+const NEW_SYSTEM_START = new Date("2026-07-13T00:00:00+08:00");
+
+/**
+ * Earnings accrued BEFORE the new-system launch (2026-07-13). Legacy earnings
+ * are preserved and still count toward the 5x cap — this lets XENA show a
+ * transparent "Legacy vs New" breakdown. current = totalEarnedAll − legacy.
+ */
+export async function getLegacyEarnings(userId: string, clientId: string | null): Promise<number> {
+  const b = NEW_SYSTEM_START;
+  const [pnl, l1, l2, mb] = await Promise.all([
+    clientId
+      ? prisma.dailyPerformance
+          .aggregate({ where: { clientId, date: { lt: b } }, _sum: { pnlUsd: true } })
+          .catch(() => ({ _sum: { pnlUsd: 0 } }))
+      : Promise.resolve({ _sum: { pnlUsd: 0 } }),
+    prisma.referralCommission
+      .aggregate({ where: { referrerId: userId, status: "PAID", createdAt: { lt: b } }, _sum: { commission: true } })
+      .catch(() => ({ _sum: { commission: 0 } })),
+    prisma.level2Commission
+      .aggregate({ where: { earnerId: userId, createdAt: { lt: b } }, _sum: { commissionAmount: true } })
+      .catch(() => ({ _sum: { commissionAmount: 0 } })),
+    prisma.monthlyBonus
+      .aggregate({ where: { userId, paidAt: { lt: b } }, _sum: { bonusAmount: true } })
+      .catch(() => ({ _sum: { bonusAmount: 0 } })),
+  ]);
+  return round2(
+    (pnl._sum.pnlUsd ?? 0) +
+      (l1._sum.commission ?? 0) +
+      (l2._sum.commissionAmount ?? 0) +
+      (mb._sum.bonusAmount ?? 0)
+  );
+}
+
 /** Recompute + persist a user's tracking (e.g. after a purchase/renewal). */
 export async function refreshPayoutTracking(userId: string, clientId: string | null): Promise<PayoutState | null> {
   try {
