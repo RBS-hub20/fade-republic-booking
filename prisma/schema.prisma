@@ -246,6 +246,24 @@ model UserPayoutTracking {
   updatedAt          DateTime @updatedAt
 }
 
+// Delivery log for transactional emails (withdrawal notices, etc.). Best-effort
+// — a logging failure never blocks a send. Provisioned via runtime self-heal.
+model EmailLog {
+  id       String   @id @default(cuid())
+  userId   String?
+  type     String // e.g. withdrawal_pending | withdrawal_approved
+  resendId String?
+  to       String?
+  subject  String?
+  // enum: sent | failed
+  status   String   @default("sent")
+  error    String?
+  sentAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([type])
+}
+
 model AuthToken {
   id        String   @id @default(cuid())
   userId    String

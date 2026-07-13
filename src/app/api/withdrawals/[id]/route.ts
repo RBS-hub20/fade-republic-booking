@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
-import { notifyWithdrawalCompleted, notifyWithdrawalRejected } from "@/lib/mailers";
+import { notifyWithdrawalRejected } from "@/lib/mailers";
+import { sendWithdrawalApprovedEmail } from "@/lib/withdrawal-emails";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -46,17 +47,23 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
           adminId: session.userId ?? null,
         },
       });
-      if (client) {
-        notifyWithdrawalCompleted({
-          email: client.email,
-          name: client.name,
+      // "Withdrawal Approved — Funds Sent" email (username + tx hash). Fetch the
+      // requesting user for their email/name/username; awaited but never throws.
+      const payee = await prisma.user
+        .findUnique({ where: { id: w.userId }, select: { email: true, name: true, username: true } })
+        .catch(() => null);
+      const to = payee?.email || client?.email;
+      if (to) {
+        await sendWithdrawalApprovedEmail({
+          userId: w.userId,
+          email: to,
+          name: payee?.name || client?.name || "",
+          username: payee?.username ?? null,
           amount: w.amount,
-          fee: w.fee,
-          receiveAmount: w.receiveAmount,
           network: w.network,
           address: w.address,
-          txHash,
-        }).catch(() => {});
+          transactionHash: txHash,
+        });
       }
       return NextResponse.json({ ok: true, withdrawal: updated });
     }

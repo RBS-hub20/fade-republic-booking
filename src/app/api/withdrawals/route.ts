@@ -8,6 +8,7 @@ import {
   computeFee,
   MIN_WITHDRAWAL,
 } from "@/lib/capital";
+import { sendWithdrawalRequestEmail } from "@/lib/withdrawal-emails";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -107,6 +108,24 @@ export async function POST(req: Request) {
         status: "pending",
       },
     });
+
+    // Email the client a "request received — pending review" notice. Awaited
+    // (never throws) so it actually fires before the serverless function ends;
+    // it can't fail the withdrawal.
+    const requester = await prisma.user
+      .findUnique({ where: { id: userId }, select: { email: true, name: true, username: true } })
+      .catch(() => null);
+    if (requester?.email) {
+      await sendWithdrawalRequestEmail({
+        userId,
+        email: requester.email,
+        name: requester.name,
+        username: requester.username,
+        amount,
+        network,
+        address,
+      });
+    }
 
     return NextResponse.json({ ok: true, withdrawal: created });
   } catch (err) {
