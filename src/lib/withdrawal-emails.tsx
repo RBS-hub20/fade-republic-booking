@@ -8,8 +8,8 @@
  * the caller — withdrawals must proceed even if email is down).
  */
 import { render } from "@react-email/render";
-import { prisma } from "./prisma";
 import { sendEmail } from "./email";
+import { logEmail } from "./email-log";
 import WithdrawalRequestEmail from "@/emails/WithdrawalRequest";
 import WithdrawalApprovedEmail from "@/emails/WithdrawalApproved";
 
@@ -37,56 +37,6 @@ export function formatDMY(date: Date = new Date()): string {
   }).formatToParts(date);
   const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
   return `${get("day")}-${get("month")}-${get("year")}`;
-}
-
-// --- EmailLog self-heal (mirrors the referral/finance schema guards) --------
-let emailLogHealed = false;
-async function ensureEmailLogSchema(): Promise<void> {
-  if (emailLogHealed) return;
-  try {
-    await prisma.$executeRawUnsafe(`CREATE TABLE IF NOT EXISTS "EmailLog" (
-      "id" TEXT NOT NULL PRIMARY KEY,
-      "userId" TEXT,
-      "type" TEXT NOT NULL,
-      "resendId" TEXT,
-      "to" TEXT,
-      "subject" TEXT,
-      "status" TEXT NOT NULL DEFAULT 'sent',
-      "error" TEXT,
-      "sentAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
-    )`);
-    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "EmailLog_userId_idx" ON "EmailLog"("userId")`);
-    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "EmailLog_type_idx" ON "EmailLog"("type")`);
-    emailLogHealed = true;
-  } catch (e) {
-    console.error("[email-log] self-heal failed:", e);
-  }
-}
-
-async function logEmail(entry: {
-  userId?: string | null;
-  type: string;
-  to: string;
-  subject: string;
-  status: "sent" | "failed";
-  error?: string;
-}): Promise<void> {
-  try {
-    await ensureEmailLogSchema();
-    await prisma.emailLog.create({
-      data: {
-        userId: entry.userId ?? null,
-        type: entry.type,
-        to: entry.to,
-        subject: entry.subject,
-        status: entry.status,
-        error: entry.error ?? null,
-      },
-    });
-  } catch (e) {
-    // Never let logging break the flow.
-    console.error("[email-log] write failed:", e);
-  }
 }
 
 export interface WithdrawalRequestEmailInput {
@@ -124,6 +74,7 @@ export async function sendWithdrawalRequestEmail(input: WithdrawalRequestEmailIn
       to: input.email,
       subject,
       status: res.delivered ? "sent" : "failed",
+      resendId: res.id,
       error: res.error,
     });
   } catch (e: any) {
@@ -176,6 +127,7 @@ export async function sendWithdrawalApprovedEmail(input: WithdrawalApprovedEmail
       to: input.email,
       subject,
       status: res.delivered ? "sent" : "failed",
+      resendId: res.id,
       error: res.error,
     });
   } catch (e: any) {

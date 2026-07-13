@@ -18,6 +18,8 @@ export interface SendResult {
   delivered: boolean;
   provider: "resend" | "console";
   error?: string;
+  /** Resend message id (for the Resend dashboard), when delivered. */
+  id?: string;
 }
 
 export async function sendEmail({ to, subject, html, text }: SendArgs): Promise<SendResult> {
@@ -35,7 +37,7 @@ export async function sendEmail({ to, subject, html, text }: SendArgs): Promise<
     return { delivered: false, provider: "resend", error: error.message };
   }
   console.log(`📧 Resend delivered to ${to} (id: ${data?.id})`);
-  return { delivered: true, provider: "resend" };
+  return { delivered: true, provider: "resend", id: data?.id };
 }
 
 export { emailConfigured } from "./resend";

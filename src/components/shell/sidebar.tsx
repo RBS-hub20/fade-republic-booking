@@ -20,6 +20,7 @@ import {
   Network,
   ShieldCheck,
   KeyRound,
+  Mail,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -48,6 +49,7 @@ function navForRole(role: string, clientId: string | null): NavItem[] {
       { href: "/admin/unlocks", label: "2nd-Level Unlocks", icon: Unlock },
       { href: "/admin/genealogy", label: "Genealogy", icon: Network },
       { href: "/admin/audit/proofs", label: "Proof Audit", icon: ShieldCheck },
+      { href: "/admin/emails", label: "Email Log", icon: Mail },
       { href: "/ledger", label: "Ledger", icon: ArrowLeftRight },
       { href: "/charts", label: "Charts", icon: CandlestickChart },
       { href: "/reports", label: "Reports", icon: FileText },
