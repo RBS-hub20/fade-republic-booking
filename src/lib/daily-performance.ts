@@ -168,6 +168,213 @@ export async function runDailyPerformance(opts?: { upToKey?: string }): Promise<
   return { ok: true, upTo: today, daysCreated, clients: report, at: new Date().toISOString() };
 }
 
+// ---------------------------------------------------------------------------
+// Shared earning-eligibility inputs
+//
+// Both the "Mark as No Trading Day" control and its status readout need the
+// exact same set of "clients who would earn today" that the nightly engine
+// uses. To avoid touching the delicate, tested `runDailyPerformance`, these
+// helpers replicate its gates (funded + INACTIVE + 5x CAPPED). Keep the three
+// gates here in sync with the loop in `runDailyPerformance` above.
+// ---------------------------------------------------------------------------
+
+type EarningClient = Awaited<ReturnType<typeof loadEarningInputs>>["clients"][number];
+
+async function loadEarningInputs() {
+  const clients = await prisma.client.findMany({
+    where: { status: "ACTIVE" },
+    include: {
+      transactions: { where: { status: "APPROVED" }, orderBy: { date: "asc" } },
+      dailyPerformances: { orderBy: { date: "asc" } },
+    },
+  });
+  const withdrawnActions = await prisma.capitalAction
+    .findMany({
+      where: { clientId: { in: clients.map((c) => c.id) }, action: "withdrawn" },
+      select: { transactionId: true },
+    })
+    .catch(() => [] as { transactionId: string }[]);
+  const withdrawnSet = new Set(withdrawnActions.map((a) => a.transactionId));
+
+  const clientUsers = await prisma.user
+    .findMany({ where: { clientId: { in: clients.map((c) => c.id) } }, select: { id: true, clientId: true } })
+    .catch(() => [] as { id: string; clientId: string | null }[]);
+  const userByClient = new Map(clientUsers.map((u) => [u.clientId, u.id]));
+  const userIds = clientUsers.map((u) => u.id);
+  const [l1g, l2g, mbg] = await Promise.all([
+    userIds.length
+      ? prisma.referralCommission
+          .groupBy({ by: ["referrerId"], where: { referrerId: { in: userIds }, status: "PAID" }, _sum: { commission: true } })
+          .catch(() => [] as { referrerId: string; _sum: { commission: number | null } }[])
+      : [],
+    userIds.length
+      ? prisma.level2Commission
+          .groupBy({ by: ["earnerId"], where: { earnerId: { in: userIds } }, _sum: { commissionAmount: true } })
+          .catch(() => [] as { earnerId: string; _sum: { commissionAmount: number | null } }[])
+      : [],
+    userIds.length
+      ? prisma.monthlyBonus
+          .groupBy({ by: ["userId"], where: { userId: { in: userIds } }, _sum: { bonusAmount: true } })
+          .catch(() => [] as { userId: string; _sum: { bonusAmount: number | null } }[])
+      : [],
+  ]);
+  const commByUser = new Map<string, number>();
+  for (const g of l1g) commByUser.set(g.referrerId, (commByUser.get(g.referrerId) ?? 0) + (g._sum.commission ?? 0));
+  for (const g of l2g) commByUser.set(g.earnerId, (commByUser.get(g.earnerId) ?? 0) + (g._sum.commissionAmount ?? 0));
+  for (const g of mbg) commByUser.set(g.userId, (commByUser.get(g.userId) ?? 0) + (g._sum.bonusAmount ?? 0));
+
+  return { clients, withdrawnSet, userByClient, commByUser };
+}
+
+/** Whether a client would earn daily ROI as of `todayKey` (mirrors engine gates). */
+function eligibleToday(
+  c: EarningClient,
+  withdrawnSet: Set<string>,
+  userByClient: Map<string | null, string>,
+  commByUser: Map<string, number>,
+  todayKey: string
+): boolean {
+  const remainingPrincipal = c.transactions.reduce(
+    (s, t) => s + (t.type === "DEPOSIT" && !withdrawnSet.has(t.id) ? t.amount : 0),
+    0
+  );
+  if (remainingPrincipal <= 0) return false; // INACTIVE
+  const firstDeposit = c.transactions.find((t) => t.type === "DEPOSIT");
+  if (!firstDeposit || toManilaDateKey(firstDeposit.date) > todayKey) return false; // not funded yet
+  const uid = userByClient.get(c.id);
+  const priorPnl = c.dailyPerformances.reduce((s, p) => s + p.pnlUsd, 0);
+  const totalEarned = priorPnl + (uid ? commByUser.get(uid) ?? 0 : 0);
+  if (remainingPrincipal * 5 <= totalEarned) return false; // 5x CAPPED
+  return true;
+}
+
+export interface NoTradingResult {
+  ok: true;
+  day: string;
+  eligible: number; // clients that would earn today
+  created: number; // fresh 0.00% rows posted
+  skipped: number; // eligible clients whose today entry already existed
+  clients: { name: string }[];
+  at: string;
+}
+
+/**
+ * Post a 0.00% "No Trading Day" entry for TODAY (Manila) for every eligible
+ * client that isn't already posted. Idempotent — clients with an existing
+ * today entry are skipped (so this never overwrites a real posted %). Because
+ * a today row now exists, the 23:59 PHT cron and self-heal both skip today via
+ * their `(clientId, date)` uniqueness, so the day stays 0.00%.
+ *
+ * Only affects TODAY; past days are untouched (use Backfill / self-heal).
+ */
+export async function markTodayNoTrading(): Promise<NoTradingResult> {
+  const today = manilaToday();
+  const { clients, withdrawnSet, userByClient, commByUser } = await loadEarningInputs();
+
+  let eligible = 0;
+  let created = 0;
+  let skipped = 0;
+  const report: { name: string }[] = [];
+
+  for (const c of clients) {
+    if (!eligibleToday(c, withdrawnSet, userByClient, commByUser, today)) continue;
+    eligible += 1;
+
+    const existingKeys = new Set(c.dailyPerformances.map((p) => toManilaDateKey(p.date)));
+    if (existingKeys.has(today)) {
+      skipped += 1;
+      continue;
+    }
+
+    // Carry the running balance forward unchanged (0% ⇒ no P/L), computed from
+    // the full percent history plus today at 0%.
+    const perfs = c.dailyPerformances.map((p) => ({
+      date: toManilaDateKey(p.date),
+      dailyPercent: p.dailyPercent,
+    }));
+    perfs.push({ date: today, dailyPercent: 0 });
+    const curve = computeEquityCurve({
+      initialDeposit: c.initialDeposit,
+      startDate: c.startDate,
+      ledger: c.transactions.map((t) => ({ date: t.date, type: t.type, amount: t.amount })),
+      performances: perfs,
+      endDate: today,
+    });
+    const pt = curve.find((p) => p.date === today);
+
+    try {
+      await prisma.dailyPerformance.create({
+        data: {
+          clientId: c.id,
+          date: new Date(`${today}T12:00:00.000Z`),
+          dailyPercent: 0,
+          balanceEOD: pt?.balance ?? c.initialDeposit,
+          pnlUsd: 0,
+          // "server:0" keeps the server-gross parser happy; "no-trading" tags
+          // this as an intentional admin hold (vs. a computed 0).
+          notes: "server:0 no-trading",
+        },
+      });
+      created += 1;
+      report.push({ name: c.name });
+    } catch {
+      // Unique (clientId, date) — a concurrent run/cron already posted today.
+      skipped += 1;
+    }
+  }
+
+  return { ok: true, day: today, eligible, created, skipped, clients: report, at: new Date().toISOString() };
+}
+
+export interface TodayPostingStatus {
+  todayKey: string;
+  eligibleCount: number; // clients that would earn today
+  postedCount: number; // eligible clients with today already posted
+  noTradingCount: number; // eligible today-posts that are 0.00%
+  allPosted: boolean; // every eligible client has today posted
+  markedNoTrading: boolean; // today is posted AND every posted entry is 0.00%
+  markedAt: string | null; // earliest createdAt among today's 0.00% posts (ISO)
+  at: string;
+}
+
+/** Snapshot of TODAY's posting state, for the "Trading Day Control" card. */
+export async function getTodayPostingStatus(): Promise<TodayPostingStatus> {
+  const today = manilaToday();
+  const { clients, withdrawnSet, userByClient, commByUser } = await loadEarningInputs();
+
+  let eligibleCount = 0;
+  let postedCount = 0;
+  let noTradingCount = 0;
+  let markedAt: string | null = null;
+
+  for (const c of clients) {
+    if (!eligibleToday(c, withdrawnSet, userByClient, commByUser, today)) continue;
+    eligibleCount += 1;
+    const todayPerf = c.dailyPerformances.find((p) => toManilaDateKey(p.date) === today);
+    if (!todayPerf) continue;
+    postedCount += 1;
+    if (todayPerf.dailyPercent === 0) {
+      noTradingCount += 1;
+      const ts = todayPerf.createdAt instanceof Date ? todayPerf.createdAt.toISOString() : null;
+      if (ts && (markedAt === null || ts < markedAt)) markedAt = ts;
+    }
+  }
+
+  const allPosted = eligibleCount > 0 && postedCount >= eligibleCount;
+  const markedNoTrading = eligibleCount > 0 && postedCount > 0 && noTradingCount === postedCount;
+
+  return {
+    todayKey: today,
+    eligibleCount,
+    postedCount,
+    noTradingCount,
+    allPosted,
+    markedNoTrading,
+    markedAt,
+    at: new Date().toISOString(),
+  };
+}
+
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /**

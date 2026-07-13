@@ -14,8 +14,13 @@ import {
 } from "@/components/ui/table";
 import { getSession } from "@/lib/auth";
 import { getServerPerformanceSummary, type PeriodTotals } from "@/lib/server-performance";
-import { getDailyPerfHealth, runDailyPerformanceResilient } from "@/lib/daily-performance";
+import {
+  getDailyPerfHealth,
+  runDailyPerformanceResilient,
+  getTodayPostingStatus,
+} from "@/lib/daily-performance";
 import { PerfHealthBanner } from "@/components/admin/perf-health-banner";
+import { NoTradingDayCard } from "@/components/admin/no-trading-day-card";
 import { formatUsd, formatPct, formatDateKey, cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -40,6 +45,8 @@ export default async function AdminPerformancePage() {
     perfHealth = await getDailyPerfHealth().catch(() => perfHealth);
   }
 
+  const todayStatus = await getTodayPostingStatus().catch(() => null);
+
   // Platform revenue from withdrawal fees (best-effort — table may be new).
   let feeRevenue = 0;
   try {
@@ -58,6 +65,19 @@ export default async function AdminPerformancePage() {
         title="Fund Performance"
         subtitle="Internal server gross (1–2%/day) vs. client payout (0.3–0.5%/day) — actual vs. paid out (Asia/Manila)."
       />
+
+      {todayStatus && (
+        <NoTradingDayCard
+          status={{
+            todayKey: todayStatus.todayKey,
+            eligibleCount: todayStatus.eligibleCount,
+            postedCount: todayStatus.postedCount,
+            allPosted: todayStatus.allPosted,
+            markedNoTrading: todayStatus.markedNoTrading,
+            markedAt: todayStatus.markedAt,
+          }}
+        />
+      )}
 
       {perfHealth && (
         <PerfHealthBanner
