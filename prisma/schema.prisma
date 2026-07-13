@@ -59,6 +59,11 @@ model User {
   // Auto-assigned avatar (permanent). gender drives which of the 10 SVGs.
   gender            String   @default("male")
   avatarType        String?
+  // Cellphone (for account verification + urgent support). Nullable for
+  // existing users; phoneVerified reserved for future OTP.
+  phoneNumber       String?
+  countryCode       String   @default("+63")
+  phoneVerified     Boolean  @default(false)
   // Withdrawable, settled referral commission (separate from trading balance).
   commissionBalance Float    @default(0)
   commissionsEarned    ReferralCommission[]   @relation("CommissionEarner")

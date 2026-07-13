@@ -8,9 +8,11 @@ import { LogoMark } from "@/components/brand/logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
+import { Select } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { REFERRALS_ENABLED } from "@/lib/referrals-config";
+import { COUNTRY_CODES, DEFAULT_COUNTRY_CODE, isValidPhoneNumber } from "@/lib/phone";
 
 function SignupForm() {
   const router = useRouter();
@@ -18,6 +20,8 @@ function SignupForm() {
   const ref = (REFERRALS_ENABLED && searchParams.get("ref")?.trim()) || "";
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [countryCode, setCountryCode] = useState(DEFAULT_COUNTRY_CODE);
+  const [phoneNumber, setPhoneNumber] = useState("");
   const [username, setUsername] = useState("");
   const [uStatus, setUStatus] = useState<
     { state: "idle" | "checking" | "available" | "taken" | "invalid"; msg?: string }
@@ -68,6 +72,10 @@ function SignupForm() {
       setError("Please select your gender.");
       return;
     }
+    if (!isValidPhoneNumber(phoneNumber)) {
+      setError("Please enter a valid cellphone number (10–11 digits).");
+      return;
+    }
     if (password !== confirm) {
       setError("Passwords do not match");
       return;
@@ -76,7 +84,7 @@ function SignupForm() {
     const res = await fetch("/api/auth/signup", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email, username, gender, password, ref }),
+      body: JSON.stringify({ name, email, username, gender, password, ref, countryCode, phoneNumber }),
     });
     const data = await res.json().catch(() => ({}));
     if (res.ok) {
@@ -138,6 +146,39 @@ function SignupForm() {
                   onChange={(e) => setEmail(e.target.value)}
                   required
                 />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="phone">Cellphone Number *</Label>
+                <div className="flex gap-2">
+                  <Select
+                    name="countryCode"
+                    aria-label="Country code"
+                    value={countryCode}
+                    onChange={(e) => setCountryCode(e.target.value)}
+                    className="w-28"
+                  >
+                    {COUNTRY_CODES.map((c) => (
+                      <option key={c.code} value={c.code}>
+                        {c.label}
+                      </option>
+                    ))}
+                  </Select>
+                  <Input
+                    id="phone"
+                    name="phoneNumber"
+                    type="tel"
+                    inputMode="numeric"
+                    autoComplete="tel-national"
+                    placeholder="917 123 4567"
+                    className="flex-1"
+                    value={phoneNumber}
+                    onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, "").slice(0, 11))}
+                    required
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  For account verification and urgent support only.
+                </p>
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="username">Username</Label>

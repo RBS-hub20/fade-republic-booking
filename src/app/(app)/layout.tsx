@@ -7,6 +7,7 @@ import { AppShell, type HeaderTier } from "@/components/shell/app-shell";
 import { ensureReferralSchemaOnce } from "@/lib/referral-schema";
 import { ensureUsernameSchemaOnce, ensureUsernamesBackfilledOnce } from "@/lib/username";
 import { ensureAvatarSchemaOnce } from "@/lib/avatar";
+import { ensurePhoneSchemaOnce } from "@/lib/phone";
 import { ensureAvatarsBackfilledOnce } from "@/lib/genealogy-tree";
 
 export const dynamic = "force-dynamic";
@@ -24,6 +25,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       ensureReferralSchemaOnce(prisma).catch(() => {}),
       ensureUsernameSchemaOnce(prisma).catch(() => {}),
       ensureAvatarSchemaOnce(prisma).catch(() => {}),
+      ensurePhoneSchemaOnce(prisma).catch(() => {}),
     ]);
   } catch {
     /* ignore — the queries below are all guarded too */

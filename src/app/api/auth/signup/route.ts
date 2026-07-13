@@ -15,6 +15,13 @@ import {
   ensureUsernameSchemaOnce,
 } from "@/lib/username";
 import { normalizeGender, avatarTypeFor, ensureAvatarSchemaOnce } from "@/lib/avatar";
+import {
+  normalizeCountryCode,
+  normalizePhoneNumber,
+  isValidPhoneNumber,
+  formatFullPhone,
+  ensurePhoneSchemaOnce,
+} from "@/lib/phone";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -51,8 +58,11 @@ export async function POST(req: Request) {
   const limited = enforce(req, "signup", 5, 60 * 60_000);
   if (limited) return limited;
 
-  const { name, email, password, phone, ref, username, gender } = await req.json().catch(() => ({}));
+  const { name, email, password, ref, username, gender, countryCode, phoneNumber } =
+    await req.json().catch(() => ({}));
   const cleanGender = normalizeGender(gender);
+  const cleanCountryCode = normalizeCountryCode(countryCode);
+  const cleanPhone = normalizePhoneNumber(phoneNumber);
 
   if (!name || !email || !password) {
     return NextResponse.json(
@@ -62,6 +72,12 @@ export async function POST(req: Request) {
   }
   if (!isValidEmail(email)) {
     return NextResponse.json({ error: "Please enter a valid email address" }, { status: 400 });
+  }
+  if (!isValidPhoneNumber(cleanPhone)) {
+    return NextResponse.json(
+      { error: "Please enter a valid cellphone number (10–11 digits)." },
+      { status: 400 }
+    );
   }
   if (String(password).length < 6) {
     return NextResponse.json({ error: "Password must be at least 6 characters" }, { status: 400 });
@@ -83,6 +99,7 @@ export async function POST(req: Request) {
     await ensureReferralSchemaOnce(prisma);
     await ensureUsernameSchemaOnce(prisma);
     await ensureAvatarSchemaOnce(prisma);
+    await ensurePhoneSchemaOnce(prisma);
 
     const existing = await prisma.user.findUnique({ where: { email: cleanEmail } });
     if (existing) {
@@ -120,7 +137,8 @@ export async function POST(req: Request) {
         data: {
           name: String(name).trim(),
           email: cleanEmail,
-          phone: phone ? String(phone).trim() : null,
+          // Full display number on the trading account (used by admin/reports).
+          phone: formatFullPhone(cleanCountryCode, cleanPhone),
           accountNumber,
           initialDeposit: 0,
           startDate: new Date(),
@@ -141,6 +159,8 @@ export async function POST(req: Request) {
           username: cleanUsername,
           usernameSet: true, // new users choose their username at signup
           gender: cleanGender,
+          phoneNumber: cleanPhone,
+          countryCode: cleanCountryCode,
         },
       });
     });
