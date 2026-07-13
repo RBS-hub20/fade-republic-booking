@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/table";
 import { getSession } from "@/lib/auth";
 import { getServerPerformanceSummary, type PeriodTotals } from "@/lib/server-performance";
-import { getDailyPerfHealth } from "@/lib/daily-performance";
+import { getDailyPerfHealth, runDailyPerformanceResilient } from "@/lib/daily-performance";
 import { PerfHealthBanner } from "@/components/admin/perf-health-banner";
 import { formatUsd, formatPct, formatDateKey, cn } from "@/lib/utils";
 
@@ -27,7 +27,18 @@ export default async function AdminPerformancePage() {
 
   const perf = await getServerPerformanceSummary();
   const t = perf.today;
-  const perfHealth = await getDailyPerfHealth().catch(() => null);
+  let perfHealth = await getDailyPerfHealth().catch(() => null);
+
+  // Self-heal safety net: if any funded client is missing a PAST night's P/L
+  // (i.e. health is stale — a gap through YESTERDAY), auto-backfill on page open
+  // so a skipped Vercel cron never lingers. Capped at yesterday via `upToKey`:
+  // TODAY is deliberately left to the 23:59 PHT cron or the manual "Backfill
+  // now" button, preserving end-of-day posting discipline. Idempotent (already
+  // posted days are skipped) and best-effort — a failure never blocks the page.
+  if (perfHealth?.stale) {
+    await runDailyPerformanceResilient({ upToKey: perfHealth.yesterdayKey }).catch(() => {});
+    perfHealth = await getDailyPerfHealth().catch(() => perfHealth);
+  }
 
   // Platform revenue from withdrawal fees (best-effort — table may be new).
   let feeRevenue = 0;
