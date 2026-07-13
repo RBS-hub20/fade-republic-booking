@@ -46,6 +46,15 @@ export interface PerformanceEntry {
   dailyPercent: number;
 }
 
+/**
+ * Launch date (Manila `yyyy-MM-dd`) of the 24h new-deposit cooling rule. Only
+ * deposits made on/after this day cool; anything before is grandfathered and
+ * earns from its arrival day exactly as it always did — so historical equity
+ * curves stay byte-for-byte identical (no retroactive "why did my profit drop"
+ * surprises). New money only.
+ */
+export const COOLING_START_KEY = "2026-07-13";
+
 /** Format a Date as a Manila-local `yyyy-MM-dd` string. */
 export function toManilaDateKey(date: Date | string): string {
   const d = typeof date === "string" ? new Date(date) : date;
@@ -173,7 +182,12 @@ export function computeEquityCurve(params: {
     // Renewals aren't deposits (no ledger entry), so they keep earning with no
     // cooling; existing capital is unaffected. Daily accrual happens once at
     // end-of-day, so "not same day" is exactly the 24h+ rule at this granularity.
-    const arrivedToday = deposits + (cursor === startKey ? initialDeposit : 0);
+    //
+    // Grandfathered: only days on/after the launch date apply cooling, so
+    // pre-launch deposits earn from their arrival day exactly as before and
+    // historical curves are unchanged.
+    const arrivedToday =
+      cursor >= COOLING_START_KEY ? deposits + (cursor === startKey ? initialDeposit : 0) : 0;
     const earningBase = Math.max(0, capitalBase - arrivedToday);
 
     // A day "trades" whenever it carries a recorded percentage. Performance is

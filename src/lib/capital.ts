@@ -13,6 +13,7 @@
  * ACTIVE CAPITAL + net earnings reconciles to the old compounded balance.
  */
 import { prisma } from "./prisma";
+import { toManilaDateKey, COOLING_START_KEY } from "./performance";
 
 export const LOCK_MONTHS = 6;
 export const WITHDRAWAL_FEE_PCT = 3;
@@ -134,8 +135,10 @@ export async function getCapitalSummary(opts: {
       if (earliest === null || maturedMs < earliest) earliest = maturedMs;
     }
     // 24h cooling window (from purchase). A renewed deposit was already trading,
-    // so it never re-enters cooling.
-    const firstProfitMs = renewAt ? 0 : new Date(d.date).getTime() + COOLING_MS;
+    // so it never re-enters cooling; and only deposits from the launch date
+    // onward are subject to cooling (pre-launch capital is grandfathered).
+    const eligible = toManilaDateKey(d.date) >= COOLING_START_KEY;
+    const firstProfitMs = renewAt || !eligible ? 0 : new Date(d.date).getTime() + COOLING_MS;
     const cooling = firstProfitMs > now;
     if (cooling) {
       coolingCapital += d.amount;
