@@ -167,6 +167,15 @@ export function computeEquityCurve(params: {
     const withdrawals = withdrawalsByDay.get(cursor) ?? 0;
     capitalBase += deposits - withdrawals;
 
+    // 24h COOLING: capital that ARRIVED today — a new package deposit, or the
+    // opening deposit on the account's first day — does not earn on its arrival
+    // day; it starts accruing the NEXT calendar day (funds aren't traded yet).
+    // Renewals aren't deposits (no ledger entry), so they keep earning with no
+    // cooling; existing capital is unaffected. Daily accrual happens once at
+    // end-of-day, so "not same day" is exactly the 24h+ rule at this granularity.
+    const arrivedToday = deposits + (cursor === startKey ? initialDeposit : 0);
+    const earningBase = Math.max(0, capitalBase - arrivedToday);
+
     // A day "trades" whenever it carries a recorded percentage. Performance is
     // credited every calendar day (Mon–Sun), so the presence of a stored
     // percent — not the weekday — decides whether returns are calculated.
@@ -175,8 +184,9 @@ export function computeEquityCurve(params: {
     let dailyPercent = 0;
     if (traded) {
       dailyPercent = pctByDay.get(cursor)!;
-      // Flat: daily P/L is calculated on Active Capital, not the running balance.
-      pnl = (capitalBase * dailyPercent) / 100;
+      // Flat: daily P/L is calculated on Active Capital (excluding capital still
+      // in its 24h cooling window), not the running balance.
+      pnl = (earningBase * dailyPercent) / 100;
       cumulativePnl += pnl;
     }
     const balance = capitalBase + cumulativePnl;

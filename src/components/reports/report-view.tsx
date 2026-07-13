@@ -436,7 +436,7 @@ function ActivePackagesSection({
                         {formatUsd(p.amount)}
                       </TableCell>
                       <TableCell>
-                        <StatusBadge locked={p.locked} />
+                        <StatusBadge locked={p.locked} cooling={p.cooling} />
                       </TableCell>
                       <TableCell className="text-sm">{formatDate(p.unlockDate)}</TableCell>
                       <TableCell className="tnum text-right">
@@ -468,7 +468,7 @@ function ActivePackagesSection({
                 <div key={p.id} className="rounded-lg border border-border bg-card/60 p-4">
                   <div className="flex items-center justify-between">
                     <PackageBadge pkg={p} />
-                    <StatusBadge locked={p.locked} />
+                    <StatusBadge locked={p.locked} cooling={p.cooling} />
                   </div>
                   <div className="mt-3 grid grid-cols-2 gap-y-2 text-sm">
                     <span className="text-muted-foreground">Amount</span>
@@ -698,7 +698,8 @@ function PackageBadge({ pkg }: { pkg: PackageRow }) {
   );
 }
 
-function StatusBadge({ locked }: { locked: boolean }) {
+function StatusBadge({ locked, cooling }: { locked: boolean; cooling?: boolean }) {
+  if (cooling) return <Badge variant="outline">⏳ Cooling</Badge>;
   return locked ? (
     <Badge variant="warning">🔒 Locked</Badge>
   ) : (

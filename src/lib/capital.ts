@@ -17,6 +17,8 @@ import { prisma } from "./prisma";
 export const LOCK_MONTHS = 6;
 export const WITHDRAWAL_FEE_PCT = 3;
 export const MIN_WITHDRAWAL = 10;
+/** New-package cooling window before first profit accrual. */
+export const COOLING_MS = 24 * 60 * 60_000;
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -36,6 +38,10 @@ export interface CapitalDeposit {
   maturityDate: string;
   matured: boolean;
   daysToMaturity: number;
+  /** In its 24h cooling window — not earning daily profit yet. */
+  cooling: boolean;
+  /** When this deposit starts earning (depositedAt + 24h), ISO. */
+  firstProfitAt: string;
 }
 
 export interface CapitalSummary {
@@ -45,6 +51,10 @@ export interface CapitalSummary {
   earliestMaturity: string | null;
   daysToMaturity: number | null;
   deposits: CapitalDeposit[];
+  /** Capital currently in its 24h cooling window (not yet earning). */
+  coolingCapital: number;
+  /** Soonest moment cooling capital starts earning (ISO), or null. */
+  nextProfitAt: string | null;
 
   dailyPnl: number;
   commissionsEarned: number; // lifetime referral earnings
@@ -104,7 +114,9 @@ export async function getCapitalSummary(opts: {
   let activeCapital = 0;
   let maturedCapital = 0;
   let releasedCapital = 0;
+  let coolingCapital = 0;
   let earliest: number | null = null;
+  let nextProfit: number | null = null;
   const depositList: CapitalDeposit[] = [];
 
   for (const d of deposits) {
@@ -121,6 +133,14 @@ export async function getCapitalSummary(opts: {
       activeCapital += d.amount;
       if (earliest === null || maturedMs < earliest) earliest = maturedMs;
     }
+    // 24h cooling window (from purchase). A renewed deposit was already trading,
+    // so it never re-enters cooling.
+    const firstProfitMs = renewAt ? 0 : new Date(d.date).getTime() + COOLING_MS;
+    const cooling = firstProfitMs > now;
+    if (cooling) {
+      coolingCapital += d.amount;
+      if (nextProfit === null || firstProfitMs < nextProfit) nextProfit = firstProfitMs;
+    }
     depositList.push({
       id: d.id,
       amount: round2(d.amount),
@@ -128,6 +148,8 @@ export async function getCapitalSummary(opts: {
       maturityDate: maturity.toISOString(),
       matured,
       daysToMaturity: Math.max(0, Math.ceil((maturedMs - now) / DAY_MS)),
+      cooling,
+      firstProfitAt: new Date(firstProfitMs || now).toISOString(),
     });
   }
 
@@ -163,6 +185,8 @@ export async function getCapitalSummary(opts: {
     hasMatured: maturedCapital > 0,
     earliestMaturity: earliest ? new Date(earliest).toISOString() : null,
     daysToMaturity: earliest ? Math.max(0, Math.ceil((earliest - now) / DAY_MS)) : null,
+    coolingCapital: round2(coolingCapital),
+    nextProfitAt: nextProfit ? new Date(nextProfit).toISOString() : null,
     deposits: depositList,
     dailyPnl,
     commissionsEarned,

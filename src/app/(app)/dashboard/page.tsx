@@ -177,6 +177,8 @@ export default async function DashboardPage() {
                 totalEarned: capital.totalEarned,
                 totalWithdrawn: capital.totalWithdrawn,
                 commissionsEarned: capital.commissionsEarned,
+                coolingCapital: capital.coolingCapital,
+                nextProfitAt: capital.nextProfitAt,
               }}
               kpis={{
                 winRate: k.winRate,

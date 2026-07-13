@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/table";
 import { cn, formatUsd, formatPct, formatDate } from "@/lib/utils";
 import { PayoutCapCard } from "@/components/finance/payout-cap-card";
+import { CoolingCard } from "@/components/finance/cooling-card";
 import type { PayoutState } from "@/lib/payout-cap";
 
 export interface CapitalView {
@@ -46,6 +47,8 @@ export interface CapitalView {
   totalEarned: number;
   totalWithdrawn: number;
   commissionsEarned: number;
+  coolingCapital: number;
+  nextProfitAt: string | null;
 }
 
 export interface WithdrawalRow {
@@ -84,10 +87,13 @@ export function FinancePanel({
 
   return (
     <div className="space-y-4">
-      {/* Payout-cap card (spans the Active Capital + Available columns) */}
-      {payout && (
+      {/* Payout-cap + cooling cards (top row) */}
+      {(payout || capital.coolingCapital > 0) && (
         <div className="grid gap-4 lg:grid-cols-2">
-          <PayoutCapCard payout={payout} clientId={clientId} />
+          {payout && <PayoutCapCard payout={payout} clientId={clientId} />}
+          {capital.coolingCapital > 0 && (
+            <CoolingCard amount={capital.coolingCapital} nextProfitAt={capital.nextProfitAt} />
+          )}
         </div>
       )}
 

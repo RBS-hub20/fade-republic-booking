@@ -71,6 +71,7 @@ export default async function ReportPage({
       locked: !d.matured,
       daysLeft: d.daysToMaturity,
       progressPct: packageProgress(d.daysToMaturity),
+      cooling: d.cooling,
     };
   });
 

@@ -29,6 +29,8 @@ export interface PackageRow {
   daysLeft: number;
   /** 0–100, clamped. */
   progressPct: number;
+  /** In its 24h cooling window — not earning daily profit yet. */
+  cooling: boolean;
 }
 
 const EMOJI: Record<Tier["id"], string> = {
