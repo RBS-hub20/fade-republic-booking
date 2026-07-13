@@ -50,7 +50,10 @@ export default async function ReportPage({
   // Reuses the capital money-model so unlock dates match the wallet exactly.
   // Best-effort — a failure here must never break the rest of the statement.
   const owner = await prisma.user
-    .findFirst({ where: { clientId: params.clientId }, select: { id: true } })
+    .findFirst({
+      where: { clientId: params.clientId },
+      select: { id: true, phoneNumber: true, countryCode: true, phoneVerified: true },
+    })
     .catch(() => null);
   const capital = await getCapitalSummary({
     clientId: params.clientId,
@@ -109,6 +112,9 @@ export default async function ReportPage({
           name: client.name,
           email: client.email,
           phone: client.phone,
+          countryCode: owner?.countryCode ?? null,
+          phoneNumber: owner?.phoneNumber ?? null,
+          phoneVerified: owner?.phoneVerified ?? false,
           accountNumber: client.accountNumber,
           startDate: client.startDate.toISOString(),
           initialDeposit: client.initialDeposit,

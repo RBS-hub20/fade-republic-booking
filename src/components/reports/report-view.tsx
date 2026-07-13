@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { EquityChart } from "@/components/dashboard/equity-chart";
+import { ClientPhoneField } from "@/components/reports/client-phone-field";
 import { AddFundsDialog } from "@/components/reports/add-funds-dialog";
 import { SetPasswordDialog } from "@/components/reports/set-password-dialog";
 import {
@@ -32,6 +33,9 @@ interface ReportClient {
   name: string;
   email: string;
   phone: string | null;
+  countryCode: string | null;
+  phoneNumber: string | null;
+  phoneVerified: boolean;
   accountNumber: string;
   startDate: string;
   initialDeposit: number;
@@ -102,8 +106,14 @@ export function ReportView({
             <h2 className="text-xl font-bold">{client.name}</h2>
             <p className="text-sm text-muted-foreground">
               <span className="font-mono">{client.accountNumber}</span> · {client.email}
-              {client.phone ? ` · ${client.phone}` : ""}
             </p>
+            <ClientPhoneField
+              clientId={client.id}
+              countryCode={client.countryCode}
+              phoneNumber={client.phoneNumber}
+              phoneVerified={client.phoneVerified}
+              canEdit={isAdmin}
+            />
             <p className="mt-1 text-xs text-muted-foreground">
               Since {formatDate(client.startDate)} · Initial {formatUsd(client.initialDeposit)}
             </p>

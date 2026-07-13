@@ -47,6 +47,20 @@ export function formatFullPhone(countryCode: string, phoneNumber: string): strin
   return num ? `${code} ${num}` : "";
 }
 
+/** Grouped, readable number, e.g. "+63 917 123 4567". */
+export function formatPhoneDisplay(countryCode: string, phoneNumber: string): string {
+  const code = normalizeCountryCode(countryCode);
+  const num = normalizePhoneNumber(phoneNumber);
+  if (!num) return "";
+  const grouped = num.replace(/(\d{3})(\d{3})(\d+)/, "$1 $2 $3");
+  return `${code} ${grouped}`;
+}
+
+/** E.164-ish tel: href, e.g. "tel:+639171234567". */
+export function telHref(countryCode: string, phoneNumber: string): string {
+  return `tel:${normalizeCountryCode(countryCode)}${normalizePhoneNumber(phoneNumber)}`;
+}
+
 // --- Runtime schema self-heal (User phone columns) --------------------------
 type RawRunner = { $executeRawUnsafe: (sql: string) => Promise<unknown> };
 
