@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2, ArrowLeft, Gift } from "lucide-react";
@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { REFERRALS_ENABLED } from "@/lib/referrals-config";
 import { COUNTRY_CODES, DEFAULT_COUNTRY_CODE, isValidPhoneNumber } from "@/lib/phone";
+import { COUNTRIES, DEFAULT_COUNTRY } from "@/lib/countries";
 
 function SignupForm() {
   const router = useRouter();
@@ -20,6 +21,8 @@ function SignupForm() {
   const ref = (REFERRALS_ENABLED && searchParams.get("ref")?.trim()) || "";
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [country, setCountry] = useState(DEFAULT_COUNTRY);
+  const [countryTouched, setCountryTouched] = useState(false);
   const [countryCode, setCountryCode] = useState(DEFAULT_COUNTRY_CODE);
   const [phoneNumber, setPhoneNumber] = useState("");
   const [username, setUsername] = useState("");
@@ -31,6 +34,21 @@ function SignupForm() {
   const [gender, setGender] = useState<"male" | "female" | "">("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Best-effort IP geolocation to pre-select the country. Skipped once the user
+  // has picked one themselves, so auto-detect never overrides a manual choice.
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/geoip")
+      .then((r) => r.json())
+      .then((d) => {
+        if (!cancelled && !countryTouched && d?.country) setCountry(d.country);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [countryTouched]);
 
   const USERNAME_RE = /^[a-z0-9_]{3,30}$/;
 
@@ -84,7 +102,7 @@ function SignupForm() {
     const res = await fetch("/api/auth/signup", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email, username, gender, password, ref, countryCode, phoneNumber }),
+      body: JSON.stringify({ name, email, username, gender, password, ref, countryCode, phoneNumber, country }),
     });
     const data = await res.json().catch(() => ({}));
     if (res.ok) {
@@ -135,6 +153,29 @@ function SignupForm() {
                   onChange={(e) => setName(e.target.value)}
                   required
                 />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="country">Country</Label>
+                <Select
+                  id="country"
+                  name="country"
+                  aria-label="Country of residence"
+                  value={country}
+                  onChange={(e) => {
+                    setCountry(e.target.value);
+                    setCountryTouched(true);
+                  }}
+                  required
+                >
+                  {COUNTRIES.map((c) => (
+                    <option key={c.code} value={c.code}>
+                      {c.flag} {c.name}
+                    </option>
+                  ))}
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Auto-detected from your location — change it if it&apos;s wrong.
+                </p>
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="email">Email</Label>

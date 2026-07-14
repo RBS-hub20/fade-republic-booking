@@ -64,6 +64,13 @@ model User {
   phoneNumber       String?
   countryCode       String   @default("+63")
   phoneVerified     Boolean  @default(false)
+  // --- Country of residence (global-expansion signup) -----------------------
+  // Collected at signup for compliance, analytics, and future localization.
+  // Nullable for pre-existing users. `country` is an ISO 3166-1 alpha-2 code
+  // (except "UK"); `timezone` is the primary IANA zone. See src/lib/countries.ts.
+  country           String?
+  countryName       String?
+  timezone          String?
   // Withdrawable, settled referral commission (separate from trading balance).
   commissionBalance Float    @default(0)
   commissionsEarned    ReferralCommission[]   @relation("CommissionEarner")

@@ -22,6 +22,12 @@ import {
   formatFullPhone,
   ensurePhoneSchemaOnce,
 } from "@/lib/phone";
+import {
+  normalizeCountry,
+  countryName,
+  countryTimezone,
+  ensureCountrySchemaOnce,
+} from "@/lib/countries";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -58,11 +64,16 @@ export async function POST(req: Request) {
   const limited = enforce(req, "signup", 5, 60 * 60_000);
   if (limited) return limited;
 
-  const { name, email, password, ref, username, gender, countryCode, phoneNumber } =
+  const { name, email, password, ref, username, gender, countryCode, phoneNumber, country } =
     await req.json().catch(() => ({}));
   const cleanGender = normalizeGender(gender);
   const cleanCountryCode = normalizeCountryCode(countryCode);
   const cleanPhone = normalizePhoneNumber(phoneNumber);
+  // Country of residence — derive display name + timezone server-side (the lib
+  // is the single source of truth; never trust client-sent name/tz).
+  const cleanCountry = normalizeCountry(country);
+  const cleanCountryName = countryName(cleanCountry);
+  const cleanTimezone = countryTimezone(cleanCountry);
 
   if (!name || !email || !password) {
     return NextResponse.json(
@@ -100,6 +111,7 @@ export async function POST(req: Request) {
     await ensureUsernameSchemaOnce(prisma);
     await ensureAvatarSchemaOnce(prisma);
     await ensurePhoneSchemaOnce(prisma);
+    await ensureCountrySchemaOnce(prisma);
 
     const existing = await prisma.user.findUnique({ where: { email: cleanEmail } });
     if (existing) {
@@ -161,6 +173,9 @@ export async function POST(req: Request) {
           gender: cleanGender,
           phoneNumber: cleanPhone,
           countryCode: cleanCountryCode,
+          country: cleanCountry,
+          countryName: cleanCountryName,
+          timezone: cleanTimezone,
         },
       });
     });

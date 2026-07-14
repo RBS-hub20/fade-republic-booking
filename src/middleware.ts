@@ -41,6 +41,8 @@ export function middleware(req: NextRequest) {
     // The verify route enforces its own CRON_SECRET / admin check.
     pathname.startsWith("/api/deposits/verify") ||
     pathname === "/api/health" ||
+    // IP → country hint for the signup form (visitors have no session yet).
+    pathname === "/api/geoip" ||
     pathname === "/favicon.ico" ||
     // Static files in /public (logo, icons, OG image, manifest, fonts, …) must
     // be reachable without a session so the marketing pages render for visitors.
