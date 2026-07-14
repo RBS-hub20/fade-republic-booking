@@ -11,6 +11,18 @@ import {
   type LedgerEntry,
   type PerformanceKpis,
 } from "./performance";
+import { ensureCountrySchemaOnce } from "./countries";
+
+/**
+ * Guard every Client read: the Client model carries `country`/`countryName`,
+ * so Prisma's SELECT references those columns. If a lagging DB doesn't have
+ * them yet (self-heal runs at runtime, not at build), the query throws P2022
+ * and crashes the page. Heal the columns first — idempotent + module-cached,
+ * so it's a no-op boolean check after the first successful run.
+ */
+async function ensureClientColumns(): Promise<void> {
+  await ensureCountrySchemaOnce(prisma).catch(() => {});
+}
 
 type ClientWithRelations = Prisma.ClientGetPayload<{
   include: { transactions: true; dailyPerformances: true };
@@ -24,6 +36,7 @@ export interface ClientPerformance {
 
 /** All clients with a lightweight computed current balance for the list view. */
 export async function getClientsWithBalance() {
+  await ensureClientColumns();
   const clients = await prisma.client.findMany({
     orderBy: { createdAt: "asc" },
     include: {
@@ -74,6 +87,7 @@ export async function getClientsWithBalance() {
 
 /** Full computed performance for a single client (dashboard / report). */
 export async function getClientPerformance(clientId: string): Promise<ClientPerformance | null> {
+  await ensureClientColumns();
   const client = await prisma.client.findUnique({
     where: { id: clientId },
     include: {
@@ -111,6 +125,7 @@ export async function getClientPerformance(clientId: string): Promise<ClientPerf
  * Combines every client's curve into a single equity series keyed by date.
  */
 export async function getPortfolioPerformance() {
+  await ensureClientColumns();
   const clients = await prisma.client.findMany({
     include: {
       transactions: { where: { status: "APPROVED" }, orderBy: { date: "asc" } },
