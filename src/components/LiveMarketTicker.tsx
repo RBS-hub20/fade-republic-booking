@@ -20,17 +20,16 @@ const SYMBOLS = [
   { proName: "TVC:SILVER", title: "XAG/USD" },
 ];
 
-export function TickerTape() {
+export default function LiveMarketTicker() {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
-    // Build TradingView's required DOM fresh each mount (the embed script looks
-    // for a sibling `__widget` div). Clearing first makes React StrictMode's
-    // double-invoke idempotent — no duplicate tapes.
-    container.innerHTML = '<div class="tradingview-widget-container__widget"></div>';
+    // Clear first so React StrictMode's double-invoke stays idempotent
+    // (no duplicate tapes).
+    container.innerHTML = "";
 
     const script = document.createElement("script");
     script.src =
@@ -57,7 +56,9 @@ export function TickerTape() {
       className="mx-auto mt-12 w-full max-w-6xl overflow-hidden rounded-2xl border border-gold-400/20 bg-background/40 px-1 py-1"
       aria-label="Live market ticker"
     >
-      <div ref={containerRef} className="tradingview-widget-container" />
+      <div className="tradingview-widget-container">
+        <div ref={containerRef} className="tradingview-widget-container__widget" />
+      </div>
     </section>
   );
 }

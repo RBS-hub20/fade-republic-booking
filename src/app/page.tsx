@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Logo, LogoMark } from "@/components/brand/logo";
-import { TickerTape } from "@/components/market/ticker-tape";
+import LiveMarketTicker from "@/components/LiveMarketTicker";
 import { FloatingCoins } from "@/components/landing/floating-coins";
 import { getSession } from "@/lib/auth";
 
@@ -161,7 +161,7 @@ export default function LandingPage() {
         </p>
 
         {/* Live market ticker — TradingView scrolling tape (real-time). */}
-        <TickerTape />
+        <LiveMarketTicker />
 
         {/* Markets strip */}
         <div className="mx-auto mt-14 flex max-w-3xl flex-wrap items-center justify-center gap-3">
