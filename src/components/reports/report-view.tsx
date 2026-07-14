@@ -25,6 +25,7 @@ import { generateClientStatement, type ReportTxn } from "@/lib/pdf";
 import type { EquityPoint, PerformanceKpis } from "@/lib/performance";
 import type { PackageRow } from "@/lib/packages";
 import type { ReferralBonusEvent } from "@/lib/referrals";
+import { countryFlag } from "@/lib/countries";
 import { Modal } from "@/components/ui/modal";
 import { Lock, Loader2, RefreshCw, ArrowDownToLine, CheckCircle2, Users } from "lucide-react";
 
@@ -36,6 +37,8 @@ interface ReportClient {
   countryCode: string | null;
   phoneNumber: string | null;
   phoneVerified: boolean;
+  country: string | null;
+  countryName: string | null;
   accountNumber: string;
   startDate: string;
   initialDeposit: number;
@@ -114,6 +117,11 @@ export function ReportView({
               phoneVerified={client.phoneVerified}
               canEdit={isAdmin}
             />
+            {client.countryName && (
+              <p className="mt-1 text-sm text-muted-foreground">
+                <span aria-hidden>{countryFlag(client.country ?? "")}</span> {client.countryName}
+              </p>
+            )}
             <p className="mt-1 text-xs text-muted-foreground">
               Since {formatDate(client.startDate)} · Initial {formatUsd(client.initialDeposit)}
             </p>

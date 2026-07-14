@@ -5,24 +5,35 @@
  * the columns provision even when the build can't reach the DB.
  */
 
+import { COUNTRIES } from "./countries";
+
 export interface CountryCode {
   code: string;
   flag: string;
   label: string;
 }
 
-/** Supported dialing codes for the signup selector. */
-export const COUNTRY_CODES: CountryCode[] = [
-  { code: "+63", flag: "🇵🇭", label: "🇵🇭 +63" },
-  { code: "+1", flag: "🇺🇸", label: "🇺🇸 +1" },
-  { code: "+44", flag: "🇬🇧", label: "🇬🇧 +44" },
-  { code: "+65", flag: "🇸🇬", label: "🇸🇬 +65" },
-  { code: "+971", flag: "🇦🇪", label: "🇦🇪 +971" },
-];
+/**
+ * Dialing codes for the phone selector, derived from the unified country list
+ * (src/lib/countries.ts) so signup + admin stay in sync. Deduped by dial code
+ * (US/CA share +1) and excluding OTHER's bare "+".
+ */
+export const COUNTRY_CODES: CountryCode[] = (() => {
+  const seen = new Set<string>();
+  const out: CountryCode[] = [];
+  for (const c of COUNTRIES) {
+    if (c.dialCode === "+" || seen.has(c.dialCode)) continue;
+    seen.add(c.dialCode);
+    out.push({ code: c.dialCode, flag: c.flag, label: `${c.flag} ${c.dialCode}` });
+  }
+  return out;
+})();
 
 export const DEFAULT_COUNTRY_CODE = "+63";
 
-const VALID_CODES = new Set(COUNTRY_CODES.map((c) => c.code));
+// Accept every dial code in the country list, plus OTHER's "+" so an "Other"
+// signup round-trips instead of silently reverting to +63.
+const VALID_CODES = new Set<string>([...COUNTRIES.map((c) => c.dialCode), DEFAULT_COUNTRY_CODE]);
 
 /** Coerce to a supported dialing code, defaulting to +63 (PH). */
 export function normalizeCountryCode(value: unknown): string {
@@ -35,9 +46,13 @@ export function normalizePhoneNumber(value: unknown): string {
   return String(value ?? "").replace(/\D/g, "");
 }
 
-/** A local number is 10–11 digits (no country code). */
+/**
+ * A valid national number is 6–15 digits (no country code) — wide enough for
+ * every supported country (e.g. Singapore 8-digit, US 10-digit, PH 10–11).
+ * 15 is the E.164 maximum for the full international number.
+ */
 export function isValidPhoneNumber(value: unknown): boolean {
-  return /^[0-9]{10,11}$/.test(normalizePhoneNumber(value));
+  return /^[0-9]{6,15}$/.test(normalizePhoneNumber(value));
 }
 
 /** Full display number, e.g. "+63 9171234567". */

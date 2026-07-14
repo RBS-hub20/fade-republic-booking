@@ -86,7 +86,7 @@ export async function POST(req: Request) {
   }
   if (!isValidPhoneNumber(cleanPhone)) {
     return NextResponse.json(
-      { error: "Please enter a valid cellphone number (10–11 digits)." },
+      { error: "Please enter a valid cellphone number (6–15 digits)." },
       { status: 400 }
     );
   }

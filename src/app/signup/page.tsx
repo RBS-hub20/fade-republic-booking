@@ -12,8 +12,8 @@ import { Select } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { REFERRALS_ENABLED } from "@/lib/referrals-config";
-import { COUNTRY_CODES, DEFAULT_COUNTRY_CODE, isValidPhoneNumber } from "@/lib/phone";
-import { COUNTRIES, DEFAULT_COUNTRY } from "@/lib/countries";
+import { isValidPhoneNumber } from "@/lib/phone";
+import { COUNTRIES, DEFAULT_COUNTRY, getCountry } from "@/lib/countries";
 
 function SignupForm() {
   const router = useRouter();
@@ -23,7 +23,6 @@ function SignupForm() {
   const [email, setEmail] = useState("");
   const [country, setCountry] = useState(DEFAULT_COUNTRY);
   const [countryTouched, setCountryTouched] = useState(false);
-  const [countryCode, setCountryCode] = useState(DEFAULT_COUNTRY_CODE);
   const [phoneNumber, setPhoneNumber] = useState("");
   const [username, setUsername] = useState("");
   const [uStatus, setUStatus] = useState<
@@ -51,6 +50,8 @@ function SignupForm() {
   }, [countryTouched]);
 
   const USERNAME_RE = /^[a-z0-9_]{3,30}$/;
+  // The country selection drives the phone dial code + placeholder (one picker).
+  const selectedCountry = getCountry(country);
 
   function onUsernameChange(v: string) {
     // Force the stored form (lowercase, [a-z0-9_], ≤30) as the user types.
@@ -91,7 +92,7 @@ function SignupForm() {
       return;
     }
     if (!isValidPhoneNumber(phoneNumber)) {
-      setError("Please enter a valid cellphone number (10–11 digits).");
+      setError("Please enter a valid cellphone number (6–15 digits).");
       return;
     }
     if (password !== confirm) {
@@ -102,7 +103,17 @@ function SignupForm() {
     const res = await fetch("/api/auth/signup", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email, username, gender, password, ref, countryCode, phoneNumber, country }),
+      body: JSON.stringify({
+        name,
+        email,
+        username,
+        gender,
+        password,
+        ref,
+        countryCode: selectedCountry.dialCode,
+        phoneNumber,
+        country,
+      }),
     });
     const data = await res.json().catch(() => ({}));
     if (res.ok) {
@@ -191,34 +202,27 @@ function SignupForm() {
               <div className="space-y-1.5">
                 <Label htmlFor="phone">Cellphone Number *</Label>
                 <div className="flex gap-2">
-                  <Select
-                    name="countryCode"
-                    aria-label="Country code"
-                    value={countryCode}
-                    onChange={(e) => setCountryCode(e.target.value)}
-                    className="w-28"
+                  <div
+                    className="flex min-w-[3.75rem] items-center justify-center rounded-md border border-border bg-secondary/40 px-2.5 text-sm font-medium text-muted-foreground"
+                    aria-label={`Dial code ${selectedCountry.dialCode}`}
                   >
-                    {COUNTRY_CODES.map((c) => (
-                      <option key={c.code} value={c.code}>
-                        {c.label}
-                      </option>
-                    ))}
-                  </Select>
+                    {selectedCountry.flag} {selectedCountry.dialCode}
+                  </div>
                   <Input
                     id="phone"
                     name="phoneNumber"
                     type="tel"
                     inputMode="numeric"
                     autoComplete="tel-national"
-                    placeholder="917 123 4567"
+                    placeholder={selectedCountry.placeholder}
                     className="flex-1"
                     value={phoneNumber}
-                    onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, "").slice(0, 11))}
+                    onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, "").slice(0, 15))}
                     required
                   />
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  For account verification and urgent support only.
+                  Dial code follows your country. For verification and urgent support only.
                 </p>
               </div>
               <div className="space-y-1.5">

@@ -18,6 +18,7 @@ import {
 import { cn, formatUsd, formatDate } from "@/lib/utils";
 import { STATUS_LABELS, type ClientStatus } from "@/lib/constants";
 import { formatPhoneDisplay, telHref } from "@/lib/phone";
+import { countryFlag } from "@/lib/countries";
 
 export interface ClientRow {
   id: string;
@@ -26,6 +27,8 @@ export interface ClientRow {
   username: string | null;
   accountNumber: string;
   status: string;
+  country: string | null;
+  countryName: string | null;
   activeCapital: number;
   hasMatured: boolean;
   availableWithdrawal: number;
@@ -45,7 +48,7 @@ const statusVariant: Record<ClientStatus, "success" | "warning" | "danger"> = {
   CLOSED: "danger",
 };
 
-type SortKey = "name" | "phone" | "activeCapital" | "netPnl" | "status";
+type SortKey = "name" | "country" | "phone" | "activeCapital" | "netPnl" | "status";
 
 export function ClientsTable({ rows }: { rows: ClientRow[] }) {
   const [q, setQ] = useState("");
@@ -62,7 +65,7 @@ export function ClientsTable({ rows }: { rows: ClientRow[] }) {
     if (needle) {
       list = rows.filter((r) => {
         const phoneStr = `${r.countryCode ?? ""}${r.phoneNumber ?? ""}`.toLowerCase();
-        const hay = [r.name, r.email, r.username ?? "", r.accountNumber, phoneStr]
+        const hay = [r.name, r.email, r.username ?? "", r.accountNumber, phoneStr, r.countryName ?? ""]
           .join(" ")
           .toLowerCase();
         // Match text OR a digits-only phone substring (so "9171234567" finds it).
@@ -72,6 +75,15 @@ export function ClientsTable({ rows }: { rows: ClientRow[] }) {
     const dir = sort.dir === "asc" ? 1 : -1;
     const cmp = (a: ClientRow, b: ClientRow): number => {
       switch (sort.key) {
+        case "country": {
+          // Empty countries sort last regardless of direction.
+          const ac = a.countryName ?? "";
+          const bc = b.countryName ?? "";
+          if (!ac && !bc) return 0;
+          if (!ac) return 1;
+          if (!bc) return -1;
+          return ac.localeCompare(bc) * dir;
+        }
         case "phone": {
           // Empty phones always sort last regardless of direction.
           const ap = a.phoneNumber ?? "";
@@ -113,6 +125,7 @@ export function ClientsTable({ rows }: { rows: ClientRow[] }) {
             <TableRow>
               <SortHead label="Client" k="name" sort={sort} onSort={toggleSort} />
               <TableHead>Account</TableHead>
+              <SortHead label="Country" k="country" sort={sort} onSort={toggleSort} />
               <SortHead label="Phone" k="phone" sort={sort} onSort={toggleSort} />
               <SortHead label="Active Capital" k="activeCapital" sort={sort} onSort={toggleSort} align="right" />
               <TableHead className="text-right">Available Withdrawal</TableHead>
@@ -144,6 +157,16 @@ export function ClientsTable({ rows }: { rows: ClientRow[] }) {
                   )}
                 </TableCell>
                 <TableCell className="font-mono text-xs">{c.accountNumber}</TableCell>
+                <TableCell className="whitespace-nowrap">
+                  {c.countryName ? (
+                    <span className="inline-flex items-center gap-1.5 text-sm">
+                      <span aria-hidden>{countryFlag(c.country ?? "")}</span>
+                      {c.countryName}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">—</span>
+                  )}
+                </TableCell>
                 <TableCell className="whitespace-nowrap">
                   {c.phoneNumber ? (
                     <div className="flex flex-col gap-1">
@@ -217,7 +240,7 @@ export function ClientsTable({ rows }: { rows: ClientRow[] }) {
             ))}
             {filtered.length === 0 && (
               <TableRow>
-                <TableCell colSpan={9} className="py-10 text-center text-muted-foreground">
+                <TableCell colSpan={10} className="py-10 text-center text-muted-foreground">
                   {q ? "No clients match your search." : "No clients yet. Click “Add Client” to get started."}
                 </TableCell>
               </TableRow>

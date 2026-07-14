@@ -38,7 +38,7 @@ export function ClientPhoneField({
 
   async function save() {
     if (!isValidPhoneNumber(num)) {
-      setError("10–11 digits required.");
+      setError("6–15 digits required.");
       return;
     }
     setSaving(true);
@@ -76,7 +76,7 @@ export function ClientPhoneField({
           </Select>
           <Input
             value={num}
-            onChange={(e) => setNum(e.target.value.replace(/\D/g, "").slice(0, 11))}
+            onChange={(e) => setNum(e.target.value.replace(/\D/g, "").slice(0, 15))}
             inputMode="numeric"
             placeholder="917 123 4567"
             className="h-9 w-40"

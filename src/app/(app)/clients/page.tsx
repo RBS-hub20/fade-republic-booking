@@ -8,6 +8,7 @@ import { prisma } from "@/lib/prisma";
 import { ensureFinanceSchemaOnce } from "@/lib/finance-schema";
 import { ensureUsernameSchemaOnce } from "@/lib/username";
 import { ensurePhoneSchemaOnce } from "@/lib/phone";
+import { ensureCountrySchemaOnce } from "@/lib/countries";
 import { getCapitalSummary, type CapitalSummary } from "@/lib/capital";
 
 export const dynamic = "force-dynamic";
@@ -26,10 +27,12 @@ export default async function ClientsPage() {
     string,
     { countryCode: string | null; phoneNumber: string | null; phoneVerified: boolean }
   >();
+  const countryByClient = new Map<string, { country: string | null; countryName: string | null }>();
   try {
     await ensureFinanceSchemaOnce(prisma);
     await ensureUsernameSchemaOnce(prisma);
     await ensurePhoneSchemaOnce(prisma);
+    await ensureCountrySchemaOnce(prisma);
     const users = await prisma.user.findMany({
       where: { clientId: { in: clients.map((c) => c.id) } },
       select: {
@@ -39,6 +42,8 @@ export default async function ClientsPage() {
         countryCode: true,
         phoneNumber: true,
         phoneVerified: true,
+        country: true,
+        countryName: true,
       },
     });
     const userByClient = new Map(users.map((u) => [u.clientId as string, u.id]));
@@ -49,6 +54,10 @@ export default async function ClientsPage() {
         countryCode: u.countryCode ?? null,
         phoneNumber: u.phoneNumber ?? null,
         phoneVerified: u.phoneVerified ?? false,
+      });
+      countryByClient.set(u.clientId, {
+        country: u.country ?? null,
+        countryName: u.countryName ?? null,
       });
     }
     const unlocks = await prisma.userUnlock
@@ -73,6 +82,7 @@ export default async function ClientsPage() {
     const activeCapital = cap ? cap.activeCapital + cap.maturedCapital : c.initialDeposit;
     const ul = unlockByClient.get(c.id);
     const ph = phoneByClient.get(c.id);
+    const co = countryByClient.get(c.id);
     return {
       id: c.id,
       name: c.name,
@@ -80,6 +90,8 @@ export default async function ClientsPage() {
       username: usernameByClient.get(c.id) ?? null,
       accountNumber: c.accountNumber,
       status: c.status,
+      country: co?.country ?? null,
+      countryName: co?.countryName ?? null,
       activeCapital,
       hasMatured: cap?.hasMatured ?? false,
       availableWithdrawal: cap?.availableWithdrawal ?? 0,

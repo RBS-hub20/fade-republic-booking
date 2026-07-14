@@ -10,6 +10,7 @@ import { prisma } from "@/lib/prisma";
 import { getCapitalSummary, addMonths, LOCK_MONTHS } from "@/lib/capital";
 import { getReferralBonusEvents } from "@/lib/referrals";
 import { getPayoutState } from "@/lib/payout-cap";
+import { ensureCountrySchemaOnce } from "@/lib/countries";
 import { toManilaDateKey } from "@/lib/performance";
 import type { ReportTxn } from "@/lib/pdf";
 import {
@@ -49,10 +50,18 @@ export default async function ReportPage({
   // Active Packages: locked-capital deposits with 6-month unlock windows.
   // Reuses the capital money-model so unlock dates match the wallet exactly.
   // Best-effort — a failure here must never break the rest of the statement.
+  await ensureCountrySchemaOnce(prisma).catch(() => {});
   const owner = await prisma.user
     .findFirst({
       where: { clientId: params.clientId },
-      select: { id: true, phoneNumber: true, countryCode: true, phoneVerified: true },
+      select: {
+        id: true,
+        phoneNumber: true,
+        countryCode: true,
+        phoneVerified: true,
+        country: true,
+        countryName: true,
+      },
     })
     .catch(() => null);
   const capital = await getCapitalSummary({
@@ -115,6 +124,8 @@ export default async function ReportPage({
           countryCode: owner?.countryCode ?? null,
           phoneNumber: owner?.phoneNumber ?? null,
           phoneVerified: owner?.phoneVerified ?? false,
+          country: owner?.country ?? null,
+          countryName: owner?.countryName ?? null,
           accountNumber: client.accountNumber,
           startDate: client.startDate.toISOString(),
           initialDeposit: client.initialDeposit,
