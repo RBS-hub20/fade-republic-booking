@@ -21,6 +21,7 @@ import {
   ShieldCheck,
   KeyRound,
   Mail,
+  UserCog,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -42,6 +43,7 @@ function navForRole(role: string, clientId: string | null): NavItem[] {
       { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
       { href: "/admin/performance", label: "Fund P&L", icon: Activity },
       { href: "/clients", label: "Clients", icon: Users },
+      { href: "/admin/users", label: "Users", icon: UserCog },
       { href: "/approvals", label: "Approvals", icon: CheckSquare },
       { href: "/admin/withdrawals", label: "Withdrawals", icon: ArrowUpFromLine },
       { href: "/admin/commissions", label: "Commissions", icon: Coins },

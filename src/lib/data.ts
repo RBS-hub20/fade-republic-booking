@@ -64,6 +64,8 @@ export async function getClientsWithBalance() {
       initialDeposit: c.initialDeposit,
       startDate: c.startDate,
       status: c.status,
+      country: c.country ?? null,
+      countryName: c.countryName ?? null,
       currentBalance: kpis.currentBalance,
       totalNetPnl: kpis.totalNetPnl,
     };

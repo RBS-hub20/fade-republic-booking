@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { recentTradingDays, randomDailyPercent, computeEquityCurve } from "@/lib/performance";
 import { CLIENT_STATUSES } from "@/lib/constants";
+import { normalizeCountry, countryName, ensureCountrySchemaOnce } from "@/lib/countries";
 
 export async function GET() {
   const clients = await prisma.client.findMany({ orderBy: { createdAt: "asc" } });
@@ -20,7 +21,7 @@ export async function POST(req: Request) {
   }
 
   const body = await req.json();
-  const { name, email, phone, accountNumber, initialDeposit, startDate, status } = body;
+  const { name, email, phone, accountNumber, initialDeposit, startDate, status, country } = body;
 
   if (!name || !email || !accountNumber) {
     return NextResponse.json(
@@ -32,14 +33,19 @@ export async function POST(req: Request) {
   const deposit = Number(initialDeposit) || 0;
   const start = startDate ? new Date(startDate) : new Date();
   const validStatus = CLIENT_STATUSES.includes(status) ? status : "ACTIVE";
+  // Country is optional on admin-created clients; default/normalize to a valid code.
+  const cleanCountry = country ? normalizeCountry(country) : null;
 
   try {
+    await ensureCountrySchemaOnce(prisma);
     const client = await prisma.client.create({
       data: {
         name,
         email,
         phone: phone || null,
         accountNumber,
+        country: cleanCountry,
+        countryName: cleanCountry ? countryName(cleanCountry) : null,
         initialDeposit: deposit,
         startDate: start,
         status: validStatus,

@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { CLIENT_STATUSES, STATUS_LABELS } from "@/lib/constants";
+import { COUNTRIES, DEFAULT_COUNTRY } from "@/lib/countries";
 
 export function AddClientDialog() {
   const router = useRouter();
@@ -66,6 +67,17 @@ export function AddClientDialog() {
               min="0"
             />
             <Field label="Start date" name="startDate" type="date" defaultValue={today} />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="country">Country</Label>
+            <Select id="country" name="country" defaultValue={DEFAULT_COUNTRY}>
+              {COUNTRIES.map((c) => (
+                <option key={c.code} value={c.code}>
+                  {c.flag} {c.name}
+                </option>
+              ))}
+            </Select>
           </div>
 
           <div className="space-y-1.5">

@@ -56,8 +56,7 @@ model User {
   // (see username-schema). usernameSet locks it after the one allowed change.
   username          String?
   usernameSet       Boolean  @default(false)
-  // Auto-assigned avatar (permanent). gender drives which of the 10 SVGs.
-  gender            String   @default("male")
+  // Auto-assigned avatar (permanent), picked deterministically from the user id.
   avatarType        String?
   // Cellphone (for account verification + urgent support). Nullable for
   // existing users; phoneVerified reserved for future OTP.
@@ -296,6 +295,10 @@ model Client {
   email          String   @unique
   phone          String?
   accountNumber  String   @unique
+  // Country of residence — mirrored from the owner User at signup, or set
+  // directly for admin-created clients. See src/lib/countries.ts.
+  country        String?
+  countryName    String?
   initialDeposit Float    @default(0)
   startDate      DateTime
   // enum: ClientStatus — ACTIVE | PAUSED | CLOSED

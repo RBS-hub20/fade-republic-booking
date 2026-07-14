@@ -14,7 +14,7 @@ import {
   isUsernameAvailable,
   ensureUsernameSchemaOnce,
 } from "@/lib/username";
-import { normalizeGender, avatarTypeFor, ensureAvatarSchemaOnce } from "@/lib/avatar";
+import { avatarTypeFor, ensureAvatarSchemaOnce } from "@/lib/avatar";
 import {
   normalizeCountryCode,
   normalizePhoneNumber,
@@ -64,9 +64,8 @@ export async function POST(req: Request) {
   const limited = enforce(req, "signup", 5, 60 * 60_000);
   if (limited) return limited;
 
-  const { name, email, password, ref, username, gender, countryCode, phoneNumber, country } =
+  const { name, email, password, ref, username, countryCode, phoneNumber, country } =
     await req.json().catch(() => ({}));
-  const cleanGender = normalizeGender(gender);
   const cleanCountryCode = normalizeCountryCode(countryCode);
   const cleanPhone = normalizePhoneNumber(phoneNumber);
   // Country of residence — derive display name + timezone server-side (the lib
@@ -152,6 +151,8 @@ export async function POST(req: Request) {
           // Full display number on the trading account (used by admin/reports).
           phone: formatFullPhone(cleanCountryCode, cleanPhone),
           accountNumber,
+          country: cleanCountry,
+          countryName: cleanCountryName,
           initialDeposit: 0,
           startDate: new Date(),
           status: "ACTIVE",
@@ -170,7 +171,6 @@ export async function POST(req: Request) {
           rootSponsorId: genealogy.rootSponsorId,
           username: cleanUsername,
           usernameSet: true, // new users choose their username at signup
-          gender: cleanGender,
           phoneNumber: cleanPhone,
           countryCode: cleanCountryCode,
           country: cleanCountry,
@@ -185,7 +185,7 @@ export async function POST(req: Request) {
     // Assign the permanent avatar (needs the generated id). Best-effort — the
     // tree also backfills any nulls.
     prisma.user
-      .update({ where: { id: user.id }, data: { avatarType: avatarTypeFor(cleanGender, user.id) } })
+      .update({ where: { id: user.id }, data: { avatarType: avatarTypeFor(user.id) } })
       .catch(() => {});
   } catch (e: any) {
     if (e?.code === "P2002") {

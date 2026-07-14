@@ -114,7 +114,7 @@ export async function GET() {
       referrals.withdrawalTable;
   }
 
-  // Genealogy readiness: username/gender/avatar columns + the downline
+  // Genealogy readiness: username/avatar columns + the downline
   // (sponsor) index that powers the network tree.
   const genealogy: { usernameCol: boolean; avatarCols: boolean; sponsorIndex: boolean } = {
     usernameCol: false,
@@ -123,7 +123,7 @@ export async function GET() {
   };
   if (db.connected) {
     try {
-      await prisma.user.findFirst({ select: { username: true, avatarType: true, gender: true } });
+      await prisma.user.findFirst({ select: { username: true, avatarType: true } });
       genealogy.usernameCol = true;
       genealogy.avatarCols = true;
     } catch {

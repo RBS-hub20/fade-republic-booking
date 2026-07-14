@@ -20,7 +20,6 @@ interface TreeNode {
   id: string;
   username: string | null;
   tier: string;
-  gender: string;
   avatarType: string | null;
   directCount: number;
   teamCount: number;

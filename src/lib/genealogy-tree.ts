@@ -7,7 +7,7 @@ import { prisma } from "./prisma";
 import { tierForBalance } from "./tiers";
 import { ensureReferralSchemaOnce } from "./referral-schema";
 import { ensureUsernameSchemaOnce } from "./username";
-import { ensureAvatarSchemaOnce, avatarTypeFor, normalizeGender } from "./avatar";
+import { ensureAvatarSchemaOnce, avatarTypeFor } from "./avatar";
 
 export const PAGE_SIZE = 20;
 
@@ -15,7 +15,6 @@ export interface TreeNode {
   id: string;
   username: string | null;
   tier: string;
-  gender: string;
   avatarType: string | null;
   directCount: number;
   teamCount: number;
@@ -39,18 +38,18 @@ export async function ensureTreeSchemaOnce(): Promise<void> {
   if (treeHealed) return;
   await ensureReferralSchemaOnce(prisma); // referralPath / referredById
   await ensureUsernameSchemaOnce(prisma); // username
-  await ensureAvatarSchemaOnce(prisma); // gender / avatarType / referredById index
+  await ensureAvatarSchemaOnce(prisma); // avatarType / referredById index (retires gender)
   treeHealed = true;
 }
 
 /** Fill avatarType for any user missing one (idempotent). */
 export async function backfillAvatars(): Promise<{ filled: number }> {
   await ensureTreeSchemaOnce();
-  const pending = await prisma.user.findMany({ where: { avatarType: null }, select: { id: true, gender: true } });
+  const pending = await prisma.user.findMany({ where: { avatarType: null }, select: { id: true } });
   let filled = 0;
   for (const u of pending) {
     await prisma.user
-      .update({ where: { id: u.id }, data: { avatarType: avatarTypeFor(normalizeGender(u.gender), u.id) } })
+      .update({ where: { id: u.id }, data: { avatarType: avatarTypeFor(u.id) } })
       .catch(() => {});
     filled += 1;
   }
@@ -70,7 +69,6 @@ export async function ensureAvatarsBackfilledOnce(): Promise<void> {
 type UserRow = {
   id: string;
   username: string | null;
-  gender: string;
   avatarType: string | null;
   createdAt: Date;
   clientId: string | null;
@@ -139,7 +137,6 @@ async function enrich(users: UserRow[]): Promise<TreeNode[]> {
       id: u.id,
       username: u.username,
       tier: tierForBalance(cap)?.name ?? "None",
-      gender: u.gender,
       avatarType: u.avatarType,
       directCount: direct,
       teamCount: teamCounts[i],
@@ -155,7 +152,6 @@ async function enrich(users: UserRow[]): Promise<TreeNode[]> {
 const CHILD_SELECT = {
   id: true,
   username: true,
-  gender: true,
   avatarType: true,
   createdAt: true,
   clientId: true,

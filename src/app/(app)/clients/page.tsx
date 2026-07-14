@@ -90,8 +90,10 @@ export default async function ClientsPage() {
       username: usernameByClient.get(c.id) ?? null,
       accountNumber: c.accountNumber,
       status: c.status,
-      country: co?.country ?? null,
-      countryName: co?.countryName ?? null,
+      // Prefer the Client's own country (admin-set / mirrored), fall back to
+      // the owner User's country for legacy signups.
+      country: c.country ?? co?.country ?? null,
+      countryName: c.countryName ?? co?.countryName ?? null,
       activeCapital,
       hasMatured: cap?.hasMatured ?? false,
       availableWithdrawal: cap?.availableWithdrawal ?? 0,

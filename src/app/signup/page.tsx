@@ -30,7 +30,6 @@ function SignupForm() {
   >({ state: "idle" });
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
-  const [gender, setGender] = useState<"male" | "female" | "">("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -87,10 +86,6 @@ function SignupForm() {
       setError("That username is already taken.");
       return;
     }
-    if (!gender) {
-      setError("Please select your gender.");
-      return;
-    }
     if (!isValidPhoneNumber(phoneNumber)) {
       setError("Please enter a valid cellphone number (6–15 digits).");
       return;
@@ -107,7 +102,6 @@ function SignupForm() {
         name,
         email,
         username,
-        gender,
         password,
         ref,
         countryCode: selectedCountry.dialCode,
@@ -255,26 +249,6 @@ function SignupForm() {
                 {uStatus.state === "idle" && (
                   <p className="text-xs text-muted-foreground">3–30 chars: a–z, 0–9, underscore. You can change it once later.</p>
                 )}
-              </div>
-              <div className="space-y-1.5">
-                <Label>Gender</Label>
-                <div className="grid grid-cols-2 gap-2">
-                  {(["male", "female"] as const).map((g) => (
-                    <button
-                      key={g}
-                      type="button"
-                      onClick={() => setGender(g)}
-                      className={`rounded-md border px-3 py-2 text-sm font-medium capitalize transition-colors ${
-                        gender === g
-                          ? "border-gold-400 bg-gold-400/10 text-gold-200"
-                          : "border-border text-muted-foreground hover:bg-accent"
-                      }`}
-                    >
-                      {g}
-                    </button>
-                  ))}
-                </div>
-                <p className="text-xs text-muted-foreground">Used to pick your profile avatar.</p>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">

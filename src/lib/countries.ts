@@ -122,6 +122,9 @@ export const COUNTRY_DDL: string[] = [
   `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "country" TEXT`,
   `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "countryName" TEXT`,
   `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "timezone" TEXT`,
+  // Client mirrors country for admin display + admin-created clients (no User).
+  `ALTER TABLE "Client" ADD COLUMN IF NOT EXISTS "country" TEXT`,
+  `ALTER TABLE "Client" ADD COLUMN IF NOT EXISTS "countryName" TEXT`,
 ];
 
 let schemaHealed = false;

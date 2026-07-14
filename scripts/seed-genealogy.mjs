@@ -43,8 +43,8 @@ async function main() {
     seq += 1;
     const id = `seedg_${level}_${seq}_${Math.random().toString(36).slice(2, 8)}`;
     const clientId = `seedgc_${seq}_${Math.random().toString(36).slice(2, 8)}`;
-    const gender = Math.random() < 0.5 ? "male" : "female";
-    const avatarType = `${gender}-${bucket5(id)}`;
+    // avatarType is just one of the 10 avatar assets — no longer gender-linked.
+    const avatarType = `${Math.random() < 0.5 ? "male" : "female"}-${bucket5(id)}`;
     const username = `trader_${level}_${seq}`;
     const email = `${username}@${DOMAIN}`;
     const deposit = pick(TIERS);
@@ -58,7 +58,7 @@ async function main() {
     const rootSponsorId = parent ? (parent.rootSponsorId ?? parent.id) : null;
 
     clients.push({ id: clientId, name: username, email, accountNumber: `SG-${seq}`, initialDeposit: 0, startDate: createdAt, status, createdAt, updatedAt: createdAt });
-    users.push({ id, email, name: username, passwordHash: "seed", role: "client", emailVerified: true, clientId, referredById, referralPath, referralDepth, rootSponsorId, username, usernameSet: false, gender, avatarType, commissionBalance: 0, createdAt, updatedAt: createdAt });
+    users.push({ id, email, name: username, passwordHash: "seed", role: "client", emailVerified: true, clientId, referredById, referralPath, referralDepth, rootSponsorId, username, usernameSet: false, avatarType, commissionBalance: 0, createdAt, updatedAt: createdAt });
     deposits.push({ clientId, type: "DEPOSIT", amount: deposit, method: "USDT_TRC20", status: "APPROVED", date: createdAt, createdAt });
     perfs.push({ clientId, date: createdAt, dailyPercent: Math.round((0.3 + Math.random() * 0.2) * 100) / 100, balanceEOD: deposit + pnlUsd, pnlUsd, notes: "server:1.5" });
     return { id, referralPath, referralDepth, rootSponsorId };
