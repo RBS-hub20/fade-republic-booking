@@ -174,6 +174,8 @@ model Withdrawal {
 
   @@index([userId, status])
   @@index([status])
+  // Operator-created (Neon): status-filtered, newest-first withdrawal scans.
+  @@index([status, createdAt(sort: Desc)], map: "idx_withdrawals_status")
 }
 
 // A user's action on a MATURED capital deposit (6-month time lock).
@@ -343,6 +345,8 @@ model Transaction {
   @@index([clientId, status])
   // Admin pending-request aggregates (groupBy type WHERE status = 'PENDING').
   @@index([status, type])
+  // Operator-created (Neon): status-filtered, newest-first scans.
+  @@index([status, createdAt(sort: Desc)], map: "idx_tx_status_created")
 }
 
 model DailyPerformance {
@@ -361,4 +365,6 @@ model DailyPerformance {
   @@unique([clientId, date])
   @@index([clientId])
   @@index([date])
+  // Operator-created (Neon): per-client, newest-day-first performance scans.
+  @@index([clientId, date(sort: Desc)], map: "idx_daily_perf_client_date")
 }
