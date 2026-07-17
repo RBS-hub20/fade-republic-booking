@@ -4,7 +4,7 @@ import { ArrowDownToLine, ArrowUpFromLine } from "lucide-react";
 import { PageHeader } from "@/components/shell/page-header";
 import { DashboardView, type DashboardDataset } from "@/components/dashboard/dashboard-view";
 import { KpiCard } from "@/components/dashboard/kpi-card";
-import { getPortfolioPerformance, getClientPerformance } from "@/lib/data";
+import { getAdminDashboardData, getClientPerformance } from "@/lib/data";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { formatUsd } from "@/lib/utils";
@@ -221,8 +221,10 @@ export default async function DashboardPage() {
   }
 
   // --- Admin view: portfolio + every client (monitoring) -------------------
-  const portfolio = await getPortfolioPerformance();
-  const clients = await prisma.client.findMany({ orderBy: { createdAt: "asc" } });
+  // Single bulk read computes the portfolio aggregate AND every client's curve
+  // (replaces getPortfolioPerformance + an N+1 getClientPerformance per client).
+  const admin = await getAdminDashboardData();
+  const portfolio = admin.portfolio;
 
   // Pending-request aggregates for the admin KPI cards.
   const pendingAgg = await prisma.transaction.groupBy({
@@ -243,19 +245,13 @@ export default async function DashboardPage() {
       curve: portfolio.curve,
       kpis: portfolio.kpis,
     },
+    ...admin.clients.map((c) => ({
+      id: c.id,
+      label: `${c.name} · ${c.accountNumber}`,
+      curve: c.curve,
+      kpis: c.kpis,
+    })),
   ];
-
-  for (const c of clients) {
-    const perf = await getClientPerformance(c.id);
-    if (perf) {
-      datasets.push({
-        id: c.id,
-        label: `${c.name} · ${c.accountNumber}`,
-        curve: perf.curve,
-        kpis: perf.kpis,
-      });
-    }
-  }
 
   return (
     <>

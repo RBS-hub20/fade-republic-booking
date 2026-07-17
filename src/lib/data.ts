@@ -178,3 +178,80 @@ export async function getPortfolioPerformance() {
 
   return { curve, kpis, clientCount: clients.length };
 }
+
+export interface AdminClientDataset {
+  id: string;
+  name: string;
+  accountNumber: string;
+  curve: EquityPoint[];
+  kpis: PerformanceKpis;
+}
+
+/**
+ * Everything the admin dashboard needs — the portfolio aggregate AND each
+ * client's own curve/KPIs — from a SINGLE bulk read (clients + approved
+ * transactions + daily performances). Replaces getPortfolioPerformance() plus
+ * an N+1 loop of getClientPerformance() per client (42 heavy loads → 1). Purely
+ * read-only; identical curve/KPI math, just computed once over shared data.
+ */
+export async function getAdminDashboardData(): Promise<{
+  portfolio: { curve: EquityPoint[]; kpis: PerformanceKpis; clientCount: number };
+  clients: AdminClientDataset[];
+}> {
+  await ensureClientColumns();
+  const clients = await prisma.client.findMany({
+    orderBy: { createdAt: "asc" },
+    include: {
+      transactions: { where: { status: "APPROVED" }, orderBy: { date: "asc" } },
+      dailyPerformances: { orderBy: { date: "asc" } },
+    },
+  });
+
+  const aggregateByDate = new Map<string, EquityPoint>();
+  let totalInitial = 0;
+  const aggLedger: LedgerEntry[] = [];
+  const perClient: AdminClientDataset[] = [];
+
+  for (const c of clients) {
+    totalInitial += c.initialDeposit;
+    const ledger = c.transactions.map((t) => ({ date: t.date, type: t.type, amount: t.amount }));
+    aggLedger.push(...ledger);
+
+    const curve = computeEquityCurve({
+      initialDeposit: c.initialDeposit,
+      startDate: c.startDate,
+      ledger,
+      // Thread the holiday flag exactly as getClientPerformance does, so the
+      // per-client curve (incl. the "no trading" markers) is byte-identical.
+      performances: c.dailyPerformances.map((p) => ({
+        date: p.date,
+        dailyPercent: p.dailyPercent,
+        noTrading: /no-trading/.test(p.notes ?? ""),
+      })),
+    });
+    const kpis = computeKpis({ initialDeposit: c.initialDeposit, ledger, curve });
+    perClient.push({ id: c.id, name: c.name, accountNumber: c.accountNumber, curve, kpis });
+
+    for (const point of curve) {
+      const existing = aggregateByDate.get(point.date);
+      if (existing) {
+        existing.balance += point.balance;
+        existing.pnl += point.pnl;
+        existing.deposits += point.deposits;
+        existing.withdrawals += point.withdrawals;
+      } else {
+        // Portfolio aggregate carries no holiday flag (matches the prior
+        // getPortfolioPerformance output, which never set it).
+        aggregateByDate.set(point.date, { ...point, noTrading: false });
+      }
+    }
+  }
+
+  const portfolioCurve = Array.from(aggregateByDate.values()).sort((a, b) => a.date.localeCompare(b.date));
+  const portfolioKpis = computeKpis({ initialDeposit: totalInitial, ledger: aggLedger, curve: portfolioCurve });
+
+  return {
+    portfolio: { curve: portfolioCurve, kpis: portfolioKpis, clientCount: clients.length },
+    clients: perClient,
+  };
+}
