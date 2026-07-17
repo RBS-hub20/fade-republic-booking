@@ -37,7 +37,69 @@ export default async function DashboardPage() {
         </>
       );
     }
-    const perf = await getClientPerformance(session.clientId);
+    // Narrowed by the guard above; capture as a local so the type survives into
+    // the nested async block below (control-flow narrowing doesn't cross closures).
+    const clientId = session.clientId;
+
+    // Fetch the signed-in user ONCE (needed by both the referral panel and the
+    // "claim your @username" banner — previously two separate round trips).
+    const me = session.userId
+      ? await prisma.user
+          .findUnique({
+            where: { id: session.userId },
+            select: {
+              id: true,
+              name: true,
+              referralCode: true,
+              commissionBalance: true,
+              clientId: true,
+              usernameSet: true,
+            },
+          })
+          .catch(() => null)
+      : null;
+
+    // Load the four INDEPENDENT sections concurrently instead of serially — this
+    // is the client-side "lean" win: ~25 sequential round trips collapse to one
+    // wave (bounded by the slowest block, not their sum), given connection_limit
+    // > 1. Each block self-guards and falls back to its prior default, so the
+    // dashboard still renders fully if any piece is unavailable — behavior is
+    // unchanged, only the concurrency differs.
+    const [perf, referral, capitalBundle, payout] = await Promise.all([
+      getClientPerformance(session.clientId).catch((err) => {
+        console.error("[dashboard] performance unavailable:", err);
+        return null;
+      }),
+      REFERRALS_ENABLED && me
+        ? getReferralSummary(me).catch((err) => {
+            console.error("[dashboard] referral summary unavailable:", err);
+            return null;
+          })
+        : Promise.resolve(null),
+      (async (): Promise<{
+        capital: Awaited<ReturnType<typeof getCapitalSummary>> | null;
+        withdrawals: any[];
+      }> => {
+        if (!session.userId) return { capital: null, withdrawals: [] };
+        try {
+          await ensureFinanceSchemaOnce(prisma);
+          const capital = await getCapitalSummary({ clientId, userId: session.userId });
+          const withdrawals = await prisma.withdrawal.findMany({
+            where: { userId: session.userId },
+            orderBy: { createdAt: "desc" },
+            take: 25,
+          });
+          return { capital, withdrawals };
+        } catch (err) {
+          console.error("[dashboard] capital summary unavailable:", err);
+          return { capital: null, withdrawals: [] };
+        }
+      })(),
+      session.userId && session.clientId
+        ? getPayoutState(session.userId, session.clientId).catch(() => null as PayoutState | null)
+        : Promise.resolve(null as PayoutState | null),
+    ]);
+
     const datasets: DashboardDataset[] = perf
       ? [
           {
@@ -48,44 +110,8 @@ export default async function DashboardPage() {
           },
         ]
       : [];
-
-    // Referral program data for this user. Gated by the feature flag and wrapped
-    // defensively: if referrals are disabled OR the columns/tables aren't
-    // migrated yet, the dashboard still renders fully (just without the referral
-    // panel) instead of 500-ing.
-    let referral = null;
-    if (REFERRALS_ENABLED) {
-      try {
-        const me = session.userId
-          ? await prisma.user.findUnique({
-              where: { id: session.userId },
-              select: { id: true, name: true, referralCode: true, commissionBalance: true, clientId: true },
-            })
-          : null;
-        referral = me ? await getReferralSummary(me) : null;
-      } catch (err) {
-        console.error("[dashboard] referral summary unavailable:", err);
-      }
-    }
-
-    // Capital-lock + Available Withdrawal money model (defensive: never 500 the
-    // dashboard if the finance tables aren't migrated yet).
-    let capital = null;
-    let withdrawals: any[] = [];
-    if (session.userId) {
-      try {
-        await ensureFinanceSchemaOnce(prisma);
-        capital = await getCapitalSummary({ clientId: session.clientId, userId: session.userId });
-        withdrawals = await prisma.withdrawal.findMany({
-          where: { userId: session.userId },
-          orderBy: { createdAt: "desc" },
-          take: 25,
-        });
-      } catch (err) {
-        console.error("[dashboard] capital summary unavailable:", err);
-      }
-    }
-
+    const capital = capitalBundle.capital;
+    const withdrawals = capitalBundle.withdrawals;
     const k = perf?.kpis;
 
     // INACTIVE account: funded before but all locked capital has since been
@@ -95,33 +121,12 @@ export default async function DashboardPage() {
     const isInactive =
       remainingPrincipal !== null && remainingPrincipal <= 0 && (k?.totalDeposits ?? 0) > 0;
 
-    // 5x payout-cap state (all earnings vs remaining capital × 5). Derived and
-    // synced to the tracking cache; degrades to null so the dashboard never
-    // breaks if the payout table isn't migrated yet.
-    let payout: PayoutState | null = null;
-    if (session.userId && session.clientId) {
-      try {
-        payout = await getPayoutState(session.userId, session.clientId);
-        void syncPayoutTracking(session.userId, payout);
-      } catch {
-        payout = null;
-      }
-    }
+    // Sync the 5x payout-cap tracking cache in the background (unchanged;
+    // fire-and-forget, never blocks the render).
+    if (payout && session.userId) void syncPayoutTracking(session.userId, payout);
     const showCapWarning = payout != null && !payout.capped && payout.status === "ACTIVE" && payout.pct >= 80;
 
-    // Show the "claim your @username" banner to users who haven't set one yet.
-    let showUsernameBanner = false;
-    if (session.userId) {
-      try {
-        const u = await prisma.user.findUnique({
-          where: { id: session.userId },
-          select: { usernameSet: true },
-        });
-        showUsernameBanner = u ? !u.usernameSet : false;
-      } catch {
-        /* username column not migrated yet — skip the banner */
-      }
-    }
+    const showUsernameBanner = me ? !me.usernameSet : false;
 
     return (
       <>
