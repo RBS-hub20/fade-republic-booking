@@ -29,6 +29,16 @@ export async function runDdlBatch(
   db: RawRunner,
   statements: readonly string[]
 ): Promise<DdlResult> {
+  // Opt-out: when the schema is provisioned at build time (`prisma db push`
+  // over DIRECT_URL), the runtime self-heal is redundant. Skipping it keeps
+  // schema DDL — which takes ACCESS EXCLUSIVE locks and, over a PgBouncer
+  // transaction pooler with connection_limit=1, serializes/hangs hot paths
+  // like login — entirely off the request path. Set SKIP_RUNTIME_DB_HEAL=1
+  // in prod once you've confirmed the build migration runs.
+  if (process.env.SKIP_RUNTIME_DB_HEAL === "1" || process.env.SKIP_RUNTIME_DB_HEAL === "true") {
+    return { applied: 0, failures: [] };
+  }
+
   const stmts = statements.map((s) => s.trim().replace(/;\s*$/, "")).filter(Boolean);
   if (stmts.length === 0) return { applied: 0, failures: [] };
 
