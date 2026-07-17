@@ -133,6 +133,13 @@ export async function backfillUsernames(): Promise<{ scanned: number; filled: nu
 let backfilled = false;
 export async function ensureUsernamesBackfilledOnce(): Promise<void> {
   if (backfilled) return;
+  // Honor the same kill switch as the schema guards: when runtime heal is off
+  // (schema managed at build), skip this background backfill so it never
+  // competes for the instance's DB connection on the login / page-load path.
+  if (process.env.SKIP_RUNTIME_DB_HEAL === "1" || process.env.SKIP_RUNTIME_DB_HEAL === "true") {
+    backfilled = true;
+    return;
+  }
   try {
     await backfillUsernames();
     backfilled = true;
