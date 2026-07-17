@@ -7,6 +7,8 @@ import { runMaturityNotifications } from "@/lib/capital";
 import { recomputeAllUnlocks, runMonthlyReferralBonus } from "@/lib/referrals";
 import { ensureFinanceSchemaOnce } from "@/lib/finance-schema";
 import { notifyDailyPerfIssue } from "@/lib/mailers";
+import { backfillUsernames } from "@/lib/username";
+import { backfillAvatars } from "@/lib/genealogy-tree";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -74,6 +76,18 @@ async function handle(req: Request) {
     result.monthlyBonus = await runMonthlyReferralBonus();
   } catch (err: any) {
     result.monthlyBonus = { ok: false, error: err?.message?.split("\n")[0] ?? "failed" };
+  }
+  // Username/avatar backfill for legacy users — moved OFF the login / page-load
+  // path to here (once daily, server-side) so it never competes for a request's
+  // DB connection. Best-effort; the direct backfill* helpers run regardless of
+  // SKIP_RUNTIME_DB_HEAL (which only gates the lazy per-request wrappers).
+  try {
+    result.backfills = {
+      usernames: await backfillUsernames(),
+      avatars: await backfillAvatars(),
+    };
+  } catch (err: any) {
+    result.backfills = { ok: false, error: err?.message?.split("\n")[0] ?? "failed" };
   }
   return NextResponse.json(result);
 }

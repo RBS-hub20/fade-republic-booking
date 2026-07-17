@@ -5,10 +5,9 @@ import { getClientPerformance } from "@/lib/data";
 import { tierForBalance } from "@/lib/tiers";
 import { AppShell, type HeaderTier } from "@/components/shell/app-shell";
 import { ensureReferralSchemaOnce } from "@/lib/referral-schema";
-import { ensureUsernameSchemaOnce, ensureUsernamesBackfilledOnce } from "@/lib/username";
+import { ensureUsernameSchemaOnce } from "@/lib/username";
 import { ensureAvatarSchemaOnce } from "@/lib/avatar";
 import { ensurePhoneSchemaOnce } from "@/lib/phone";
-import { ensureAvatarsBackfilledOnce } from "@/lib/genealogy-tree";
 
 export const dynamic = "force-dynamic";
 
@@ -30,9 +29,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   } catch {
     /* ignore — the queries below are all guarded too */
   }
-  // Fill username/avatar for existing users (once per process, fire-and-forget).
-  void ensureUsernamesBackfilledOnce();
-  void ensureAvatarsBackfilledOnce();
+  // Username/avatar backfill for legacy users now runs in the daily cron
+  // (see /api/cron/daily) — off the page-load path entirely.
 
   // Verification status drives the "verify your email" banner.
   let emailVerified = true;

@@ -111,6 +111,8 @@ model ReferralCommission {
 
   @@index([referrerId])
   @@index([referredUserId])
+  // Lifetime PAID-commission sums per earner (payout-cap + referral summaries).
+  @@index([referrerId, status])
 }
 
 // AI support chat transcript (both sides), retained for admin review.
@@ -189,6 +191,8 @@ model CapitalAction {
 
   @@index([transactionId])
   @@index([userId])
+  // Released-principal lookups by client (daily-perf engine + capital summaries).
+  @@index([clientId])
 }
 
 // 2nd-level unlock status per user (needs 3+ qualifying direct referrals).
@@ -335,6 +339,10 @@ model Transaction {
 
   @@index([clientId])
   @@index([date])
+  // Per-client approved-transaction loads (dashboard / reports / curves).
+  @@index([clientId, status])
+  // Admin pending-request aggregates (groupBy type WHERE status = 'PENDING').
+  @@index([status, type])
 }
 
 model DailyPerformance {

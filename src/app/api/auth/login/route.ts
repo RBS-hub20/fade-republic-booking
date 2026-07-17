@@ -4,7 +4,7 @@ import { SESSION_COOKIE, type Session, type Role } from "@/lib/auth-config";
 import { encodeSession } from "@/lib/session";
 import { verifyPassword, hashPassword } from "@/lib/password";
 import { enforce } from "@/lib/rate-limit";
-import { ensureUsernameSchemaOnce, ensureUsernamesBackfilledOnce } from "@/lib/username";
+import { ensureUsernameSchemaOnce } from "@/lib/username";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -110,9 +110,7 @@ export async function POST(req: Request) {
     );
   }
 
-  // One-time backfill so existing users get a username (and the claim banner).
-  // Fire-and-forget — never delays or blocks login.
-  void ensureUsernamesBackfilledOnce();
+  // (Username backfill for legacy users runs in the daily cron, not on login.)
 
   const session: Session = {
     userId: user.id,
