@@ -20,8 +20,14 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  // Pooled endpoint (e.g. Neon/PgBouncer with ?pgbouncer=true&connection_limit=1)
+  // for runtime queries.
+  url       = env("DATABASE_URL")
+  // Direct (non-pooled) endpoint for `prisma db push` / migrations, which can't
+  // run over a transaction pooler. db-deploy.mjs defaults this to DATABASE_URL
+  // when unset (local dev / no pooler), so it's always resolvable.
+  directUrl = env("DIRECT_URL")
 }
 
 model User {

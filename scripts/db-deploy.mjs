@@ -34,6 +34,13 @@ const childEnv = {
   PATH: `${binDir}${delimiter}${process.env.PATH ?? ""}`,
 };
 
+// The schema references env("DIRECT_URL") for `prisma db push`/generate. When no
+// separate direct endpoint is configured (local dev / no pooler), fall back to
+// DATABASE_URL so those commands never fail on a missing env var.
+if (!childEnv.DIRECT_URL && childEnv.DATABASE_URL) {
+  childEnv.DIRECT_URL = childEnv.DATABASE_URL;
+}
+
 function run(cmd, extraEnv = {}) {
   console.log(`▸ ${cmd}`);
   execSync(cmd, { stdio: "inherit", cwd: root, env: { ...childEnv, ...extraEnv } });
