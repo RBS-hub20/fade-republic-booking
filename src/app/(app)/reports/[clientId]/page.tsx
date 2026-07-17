@@ -33,7 +33,25 @@ export default async function ReportPage({
   // Clients may only view their own statement.
   if (!isAdmin && session.clientId !== params.clientId) redirect("/dashboard");
 
-  const perf = await getClientPerformance(params.clientId);
+  // Wave 1: performance and the owner User are independent — load concurrently.
+  // (owner drives the capital / referral-bonus / payout queries below.)
+  await ensureCountrySchemaOnce(prisma).catch(() => {});
+  const [perf, owner] = await Promise.all([
+    getClientPerformance(params.clientId),
+    prisma.user
+      .findFirst({
+        where: { clientId: params.clientId },
+        select: {
+          id: true,
+          phoneNumber: true,
+          countryCode: true,
+          phoneVerified: true,
+          country: true,
+          countryName: true,
+        },
+      })
+      .catch(() => null),
+  ]);
   if (!perf || !perf.client) notFound();
 
   const { client, curve, kpis } = perf;
@@ -47,27 +65,24 @@ export default async function ReportPage({
     notes: t.notes,
   }));
 
+  // Wave 2: capital (Active Packages), referral-bonus events, and the 5x
+  // payout-cap state all depend only on the owner — load them concurrently.
+  // Each self-guards so a single failure never breaks the rest of the statement.
+  const [capital, referralBonuses, payoutCapped] = await Promise.all([
+    getCapitalSummary({
+      clientId: params.clientId,
+      userId: owner?.id ?? session.userId ?? "",
+    }).catch(() => null),
+    owner?.id ? getReferralBonusEvents(owner.id).catch(() => []) : Promise.resolve([]),
+    owner?.id
+      ? getPayoutState(owner.id, params.clientId)
+          .then((s) => s.capped)
+          .catch(() => false)
+      : Promise.resolve(false),
+  ]);
+
   // Active Packages: locked-capital deposits with 6-month unlock windows.
   // Reuses the capital money-model so unlock dates match the wallet exactly.
-  // Best-effort — a failure here must never break the rest of the statement.
-  await ensureCountrySchemaOnce(prisma).catch(() => {});
-  const owner = await prisma.user
-    .findFirst({
-      where: { clientId: params.clientId },
-      select: {
-        id: true,
-        phoneNumber: true,
-        countryCode: true,
-        phoneVerified: true,
-        country: true,
-        countryName: true,
-      },
-    })
-    .catch(() => null);
-  const capital = await getCapitalSummary({
-    clientId: params.clientId,
-    userId: owner?.id ?? session.userId ?? "",
-  }).catch(() => null);
   const packages: PackageRow[] = (capital?.deposits ?? []).map((d) => {
     const tier = tierForPackageAmount(d.amount);
     return {
@@ -86,19 +101,6 @@ export default async function ReportPage({
       cooling: d.cooling,
     };
   });
-
-  // Referral bonus events (L1 + L2) to interleave into the Daily Performance
-  // Log as "+$X.XX Referral Bonus from @user" entries.
-  const referralBonuses = owner?.id
-    ? await getReferralBonusEvents(owner.id).catch(() => [])
-    : [];
-
-  // 5x payout cap state — drives the "CAPPED — $0.00" notice in the daily log.
-  const payoutCapped = owner?.id
-    ? await getPayoutState(owner.id, params.clientId)
-        .then((s) => s.capped)
-        .catch(() => false)
-    : false;
 
   return (
     <>
