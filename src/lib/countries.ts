@@ -13,6 +13,8 @@
  * countries (name "Other", bare "+" dial code, UTC timezone).
  */
 
+import { runDdlBatch, type RawRunner } from "./schema-ddl";
+
 export interface Country {
   code: string;
   flag: string;
@@ -116,8 +118,6 @@ export function countryTimezone(code: string): string {
 }
 
 // --- Runtime schema self-heal (User country columns) ------------------------
-type RawRunner = { $executeRawUnsafe: (sql: string) => Promise<unknown> };
-
 export const COUNTRY_DDL: string[] = [
   `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "country" TEXT`,
   `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "countryName" TEXT`,
@@ -130,10 +130,7 @@ export const COUNTRY_DDL: string[] = [
 let schemaHealed = false;
 export async function ensureCountrySchemaOnce(db: RawRunner): Promise<void> {
   if (schemaHealed) return;
-  try {
-    for (const sql of COUNTRY_DDL) await db.$executeRawUnsafe(sql);
-    schemaHealed = true;
-  } catch (e) {
-    console.error("[country-schema] self-heal failed:", e);
-  }
+  const { failures } = await runDdlBatch(db, COUNTRY_DDL);
+  if (failures.length === 0) schemaHealed = true;
+  else console.error("[country-schema] self-heal incomplete:", failures);
 }

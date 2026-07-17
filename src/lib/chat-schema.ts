@@ -4,7 +4,7 @@
  * can't always reach the DB over DIRECT_URL, so build-time migrations may not
  * apply. The first chat request ensures the table exists.
  */
-type RawRunner = { $executeRawUnsafe: (sql: string) => Promise<unknown> };
+import { runDdlBatch, type RawRunner } from "./schema-ddl";
 
 export const CHAT_DDL: string[] = [
   `CREATE TABLE IF NOT EXISTS "ChatMessage" (
@@ -22,14 +22,7 @@ export const CHAT_DDL: string[] = [
 let schemaHealed = false;
 export async function ensureChatSchemaOnce(db: RawRunner): Promise<void> {
   if (schemaHealed) return;
-  let allOk = true;
-  for (const sql of CHAT_DDL) {
-    try {
-      await db.$executeRawUnsafe(sql);
-    } catch (e) {
-      allOk = false;
-      console.error("[chat-schema] statement failed:", e);
-    }
-  }
-  if (allOk) schemaHealed = true;
+  const { failures } = await runDdlBatch(db, CHAT_DDL);
+  if (failures.length === 0) schemaHealed = true;
+  else console.error("[chat-schema] self-heal incomplete:", failures);
 }

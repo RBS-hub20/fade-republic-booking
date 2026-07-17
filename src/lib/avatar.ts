@@ -8,6 +8,8 @@
  * values keep rendering unchanged.
  */
 
+import { runDdlBatch } from "./schema-ddl";
+
 /** The 10 avatar asset ids (filenames in /public/avatars, sans extension). */
 export const AVATARS: string[] = [
   "male-1", "male-2", "male-3", "male-4", "male-5",
@@ -47,14 +49,7 @@ export const AVATAR_DDL: string[] = [
 let schemaHealed = false;
 export async function ensureAvatarSchemaOnce(db: RawRunner): Promise<void> {
   if (schemaHealed) return;
-  let allOk = true;
-  for (const sql of AVATAR_DDL) {
-    try {
-      await db.$executeRawUnsafe(sql);
-    } catch (e) {
-      allOk = false;
-      console.error("[avatar-schema] statement failed:", e);
-    }
-  }
-  if (allOk) schemaHealed = true;
+  const { failures } = await runDdlBatch(db, AVATAR_DDL);
+  if (failures.length === 0) schemaHealed = true;
+  else console.error("[avatar-schema] self-heal incomplete:", failures);
 }

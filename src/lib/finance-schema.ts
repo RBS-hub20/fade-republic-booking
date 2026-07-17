@@ -4,7 +4,7 @@
  * Vercel build can't always reach the DB over DIRECT_URL, so build-time
  * migrations may not apply. The first finance request ensures these exist.
  */
-type RawRunner = { $executeRawUnsafe: (sql: string) => Promise<unknown> };
+import { runDdlBatch, type RawRunner } from "./schema-ddl";
 
 export const FINANCE_DDL: string[] = [
   `CREATE TABLE IF NOT EXISTS "Withdrawal" (
@@ -41,14 +41,7 @@ export const FINANCE_DDL: string[] = [
 let schemaHealed = false;
 export async function ensureFinanceSchemaOnce(db: RawRunner): Promise<void> {
   if (schemaHealed) return;
-  let allOk = true;
-  for (const sql of FINANCE_DDL) {
-    try {
-      await db.$executeRawUnsafe(sql);
-    } catch (e) {
-      allOk = false;
-      console.error("[finance-schema] statement failed:", e);
-    }
-  }
-  if (allOk) schemaHealed = true;
+  const { failures } = await runDdlBatch(db, FINANCE_DDL);
+  if (failures.length === 0) schemaHealed = true;
+  else console.error("[finance-schema] self-heal incomplete:", failures);
 }

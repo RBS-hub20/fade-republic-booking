@@ -16,6 +16,7 @@
  */
 import { prisma } from "./prisma";
 import { getRemainingPrincipal } from "./capital";
+import { runDdlBatch } from "./schema-ddl";
 
 export const PAYOUT_MULTIPLIER = 5;
 const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -54,8 +55,9 @@ let schemaHealed = false;
 export async function ensurePayoutSchemaOnce(): Promise<void> {
   if (schemaHealed) return;
   try {
-    for (const sql of PAYOUT_DDL) await prisma.$executeRawUnsafe(sql);
-    schemaHealed = true;
+    const { failures } = await runDdlBatch(prisma, PAYOUT_DDL);
+    if (failures.length === 0) schemaHealed = true;
+    else console.error("[payout-schema] self-heal incomplete:", failures);
   } catch (e) {
     console.error("[payout-schema] self-heal failed:", e);
   }

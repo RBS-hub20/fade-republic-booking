@@ -4,7 +4,6 @@ import { SESSION_COOKIE, type Session, type Role } from "@/lib/auth-config";
 import { encodeSession } from "@/lib/session";
 import { verifyPassword, hashPassword } from "@/lib/password";
 import { enforce } from "@/lib/rate-limit";
-import { getClientPerformance } from "@/lib/data";
 import { ensureUsernameSchemaOnce, ensureUsernamesBackfilledOnce } from "@/lib/username";
 
 export const runtime = "nodejs";
@@ -125,12 +124,30 @@ export async function POST(req: Request) {
     iat: Date.now(), // immutable login time → drives the hard session cap
   };
 
-  // Landing target: a client who hasn't funded yet (balance $0 → no tier) lands
-  // on QX Tiers to pick a package; everyone else goes to the dashboard.
+  // Landing target: a client who hasn't funded yet lands on QX Tiers to pick a
+  // package; everyone else goes to the dashboard. This is a binary funded/not
+  // gate, so we use a cheap "is this client funded?" probe instead of loading
+  // every transaction + daily-performance row and rebuilding the equity curve
+  // (keeps login fast, even cold). Funded = a positive opening deposit OR at
+  // least one approved deposit transaction. Explicit `select` also avoids
+  // touching newer Client columns.
   let redirectTo = "/dashboard";
   if (user.role === "client" && user.clientId) {
-    const perf = await getClientPerformance(user.clientId).catch(() => null);
-    if ((perf?.kpis.currentBalance ?? 0) <= 0) redirectTo = "/qx-tiers";
+    const funded = await prisma.client
+      .findUnique({
+        where: { id: user.clientId },
+        select: {
+          initialDeposit: true,
+          transactions: {
+            where: { type: "DEPOSIT", status: "APPROVED" },
+            select: { id: true },
+            take: 1,
+          },
+        },
+      })
+      .then((c) => !!c && (c.initialDeposit > 0 || c.transactions.length > 0))
+      .catch(() => true); // on error, don't trap a real user on /qx-tiers
+    if (!funded) redirectTo = "/qx-tiers";
   }
 
   const res = NextResponse.json({ ok: true, role: session.role, redirectTo });

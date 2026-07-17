@@ -6,6 +6,8 @@
  *
  * Every statement uses IF NOT EXISTS, so running it repeatedly is a safe no-op.
  */
+import { runDdlBatch, type RawRunner } from "./schema-ddl";
+
 export const REFERRAL_DDL: string[] = [
   `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "referralCode" TEXT`,
   `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "referredById" TEXT`,
@@ -83,27 +85,15 @@ export const REFERRAL_DDL: string[] = [
   `CREATE INDEX IF NOT EXISTS "MonthlyBonus_userId_idx" ON "MonthlyBonus"("userId")`,
 ];
 
-type RawRunner = { $executeRawUnsafe: (sql: string) => Promise<unknown> };
-
 /**
  * Apply the referral DDL over the given Prisma client. Returns a per-statement
  * report; individual failures are captured rather than thrown so one hiccup
- * doesn't abort the rest.
+ * doesn't abort the rest. Batched into a single round trip (see runDdlBatch).
  */
 export async function applyReferralSchema(
   db: RawRunner
 ): Promise<{ applied: number; failures: { sql: string; error: string }[] }> {
-  let applied = 0;
-  const failures: { sql: string; error: string }[] = [];
-  for (const sql of REFERRAL_DDL) {
-    try {
-      await db.$executeRawUnsafe(sql);
-      applied += 1;
-    } catch (e: any) {
-      failures.push({ sql: sql.split("\n")[0].trim(), error: e?.message?.split("\n")[0] ?? "failed" });
-    }
-  }
-  return { applied, failures };
+  return runDdlBatch(db, REFERRAL_DDL);
 }
 
 // One-time-per-process runtime self-heal guard. If the build-time migration

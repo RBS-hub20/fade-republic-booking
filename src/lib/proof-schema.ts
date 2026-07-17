@@ -3,7 +3,7 @@
  * Mirrors the other self-heal guards: the first request that touches proofs
  * ensures the table exists over the live DATABASE_URL.
  */
-type RawRunner = { $executeRawUnsafe: (sql: string) => Promise<unknown> };
+import { runDdlBatch, type RawRunner } from "./schema-ddl";
 
 export const PROOF_DDL: string[] = [
   `CREATE TABLE IF NOT EXISTS "ProofFile" (
@@ -28,14 +28,7 @@ export const PROOF_DDL: string[] = [
 let healed = false;
 export async function ensureProofSchemaOnce(db: RawRunner): Promise<void> {
   if (healed) return;
-  let allOk = true;
-  for (const sql of PROOF_DDL) {
-    try {
-      await db.$executeRawUnsafe(sql);
-    } catch (e) {
-      allOk = false;
-      console.error("[proof-schema] statement failed:", e);
-    }
-  }
-  if (allOk) healed = true;
+  const { failures } = await runDdlBatch(db, PROOF_DDL);
+  if (failures.length === 0) healed = true;
+  else console.error("[proof-schema] self-heal incomplete:", failures);
 }

@@ -6,6 +6,7 @@
  */
 
 import { COUNTRIES } from "./countries";
+import { runDdlBatch, type RawRunner } from "./schema-ddl";
 
 export interface CountryCode {
   code: string;
@@ -77,8 +78,6 @@ export function telHref(countryCode: string, phoneNumber: string): string {
 }
 
 // --- Runtime schema self-heal (User phone columns) --------------------------
-type RawRunner = { $executeRawUnsafe: (sql: string) => Promise<unknown> };
-
 export const PHONE_DDL: string[] = [
   `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "phoneNumber" TEXT`,
   `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "countryCode" TEXT NOT NULL DEFAULT '+63'`,
@@ -88,10 +87,7 @@ export const PHONE_DDL: string[] = [
 let schemaHealed = false;
 export async function ensurePhoneSchemaOnce(db: RawRunner): Promise<void> {
   if (schemaHealed) return;
-  try {
-    for (const sql of PHONE_DDL) await db.$executeRawUnsafe(sql);
-    schemaHealed = true;
-  } catch (e) {
-    console.error("[phone-schema] self-heal failed:", e);
-  }
+  const { failures } = await runDdlBatch(db, PHONE_DDL);
+  if (failures.length === 0) schemaHealed = true;
+  else console.error("[phone-schema] self-heal incomplete:", failures);
 }

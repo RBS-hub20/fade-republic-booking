@@ -7,6 +7,7 @@
  *  - `usernameSet` locks the value after the single allowed change.
  */
 import { prisma } from "./prisma";
+import { runDdlBatch } from "./schema-ddl";
 
 export const USERNAME_RE = /^[a-z0-9_]{3,30}$/;
 
@@ -70,18 +71,11 @@ export const USERNAME_DDL: string[] = [
 let schemaHealed = false;
 export async function ensureUsernameSchemaOnce(db: RawRunner = prisma): Promise<void> {
   if (schemaHealed) return;
-  let allOk = true;
-  for (const sql of USERNAME_DDL) {
-    try {
-      await db.$executeRawUnsafe(sql);
-    } catch (e) {
-      // The LOWER(email) unique index can fail if legacy case-variant duplicate
-      // emails exist — that's non-fatal (login still works); just log it.
-      allOk = false;
-      console.error("[username-schema] statement failed:", e);
-    }
-  }
-  if (allOk) schemaHealed = true;
+  // The LOWER(email) unique index can fail if legacy case-variant duplicate
+  // emails exist — that's non-fatal (login still works); it just won't latch.
+  const { failures } = await runDdlBatch(db, USERNAME_DDL);
+  if (failures.length === 0) schemaHealed = true;
+  else console.error("[username-schema] self-heal incomplete:", failures);
 }
 
 // ---- backfill for existing users -------------------------------------------

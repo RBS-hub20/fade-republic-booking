@@ -4,12 +4,10 @@
  * best-effort — logging must never break a send.
  */
 import { prisma } from "./prisma";
+import { runDdlBatch } from "./schema-ddl";
 
-let schemaHealed = false;
-export async function ensureEmailLogSchemaOnce(): Promise<void> {
-  if (schemaHealed) return;
-  try {
-    await prisma.$executeRawUnsafe(`CREATE TABLE IF NOT EXISTS "EmailLog" (
+const EMAILLOG_DDL: string[] = [
+  `CREATE TABLE IF NOT EXISTS "EmailLog" (
       "id" TEXT NOT NULL PRIMARY KEY,
       "userId" TEXT,
       "type" TEXT NOT NULL,
@@ -19,13 +17,17 @@ export async function ensureEmailLogSchemaOnce(): Promise<void> {
       "status" TEXT NOT NULL DEFAULT 'sent',
       "error" TEXT,
       "sentAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
-    )`);
-    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "EmailLog_userId_idx" ON "EmailLog"("userId")`);
-    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "EmailLog_type_idx" ON "EmailLog"("type")`);
-    schemaHealed = true;
-  } catch (e) {
-    console.error("[email-log] self-heal failed:", e);
-  }
+    )`,
+  `CREATE INDEX IF NOT EXISTS "EmailLog_userId_idx" ON "EmailLog"("userId")`,
+  `CREATE INDEX IF NOT EXISTS "EmailLog_type_idx" ON "EmailLog"("type")`,
+];
+
+let schemaHealed = false;
+export async function ensureEmailLogSchemaOnce(): Promise<void> {
+  if (schemaHealed) return;
+  const { failures } = await runDdlBatch(prisma, EMAILLOG_DDL);
+  if (failures.length === 0) schemaHealed = true;
+  else console.error("[email-log] self-heal incomplete:", failures);
 }
 
 export interface LogEmailEntry {
