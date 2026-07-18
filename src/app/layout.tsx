@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { PublicXena } from "@/components/support/public-xena";
 
@@ -18,12 +18,21 @@ export const metadata: Metadata = {
   applicationName: "QuantumX Global Markets",
   manifest: "/site.webmanifest",
   icons: {
+    // Ordered small→large. Google/browsers pick the best-fit source; declaring
+    // the 192px and 512px PNGs gives Google Search a crisp logo to render
+    // instead of downsampling only the 48px .ico.
     icon: [
       { url: "/favicon.ico", sizes: "48x48" },
-      { url: "/icon.png", type: "image/png" },
+      { url: "/icon-192.png", type: "image/png", sizes: "192x192" },
+      { url: "/icon-512.png", type: "image/png", sizes: "512x512" },
     ],
     shortcut: "/favicon.ico",
-    apple: "/apple-touch-icon.png",
+    apple: { url: "/apple-touch-icon.png", sizes: "180x180" },
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: { index: true, follow: true, "max-image-preview": "large" },
   },
   openGraph: {
     type: "website",
@@ -39,6 +48,12 @@ export const metadata: Metadata = {
     description: DESCRIPTION,
     images: ["/og-image.png"],
   },
+};
+
+// Emits <meta name="theme-color" content="#0A0A0A"> — the brand black used by
+// the manifest, so mobile browser chrome and PWA installs match the site.
+export const viewport: Viewport = {
+  themeColor: "#0A0A0A",
 };
 
 export default function RootLayout({
