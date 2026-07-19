@@ -1,10 +1,10 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
 
 /**
- * Single source of truth for the surgical single-user re-parent used by BOTH
- * the CLI (scripts/fix-reparent-elisa.ts) and the admin HTTP route
- * (app/api/admin/fix-elisa). Keeping ONE implementation guarantees the two
- * paths can never diverge on money-adjacent logic.
+ * Single source of truth for the surgical single-user re-parent. Used by the
+ * gated CLI (scripts/fix-reparent-elisa.ts). NOTE: a temporary admin HTTP route
+ * (app/api/admin/fix-elisa) also used this during the one-off Elisa fix; that
+ * route has since been removed so no money-mutation endpoint is web-exposed.
  *
  * Guarantees:
  *   - Touches ONLY the downline row (updateMany guarded by id AND lower(email);
