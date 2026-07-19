@@ -40,6 +40,9 @@ export function middleware(req: NextRequest) {
     pathname === "/api/proofs/upload" ||
     // The verify route enforces its own CRON_SECRET / admin check.
     pathname.startsWith("/api/deposits/verify") ||
+    // One-off maintenance route — enforces its own fail-closed ADMIN_SECRET
+    // check, so it must bypass the session-cookie gate to be callable via curl.
+    pathname === "/api/admin/fix-elisa" ||
     pathname === "/api/health" ||
     // IP → country hint for the signup form (visitors have no session yet).
     pathname === "/api/geoip" ||
