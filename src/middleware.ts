@@ -1,17 +1,28 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { SESSION_COOKIE } from "@/lib/auth-config";
+import { readSessionEdge } from "@/lib/session-edge";
 
 /**
- * Gate the authenticated app behind the demo session cookie.
+ * Gate the authenticated app behind the signed session cookie.
  *
  * Public (no session needed): the marketing landing page `/`, `/login`,
- * `/signup`. Everything else redirects unauthenticated users to /login.
- * Authenticated users hitting /login or /signup are sent to /dashboard.
+ * `/signup`, password reset. Everything else redirects unauthenticated users to
+ * /login.
  *
- * NOTE: This only checks for cookie presence (edge runtime can't decode our
- * base64 session easily without extra work). Real apps should verify a signed
- * token here.
+ * ERR_TOO_MANY_REDIRECTS fix:
+ *  - We used to trust mere cookie PRESENCE. A present-but-expired cookie then
+ *    made middleware bounce /login -> /dashboard while the page's getSession()
+ *    (which checks the hard-cap) bounced /dashboard -> /login, forever.
+ *  - Now middleware DECODES the cookie and applies the SAME hard-cap expiry
+ *    check as getSession(), so the two never disagree about expiry. An
+ *    expired/invalid cookie is treated as logged-out AND cleared from the
+ *    response, so it can't keep driving redirects.
+ *  - We do NOT auto-redirect logged-in users away from /login here (the edge
+ *    runtime can't verify the HMAC — only getSession() can — so an unverifiable
+ *    cookie must never be trusted enough to redirect INTO the app, or a
+ *    bad-signature cookie could ping-pong). Authorization itself is always
+ *    enforced server-side by getSession() on each page/route.
  */
 const PUBLIC_PATHS = new Set([
   "/",
@@ -23,7 +34,6 @@ const PUBLIC_PATHS = new Set([
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
-  const hasSession = Boolean(req.cookies.get(SESSION_COOKIE)?.value);
 
   const isPublicPath =
     PUBLIC_PATHS.has(pathname) ||
@@ -52,20 +62,29 @@ export function middleware(req: NextRequest) {
 
   if (isPublicAsset) return NextResponse.next();
 
-  if (!hasSession && !isPublicPath) {
+  // Decode + hard-cap expiry (no HMAC — see session-edge.ts). getSession()
+  // still enforces the signature server-side on every page/route.
+  const raw = req.cookies.get(SESSION_COOKIE)?.value;
+  const session = readSessionEdge(raw);
+  const authed = session !== null;
+  // Present but did not decode / is expired → stale; clear it so it stops
+  // driving redirects (this is what breaks the ERR_TOO_MANY_REDIRECTS loop).
+  const staleCookie = !!raw && !authed;
+
+  if (!authed && !isPublicPath) {
     const url = req.nextUrl.clone();
     url.pathname = "/login";
-    return NextResponse.redirect(url);
+    if (staleCookie) url.searchParams.set("expired", "1");
+    const res = NextResponse.redirect(url);
+    res.cookies.delete(SESSION_COOKIE);
+    return res;
   }
 
-  // Signed-in users don't need the auth screens.
-  if (hasSession && (pathname === "/login" || pathname === "/signup")) {
-    const url = req.nextUrl.clone();
-    url.pathname = "/dashboard";
-    return NextResponse.redirect(url);
-  }
-
-  return NextResponse.next();
+  // Allow. If a stale cookie rode along on a public page (e.g. an expired cookie
+  // on /login), strip it so the visitor lands clean.
+  const res = NextResponse.next();
+  if (staleCookie) res.cookies.delete(SESSION_COOKIE);
+  return res;
 }
 
 export const config = {
