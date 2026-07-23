@@ -51,6 +51,9 @@ export function middleware(req: NextRequest) {
     // The verify route enforces its own CRON_SECRET / admin check.
     pathname.startsWith("/api/deposits/verify") ||
     pathname === "/api/health" ||
+    // Emergency "unstick me" route — must be reachable without a session so a
+    // stuck user can clear their stale cookie. Enforces nothing; only clears.
+    pathname === "/api/clear" ||
     // IP → country hint for the signup form (visitors have no session yet).
     pathname === "/api/geoip" ||
     pathname === "/favicon.ico" ||
