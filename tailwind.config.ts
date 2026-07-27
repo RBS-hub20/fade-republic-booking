@@ -53,6 +53,18 @@ const config: Config = {
         },
         profit: "#16c784",
         loss: "#ea3943",
+        // eGov SuperAgent brand kit (Philippine flag palette on a deep navy
+        // canvas). Scoped under `egov-*` so it can't collide with the
+        // gold/zinc terminal theme used by the rest of the app.
+        egov: {
+          bg: "#050A18",
+          surface: "#0A1024",
+          navy: "#0A2156",
+          action: "#1E90FF",
+          yellow: "#FCD116",
+          red: "#CE1126",
+          green: "#20C997",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",

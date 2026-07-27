@@ -30,6 +30,10 @@ const PUBLIC_PATHS = new Set([
   "/signup",
   "/forgot-password",
   "/reset-password",
+  // eGov SuperAgent MVP — a self-contained public demo (landing + console).
+  // It has no accounts of its own and reads only mock agency data.
+  "/egov",
+  "/app",
 ]);
 
 export function middleware(req: NextRequest) {
@@ -56,6 +60,8 @@ export function middleware(req: NextRequest) {
     pathname === "/api/clear" ||
     // IP → country hint for the signup form (visitors have no session yet).
     pathname === "/api/geoip" ||
+    // Messenger calls this from Facebook's servers — it can never carry a session.
+    pathname === "/api/webhook/messenger" ||
     pathname === "/favicon.ico" ||
     // Static files in /public (logo, icons, OG image, manifest, fonts, …) must
     // be reachable without a session so the marketing pages render for visitors.
