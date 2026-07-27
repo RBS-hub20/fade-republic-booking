@@ -22,6 +22,10 @@ const HIDE_PREFIXES = [
   "/charts",
   "/qx-tiers",
   "/deposit",
+  // eGov SuperAgent is a separate product surface with its own agent — the
+  // QuantumX sales bot has no business floating over it.
+  "/egov",
+  "/app",
 ];
 
 export function PublicXena() {

@@ -1,0 +1,40 @@
+{
+  "agency": "Social Security System",
+  "member": {
+    "name": "Renmar Sombilon",
+    "sssNumber": "34-1234567-8",
+    "membershipType": "Employed (Private)",
+    "employer": "RBS Labs Inc.",
+    "monthlyContribution": 1350,
+    "employerShare": 900,
+    "employeeShare": 450,
+    "status": "Up to Date",
+    "lastPosted": "2026-06-30"
+  },
+  "contributions": [
+    { "period": "Jun 2026", "employer": "RBS Labs Inc.", "amount": 1350, "status": "Paid", "postedAt": "2026-06-30", "orNumber": "SSS-OR-2026-06-77412" },
+    { "period": "May 2026", "employer": "RBS Labs Inc.", "amount": 1350, "status": "Paid", "postedAt": "2026-05-29", "orNumber": "SSS-OR-2026-05-71980" },
+    { "period": "Apr 2026", "employer": "RBS Labs Inc.", "amount": 1350, "status": "Paid", "postedAt": "2026-04-30", "orNumber": "SSS-OR-2026-04-66325" },
+    { "period": "Mar 2026", "employer": "RBS Labs Inc.", "amount": 1350, "status": "Paid", "postedAt": "2026-03-31", "orNumber": "SSS-OR-2026-03-60841" },
+    { "period": "Feb 2026", "employer": "RBS Labs Inc.", "amount": 1350, "status": "Paid", "postedAt": "2026-02-27", "orNumber": "SSS-OR-2026-02-55207" },
+    { "period": "Jan 2026", "employer": "RBS Labs Inc.", "amount": 1350, "status": "Paid", "postedAt": "2026-01-30", "orNumber": "SSS-OR-2026-01-49663" }
+  ],
+  "totals": {
+    "postedMonths": 6,
+    "postedAmount": 8100,
+    "creditedYearsOfService": 11,
+    "totalCreditedContributions": 178200
+  },
+  "nextDue": {
+    "period": "Jul 2026",
+    "dueDate": "2026-07-30",
+    "amount": 1350,
+    "channel": "SSS PRN / GCash"
+  },
+  "benefitsEligibility": [
+    { "benefit": "Sickness", "eligible": true, "note": "6 posted months in the last 12" },
+    { "benefit": "Salary Loan", "eligible": true, "note": "36 posted months — up to P27,000" },
+    { "benefit": "Maternity", "eligible": true, "note": "Requires 3 posted months before semester of contingency" },
+    { "benefit": "Retirement", "eligible": false, "note": "11 of 20 credited years of service" }
+  ]
+}

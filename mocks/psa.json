@@ -1,0 +1,58 @@
+{
+  "agency": "Philippine Statistics Authority",
+  "request": {
+    "trackingNumber": "EGOV-2026-8891",
+    "document": "Birth Certificate (PSA SECPA)",
+    "ownerName": "Renmar Sombilon",
+    "copies": 2,
+    "purpose": "Passport renewal — DFA appointment",
+    "requestedAt": "2026-07-27T09:12:00+08:00",
+    "etaDays": 3,
+    "etaDate": "2026-07-30",
+    "fee": 365,
+    "paymentStatus": "Paid via GCash",
+    "referenceCode": "PSA-SECPA-8891-RS"
+  },
+  "steps": [
+    {
+      "key": "requested",
+      "label": "Requested",
+      "detail": "Application filed and P365 paid via GCash",
+      "status": "done",
+      "at": "2026-07-27T09:12:00+08:00"
+    },
+    {
+      "key": "verifying",
+      "label": "Verifying",
+      "detail": "PSA Civil Registry matching your record against the 1994 registry book",
+      "status": "current",
+      "at": "2026-07-27T14:40:00+08:00"
+    },
+    {
+      "key": "printing",
+      "label": "Printing",
+      "detail": "SECPA security paper printing at PSA Quezon City",
+      "status": "pending",
+      "at": null
+    },
+    {
+      "key": "ready",
+      "label": "Ready for pickup",
+      "detail": "Present your QR code and one valid ID at the releasing counter",
+      "status": "pending",
+      "at": null
+    }
+  ],
+  "pickup": {
+    "branch": "PSA Serbilis Center — SM City Cebu",
+    "address": "3F SM City Cebu, North Reclamation Area, Cebu City 6000",
+    "hours": "Mon–Sat, 9:00 AM – 6:00 PM",
+    "landmark": "Beside the Cyberzone escalator",
+    "coordinates": { "lat": 10.3115, "lng": 123.9182 },
+    "queueEstimate": "Priority lane — walk-in average 12 minutes"
+  },
+  "qr": {
+    "payload": "EGOV-2026-8891|PSA|SECPA|RENMAR-SOMBILON|2026-07-30",
+    "note": "Scan at the PSA releasing counter — no fixer, no extra fee."
+  }
+}

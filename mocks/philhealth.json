@@ -1,0 +1,34 @@
+{
+  "agency": "Philippine Health Insurance Corporation",
+  "member": {
+    "name": "Renmar Sombilon",
+    "philHealthId": "12-345678901-2",
+    "category": "Direct Contributor — Employed Private",
+    "employer": "RBS Labs Inc.",
+    "status": "Active",
+    "effectiveDate": "2015-03-01",
+    "validUntil": "2026-12-31",
+    "monthlyPremium": 900,
+    "premiumRate": "5% of monthly basic salary, shared 50/50 with employer"
+  },
+  "dependents": [
+    { "name": "Maria Liza Sombilon", "relationship": "Spouse", "birthDate": "1992-08-14", "status": "Active" },
+    { "name": "Liam Andrei Sombilon", "relationship": "Son", "birthDate": "2019-02-03", "status": "Active" },
+    { "name": "Aurora Sombilon", "relationship": "Mother", "birthDate": "1958-11-22", "status": "Active — Senior Citizen" }
+  ],
+  "contributions": [
+    { "period": "Jun 2026", "employer": "RBS Labs Inc.", "amount": 900, "status": "Posted" },
+    { "period": "May 2026", "employer": "RBS Labs Inc.", "amount": 900, "status": "Posted" },
+    { "period": "Apr 2026", "employer": "RBS Labs Inc.", "amount": 900, "status": "Posted" }
+  ],
+  "benefits": [
+    { "name": "Konsulta Package", "detail": "Free primary care, labs and meds at your registered Konsulta provider", "available": true },
+    { "name": "Case Rate Coverage", "detail": "Inpatient case rates for you and all 3 dependents", "available": true },
+    { "name": "Z Benefits", "detail": "Catastrophic illness package — requires accreditation referral", "available": true }
+  ],
+  "provider": {
+    "name": "Cebu Doctors' University Hospital",
+    "konsultaProvider": "RBS Labs Clinic — Konsulta Package",
+    "lastAvailment": "2026-02-18"
+  }
+}

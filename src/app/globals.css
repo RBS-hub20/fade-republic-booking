@@ -161,3 +161,114 @@
 ::-webkit-scrollbar-thumb:hover {
   background: hsl(217 14% 30%);
 }
+
+/* ==========================================================================
+   eGov SuperAgent (/egov and /app)
+   A separate surface from the trading terminal: deep navy canvas, Action Blue
+   accent, hairline borders. Everything below is namespaced `eg-*` so it can
+   never leak into the gold/zinc theme.
+   ========================================================================== */
+
+.eg-root {
+  background: #050a18;
+  color: #e6ecf7;
+  color-scheme: dark;
+}
+
+/* Layered ambience: two brand-tinted glows over the flat navy canvas. */
+.eg-ambient {
+  background:
+    radial-gradient(900px 520px at 12% -10%, rgba(30, 144, 255, 0.18), transparent 62%),
+    radial-gradient(760px 460px at 88% 4%, rgba(10, 33, 86, 0.75), transparent 64%),
+    radial-gradient(620px 420px at 50% 108%, rgba(252, 209, 22, 0.06), transparent 60%);
+}
+
+/* Faint blueprint grid — reads as "system", not as decoration. */
+.eg-grid {
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(circle at 50% 0%, black, transparent 72%);
+  -webkit-mask-image: radial-gradient(circle at 50% 0%, black, transparent 72%);
+}
+
+.eg-panel {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.015));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(12px);
+}
+
+.eg-hairline {
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+/* Linear-style top highlight on cards. */
+.eg-sheen {
+  position: relative;
+}
+.eg-sheen::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.35),
+    transparent
+  );
+  pointer-events: none;
+}
+
+.eg-glow-blue {
+  box-shadow: 0 0 0 1px rgba(30, 144, 255, 0.25), 0 18px 60px -18px rgba(30, 144, 255, 0.55);
+}
+
+.eg-text-gradient {
+  background: linear-gradient(180deg, #ffffff 20%, #9fb6dd 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Slow drift for the hero logo — subtle enough to read as depth, not motion. */
+@keyframes eg-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+.eg-float {
+  animation: eg-float 7s ease-in-out infinite;
+}
+
+@keyframes eg-pulse-ring {
+  0% { box-shadow: 0 0 0 0 rgba(32, 201, 151, 0.45); }
+  70% { box-shadow: 0 0 0 6px rgba(32, 201, 151, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(32, 201, 151, 0); }
+}
+.eg-pulse {
+  animation: eg-pulse-ring 2.4s ease-out infinite;
+}
+
+/* Scoped scrollbars — the global ones are zinc, these match the navy canvas. */
+.eg-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.eg-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.eg-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+}
+.eg-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(30, 144, 255, 0.45);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .eg-float,
+  .eg-pulse {
+    animation: none !important;
+  }
+}
