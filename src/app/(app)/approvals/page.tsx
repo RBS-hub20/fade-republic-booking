@@ -34,6 +34,24 @@ export default async function ApprovalsPage() {
     client: t.client,
   }));
 
+  // Recently auto-expired deposits — visible in the Expired tab (audit), never
+  // in the pending queue. Bounded so the page stays fast.
+  const expiredRows = await prisma.transaction.findMany({
+    where: { status: "EXPIRED", type: "DEPOSIT" },
+    orderBy: { date: "desc" },
+    take: 50,
+    include: { client: { select: { name: true, accountNumber: true } } },
+  });
+  const expired = expiredRows.map((t) => ({
+    id: t.id,
+    date: toManilaDateKey(t.date),
+    type: t.type as "DEPOSIT" | "WITHDRAWAL",
+    amount: t.amount,
+    method: t.method as any,
+    notes: t.notes,
+    client: t.client,
+  }));
+
   return (
     <>
       <PageHeader title="Approvals" subtitle="Review client deposit & withdrawal requests">
@@ -41,7 +59,7 @@ export default async function ApprovalsPage() {
           <Badge variant="warning">{pending.length} pending</Badge>
         )}
       </PageHeader>
-      <ApprovalsView pending={pending} />
+      <ApprovalsView pending={pending} expired={expired} />
     </>
   );
 }
