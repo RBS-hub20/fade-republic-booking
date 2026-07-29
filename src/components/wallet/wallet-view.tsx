@@ -52,12 +52,15 @@ function pillFor(t: Txn): { label: string; variant: "outline" | "warning" | "dan
   if (t.type === "DEPOSIT") {
     if (t.status === "APPROVED") return { label: "Credited", variant: "success" };
     if (t.status === "REJECTED") return { label: "Failed", variant: "danger" };
+    // Abandoned (no TxHash, window lapsed) → soft-expired. Show muted, never "Pending".
+    if (t.status === "EXPIRED") return { label: "Expired", variant: "outline" };
     return hasTxHash(t.notes)
       ? { label: "Confirming", variant: "warning" }
       : { label: "Pending", variant: "warning" };
   }
   if (t.status === "APPROVED") return { label: "Paid", variant: "outline" };
   if (t.status === "REJECTED") return { label: "Rejected", variant: "danger" };
+  if (t.status === "EXPIRED") return { label: "Expired", variant: "outline" };
   return { label: "Pending", variant: "warning" };
 }
 

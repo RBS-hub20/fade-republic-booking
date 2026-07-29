@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { ApprovalsView } from "@/components/approvals/approvals-view";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { expireStaleDeposits } from "@/lib/deposit-expiry";
 import { toManilaDateKey } from "@/lib/performance";
 
 export const dynamic = "force-dynamic";
@@ -12,6 +13,10 @@ export default async function ApprovalsPage() {
   const session = getSession();
   if (!session) redirect("/login");
   if (session.role !== "admin") redirect("/dashboard");
+
+  // Sweep abandoned (no-TxHash, >30min) deposits to EXPIRED so they never
+  // clutter the pending queue below. Best-effort; never blocks the page.
+  await expireStaleDeposits().catch(() => {});
 
   const rows = await prisma.transaction.findMany({
     where: { status: "PENDING" },

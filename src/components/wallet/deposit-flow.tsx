@@ -36,7 +36,7 @@ interface DepositWallet {
   explorerUrl: string;
 }
 
-type DepositState = "waiting" | "confirming" | "credited" | "failed";
+type DepositState = "waiting" | "confirming" | "credited" | "failed" | "expired";
 
 const WINDOW_SECONDS = 30 * 60; // 30-minute payment window
 const POLL_MS = 15_000;
@@ -124,6 +124,9 @@ export function DepositFlow({
         if (d.state === "credited") {
           onChanged();
           router.refresh(); // refresh server-rendered balance
+          if (pollRef.current) clearInterval(pollRef.current);
+        } else if (d.state === "expired") {
+          onChanged(); // drop it from history/pending views
           if (pollRef.current) clearInterval(pollRef.current);
         }
       }
@@ -335,14 +338,19 @@ export function DepositFlow({
   const w = active.wallet;
   const mm = String(Math.floor(secondsLeft / 60)).padStart(2, "0");
   const ss = String(secondsLeft % 60).padStart(2, "0");
-  const expired = secondsLeft === 0 && state !== "credited";
+  // Expired = the server marked it EXPIRED, OR the 30-min window lapsed with no
+  // TxHash submitted yet (still "waiting"). A submitted deposit ("confirming")
+  // is never treated as expired — it keeps waiting for on-chain/admin confirm.
+  const timedOut = secondsLeft === 0;
+  const isExpired = state === "expired" || (timedOut && state === "waiting");
 
   const badge = {
     waiting: { label: "Waiting for confirmation", cls: "border-gold-400/30 bg-gold-400/10 text-gold-200", icon: <Clock className="h-4 w-4" /> },
     confirming: { label: "Confirming…", cls: "border-gold-400/30 bg-gold-400/10 text-gold-200", icon: <Radar className="h-4 w-4 animate-pulse" /> },
     credited: { label: "Credited", cls: "border-profit/30 bg-profit/10 text-profit", icon: <CheckCircle2 className="h-4 w-4" /> },
     failed: { label: "Failed", cls: "border-loss/30 bg-loss/10 text-loss", icon: <XCircle className="h-4 w-4" /> },
-  }[state];
+    expired: { label: "Expired", cls: "border-loss/30 bg-loss/10 text-loss", icon: <XCircle className="h-4 w-4" /> },
+  }[isExpired ? "expired" : state];
 
   return (
     <div className="space-y-4">
@@ -370,6 +378,19 @@ export function DepositFlow({
             Make another deposit
           </Button>
         </div>
+      ) : isExpired ? (
+        <div className="rounded-lg border border-loss/30 bg-loss/10 p-6 text-center">
+          <Clock className="mx-auto h-10 w-10 text-loss" />
+          <p className="mt-3 font-semibold text-loss">Deposit expired</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            No transaction was submitted within the 30-minute window, so this deposit was
+            removed from review. If you already sent USDT, keep your TxID and contact support to
+            reconcile it.
+          </p>
+          <Button className="mt-4" onClick={reset}>
+            Create new deposit
+          </Button>
+        </div>
       ) : (
         <>
           {/* Amount + countdown */}
@@ -381,8 +402,8 @@ export function DepositFlow({
             </div>
             <div className="rounded-md border border-border bg-card px-3 py-2 text-center">
               <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Time remaining</p>
-              <p className={cn("tnum text-lg font-bold", expired ? "text-loss" : "text-foreground")}>
-                {expired ? "Expired" : `${mm}:${ss}`}
+              <p className={cn("tnum text-lg font-bold", isExpired ? "text-loss" : "text-foreground")}>
+                {isExpired ? "Expired" : `${mm}:${ss}`}
               </p>
               <p className="text-[11px] text-muted-foreground">30-minute window</p>
             </div>

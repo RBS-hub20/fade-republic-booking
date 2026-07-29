@@ -9,6 +9,7 @@ import { ensureFinanceSchemaOnce } from "@/lib/finance-schema";
 import { notifyDailyPerfIssue } from "@/lib/mailers";
 import { backfillUsernames } from "@/lib/username";
 import { backfillAvatars } from "@/lib/genealogy-tree";
+import { expireStaleDeposits } from "@/lib/deposit-expiry";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -57,6 +58,14 @@ async function handle(req: Request) {
     result.deposits = await verifyPendingDeposits();
   } catch (err: any) {
     result.deposits = { ok: false, error: err?.message?.split("\n")[0] ?? "failed" };
+  }
+  // Global safety-net sweep: soft-expire any abandoned (no-TxHash, >30min)
+  // deposits the lazy per-request paths didn't catch. Runs after verification so
+  // a just-verified deposit is APPROVED (not PENDING) and never expired.
+  try {
+    result.expiredDeposits = await expireStaleDeposits();
+  } catch (err: any) {
+    result.expiredDeposits = { ok: false, error: err?.message?.split("\n")[0] ?? "failed" };
   }
   try {
     await ensureFinanceSchemaOnce(prisma);

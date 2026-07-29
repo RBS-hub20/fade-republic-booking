@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { verifyPendingDeposits } from "@/lib/verify-deposits";
+import { expireStaleDeposits } from "@/lib/deposit-expiry";
 import { parseTxHash } from "@/lib/chain";
 import { enforce } from "@/lib/rate-limit";
 
@@ -9,11 +10,12 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
-export type DepositState = "waiting" | "confirming" | "credited" | "failed";
+export type DepositState = "waiting" | "confirming" | "credited" | "failed" | "expired";
 
 function stateOf(t: { status: string; notes: string | null }): DepositState {
   if (t.status === "APPROVED") return "credited";
   if (t.status === "REJECTED") return "failed";
+  if (t.status === "EXPIRED") return "expired";
   return parseTxHash(t.notes) ? "confirming" : "waiting";
 }
 
@@ -30,6 +32,10 @@ export async function GET(req: Request) {
   // 12 polls / minute per IP (client polls ~every 15s).
   const limited = enforce(req, "depstatus", 12, 60_000);
   if (limited) return limited;
+
+  // Soft-expire this client's own abandoned (no-TxHash, >30min) deposits so the
+  // poll reflects expiry immediately and they drop out of the admin queue.
+  await expireStaleDeposits({ clientId: session.clientId }).catch(() => {});
 
   // Best-effort: verify this client's pending deposits on-chain.
   await verifyPendingDeposits({ clientId: session.clientId }).catch(() => {});

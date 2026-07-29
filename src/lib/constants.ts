@@ -18,7 +18,9 @@ export const TRANSACTION_METHODS = [
 ] as const;
 export type TransactionMethod = (typeof TRANSACTION_METHODS)[number];
 
-export const TRANSACTION_STATUSES = ["PENDING", "APPROVED", "REJECTED"] as const;
+// EXPIRED = a deposit that lapsed its 30-min payment window with no TxHash
+// submitted (soft-expired; never credited, kept for audit).
+export const TRANSACTION_STATUSES = ["PENDING", "APPROVED", "REJECTED", "EXPIRED"] as const;
 export type TransactionStatus = (typeof TRANSACTION_STATUSES)[number];
 
 export const STATUS_BADGE: Record<
@@ -28,6 +30,7 @@ export const STATUS_BADGE: Record<
   APPROVED: { label: "Approved", variant: "outline" },
   PENDING: { label: "Pending", variant: "warning" },
   REJECTED: { label: "Rejected", variant: "danger" },
+  EXPIRED: { label: "Expired", variant: "outline" },
 };
 
 export const STATUS_LABELS: Record<ClientStatus, string> = {
