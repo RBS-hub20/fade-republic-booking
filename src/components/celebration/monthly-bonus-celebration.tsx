@@ -8,6 +8,8 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatUsd } from "@/lib/utils";
+import { useShareImage } from "@/lib/use-share-image";
+import { ShareFormatToggle } from "@/components/celebration/share-format-toggle";
 import type { CelebrationBonus } from "@/lib/referrals";
 
 // Below this, use the gentle "your team is growing" copy instead of the big win.
@@ -78,48 +80,10 @@ export function MonthlyBonusCelebration({
 
   const close = useCallback(() => { setShown(false); setTimeout(() => setOpen(false), 180); }, []);
 
-  // --- Share image ------------------------------------------------------------
-  const shareRef = useRef<HTMLDivElement>(null);
-  const [genning, setGenning] = useState(false);
-  const [imgUrl, setImgUrl] = useState<string | null>(null);
+  // --- Share image (story 9:16 + square 1:1) ---------------------------------
+  const share = useShareImage();
   const [copied, setCopied] = useState(false);
   const refLink = referralCode ? `${origin}/signup?ref=${referralCode}` : `${origin}/signup`;
-
-  const generate = useCallback(async () => {
-    if (!shareRef.current) return;
-    setGenning(true);
-    try {
-      const html2canvas = (await import("html2canvas")).default;
-      const canvas = await html2canvas(shareRef.current, {
-        backgroundColor: "#1e1b4b", scale: 1, width: 1080, height: 1920, useCORS: true, logging: false,
-      });
-      setImgUrl(canvas.toDataURL("image/png"));
-    } catch (e) {
-      console.error("[celebration] share image failed:", e);
-    }
-    setGenning(false);
-  }, []);
-
-  const download = useCallback(() => {
-    if (!imgUrl) return;
-    const a = document.createElement("a");
-    a.href = imgUrl;
-    a.download = `quantumx-bonus-${bonus?.monthYear ?? "win"}.png`;
-    a.click();
-  }, [imgUrl, bonus]);
-
-  const nativeShare = useCallback(async () => {
-    if (!imgUrl) return;
-    try {
-      const blob = await (await fetch(imgUrl)).blob();
-      const file = new File([blob], "quantumx-bonus.png", { type: "image/png" });
-      if (navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ files: [file], title: "QuantumX", text: "I earned while I slept! 🚀" });
-        return;
-      }
-    } catch { /* fall through to download */ }
-    download();
-  }, [imgUrl, download]);
 
   const copyLink = useCallback(async () => {
     try { await navigator.clipboard.writeText(refLink); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch {}
@@ -180,28 +144,30 @@ export function MonthlyBonusCelebration({
         ) : (
           <>
             <h2 className="text-center text-xl font-bold">Share your win 🚀</h2>
-            <p className="mt-1 text-center text-xs text-white/80">Generate a story image for MyDay / Facebook.</p>
+            <p className="mt-1 text-center text-xs text-white/80">Story for MyDay, or Square for FB / IG feed.</p>
 
-            <div className="mx-auto mt-4 w-40 overflow-hidden rounded-lg border border-white/20">
-              {imgUrl ? (
-                <img src={imgUrl} alt="Your win" className="w-full" />
+            <ShareFormatToggle format={share.format} onChange={share.chooseFormat} />
+
+            <div className={`mx-auto mt-3 overflow-hidden rounded-lg border border-white/20 ${share.format === "square" ? "w-44" : "w-36"}`}>
+              {share.imgUrl ? (
+                <img src={share.imgUrl} alt="Your win" className="w-full" />
               ) : (
-                <div className="flex aspect-[9/16] items-center justify-center bg-white/10 text-center text-[11px] text-white/70">
-                  {genning ? <Loader2 className="h-6 w-6 animate-spin" /> : "Tap Generate"}
+                <div className={`flex items-center justify-center bg-white/10 text-center text-[11px] text-white/70 ${share.format === "square" ? "aspect-square" : "aspect-[9/16]"}`}>
+                  {share.genning ? <Loader2 className="h-6 w-6 animate-spin" /> : "Tap Generate"}
                 </div>
               )}
             </div>
 
             <div className="mt-5 space-y-2">
-              {!imgUrl ? (
-                <Button onClick={generate} disabled={genning} className="w-full bg-white text-indigo-700 hover:bg-white/90">
-                  {genning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Share2 className="h-4 w-4" />} Generate image
+              {!share.imgUrl ? (
+                <Button onClick={share.generate} disabled={share.genning} className="w-full bg-white text-indigo-700 hover:bg-white/90">
+                  {share.genning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Share2 className="h-4 w-4" />} Generate {share.format === "square" ? "square" : "story"} image
                 </Button>
               ) : (
                 <>
                   <div className="grid grid-cols-2 gap-2">
-                    <Button onClick={nativeShare} className="bg-white text-indigo-700 hover:bg-white/90"><Share2 className="h-4 w-4" /> Share</Button>
-                    <Button onClick={download} variant="outline" className="border-white/40 bg-white/10 text-white hover:bg-white/20"><Download className="h-4 w-4" /> Download</Button>
+                    <Button onClick={() => share.nativeShare("I earned while I slept! 🚀")} className="bg-white text-indigo-700 hover:bg-white/90"><Share2 className="h-4 w-4" /> Share</Button>
+                    <Button onClick={() => share.download(`quantumx-bonus-${bonus.monthYear}-${share.format}.png`)} variant="outline" className="border-white/40 bg-white/10 text-white hover:bg-white/20"><Download className="h-4 w-4" /> Download</Button>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <Button onClick={() => window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(refLink)}`, "_blank")} variant="outline" className="border-white/40 bg-white/10 text-white hover:bg-white/20"><Facebook className="h-4 w-4" /> Facebook</Button>
@@ -215,33 +181,38 @@ export function MonthlyBonusCelebration({
         )}
       </div>
 
-      {/* Off-screen 1080×1920 share card captured by html2canvas */}
-      <div ref={shareRef} aria-hidden style={{
-        position: "fixed", left: -99999, top: 0, width: 1080, height: 1920,
-        background: "linear-gradient(160deg, #7c3aed 0%, #4f46e5 50%, #3b82f6 100%)",
-        color: "#fff", fontFamily: "system-ui, sans-serif", padding: 96,
-        display: "flex", flexDirection: "column", alignItems: "center", boxSizing: "border-box",
-      }}>
-        <div style={{ fontSize: 48, fontWeight: 800, letterSpacing: 2, opacity: 0.95 }}>QuantumX Global</div>
-        <div style={{ marginTop: 140, fontSize: 60, fontWeight: 800, textAlign: "center", lineHeight: 1.1 }}>I EARNED WHILE<br />I SLEPT! 😴💸</div>
-        <div style={{ marginTop: 60, fontSize: 220, fontWeight: 900, textShadow: "0 8px 40px rgba(0,0,0,0.35)" }}>{formatUsd(bonus.bonusAmount)}</div>
-        <div style={{ fontSize: 40, fontWeight: 600, opacity: 0.95 }}>Monthly Bonus · {month}</div>
-        <div style={{ marginTop: 70, fontSize: 40, textAlign: "center", maxWidth: 820, lineHeight: 1.35 }}>
-          My {bonus.directsCount} direct{bonus.directsCount === 1 ? "" : "s"} earned <b>{formatUsd(bonus.totalDirectsPl)}</b> — I got <b>5%</b>! 🔥
-        </div>
-        <div style={{ marginTop: 50, fontSize: 44, fontWeight: 700 }}>{firstName} · {tier} Tier</div>
-        <div style={{ flex: 1 }} />
-        <div style={{ display: "flex", alignItems: "center", gap: 32, background: "rgba(255,255,255,0.12)", padding: 32, borderRadius: 28 }}>
-          <div style={{ background: "#fff", padding: 16, borderRadius: 16 }}>
-            <QRCodeCanvas value={refLink} size={180} level="M" />
+      {/* Off-screen share card captured by html2canvas — story (9:16) or square (1:1). */}
+      {(() => {
+        const sq = share.format === "square";
+        return (
+          <div ref={share.ref} aria-hidden style={{
+            position: "fixed", left: -99999, top: 0, width: 1080, height: sq ? 1080 : 1920,
+            background: "linear-gradient(160deg, #7c3aed 0%, #4f46e5 50%, #3b82f6 100%)",
+            color: "#fff", fontFamily: "system-ui, sans-serif", padding: sq ? 64 : 96,
+            display: "flex", flexDirection: "column", alignItems: "center", boxSizing: "border-box",
+          }}>
+            <div style={{ fontSize: sq ? 40 : 48, fontWeight: 800, letterSpacing: 2, opacity: 0.95 }}>QuantumX Global</div>
+            <div style={{ marginTop: sq ? 36 : 140, fontSize: sq ? 50 : 60, fontWeight: 800, textAlign: "center", lineHeight: 1.1 }}>I EARNED WHILE<br />I SLEPT! 😴💸</div>
+            <div style={{ marginTop: sq ? 20 : 60, fontSize: sq ? 150 : 220, fontWeight: 900, textShadow: "0 8px 40px rgba(0,0,0,0.35)" }}>{formatUsd(bonus.bonusAmount)}</div>
+            <div style={{ fontSize: sq ? 34 : 40, fontWeight: 600, opacity: 0.95 }}>Monthly Bonus · {month}</div>
+            <div style={{ marginTop: sq ? 28 : 70, fontSize: sq ? 34 : 40, textAlign: "center", maxWidth: sq ? 920 : 820, lineHeight: 1.35 }}>
+              My {bonus.directsCount} direct{bonus.directsCount === 1 ? "" : "s"} earned <b>{formatUsd(bonus.totalDirectsPl)}</b> — I got <b>5%</b>! 🔥
+            </div>
+            <div style={{ marginTop: sq ? 20 : 50, fontSize: sq ? 36 : 44, fontWeight: 700 }}>{firstName} · {tier} Tier</div>
+            <div style={{ flex: 1 }} />
+            <div style={{ display: "flex", alignItems: "center", gap: sq ? 24 : 32, background: "rgba(255,255,255,0.12)", padding: sq ? 24 : 32, borderRadius: 28 }}>
+              <div style={{ background: "#fff", padding: sq ? 12 : 16, borderRadius: 16 }}>
+                <QRCodeCanvas value={refLink} size={sq ? 140 : 180} level="M" />
+              </div>
+              <div>
+                <div style={{ fontSize: sq ? 26 : 30, opacity: 0.9 }}>Join my team:</div>
+                <div style={{ fontSize: sq ? 30 : 34, fontWeight: 700, wordBreak: "break-all" }}>{refLink.replace(/^https?:\/\//, "")}</div>
+              </div>
+            </div>
+            <div style={{ marginTop: sq ? 24 : 56, fontSize: sq ? 26 : 30, opacity: 0.8 }}>QuantumX — Precision Trading, Real Results</div>
           </div>
-          <div>
-            <div style={{ fontSize: 30, opacity: 0.9 }}>Join my team:</div>
-            <div style={{ fontSize: 34, fontWeight: 700, wordBreak: "break-all" }}>{refLink.replace(/^https?:\/\//, "")}</div>
-          </div>
-        </div>
-        <div style={{ marginTop: 56, fontSize: 30, opacity: 0.8 }}>QuantumX — Precision Trading, Real Results</div>
-      </div>
+        );
+      })()}
     </div>
   );
 }

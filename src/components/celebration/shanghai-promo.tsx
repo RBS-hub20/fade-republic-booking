@@ -2,9 +2,12 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { X, Plane, Copy, Check, Users, TrendingUp, Hotel, Utensils, Camera, Trophy } from "lucide-react";
+import { X, Plane, Copy, Check, Users, TrendingUp, Hotel, Utensils, Camera, Trophy, Share2, Download, Facebook, Loader2 } from "lucide-react";
+import { QRCodeCanvas } from "qrcode.react";
 import { Button } from "@/components/ui/button";
 import { formatUsd } from "@/lib/utils";
+import { useShareImage } from "@/lib/use-share-image";
+import { ShareFormatToggle } from "@/components/celebration/share-format-toggle";
 
 // The promo runs Aug 4–31, 2026 (local). Bonus modal owns Aug 1–3; Sept 1+ it
 // auto-disables — no code removal needed.
@@ -33,7 +36,9 @@ export function ShanghaiPromo({
   const [open, setOpen] = useState(false);
   const [shown, setShown] = useState(false);
   const [tab, setTab] = useState<"builders" | "investors">("builders");
+  const [mode, setMode] = useState<"promo" | "share">("promo");
   const [copied, setCopied] = useState(false);
+  const share = useShareImage();
   const refLink = referralCode ? `${origin}/signup?ref=${referralCode}` : `${origin}/signup`;
 
   useEffect(() => {
@@ -98,6 +103,8 @@ export function ShanghaiPromo({
         </h2>
         <p className="text-center text-sm font-semibold text-white/90">Oct 2026 · All-Expenses-Paid</p>
 
+        {mode === "promo" ? (
+        <>
         {/* Tabs */}
         <div className="mt-5 grid grid-cols-2 gap-2">
           {(["builders", "investors"] as const).map((t) => (
@@ -175,12 +182,93 @@ export function ShanghaiPromo({
         </p>
 
         <div className="mt-4 space-y-2">
-          <Button onClick={close} className="w-full bg-gradient-to-r from-gold-500 to-gold-300 font-bold text-black hover:from-gold-400 hover:to-gold-200">
-            <Plane className="h-4 w-4" /> Let&apos;s go to Shanghai!
-          </Button>
+          <div className="grid grid-cols-[1fr_auto] gap-2">
+            <Button onClick={close} className="bg-gradient-to-r from-gold-500 to-gold-300 font-bold text-black hover:from-gold-400 hover:to-gold-200">
+              <Plane className="h-4 w-4" /> Let&apos;s go to Shanghai!
+            </Button>
+            <Button onClick={() => setMode("share")} variant="outline" className="border-gold-400/40 bg-white/5 text-gold-200 hover:bg-white/10" title="Share">
+              <Share2 className="h-4 w-4" />
+            </Button>
+          </div>
           <button onClick={close} className="w-full py-1 text-center text-xs text-white/60 hover:text-white">Maybe later</button>
         </div>
+        </>
+        ) : (
+          /* ---- Share view ---- */
+          <div className="mt-5">
+            <p className="text-center text-sm font-semibold text-gold-200">Share your Shanghai journey 📸</p>
+            <p className="mt-1 text-center text-xs text-white/70">Story for MyDay, or Square for FB / IG feed.</p>
+            <ShareFormatToggle format={share.format} onChange={share.chooseFormat} />
+            <div className={`mx-auto mt-3 overflow-hidden rounded-lg border border-white/20 ${share.format === "square" ? "w-44" : "w-36"}`}>
+              {share.imgUrl ? (
+                <img src={share.imgUrl} alt="Shanghai" className="w-full" />
+              ) : (
+                <div className={`flex items-center justify-center bg-white/5 text-center text-[11px] text-white/60 ${share.format === "square" ? "aspect-square" : "aspect-[9/16]"}`}>
+                  {share.genning ? <Loader2 className="h-6 w-6 animate-spin" /> : "Tap Generate"}
+                </div>
+              )}
+            </div>
+            <div className="mt-5 space-y-2">
+              {!share.imgUrl ? (
+                <Button onClick={share.generate} disabled={share.genning} className="w-full bg-gold-400 text-black hover:bg-gold-300">
+                  {share.genning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Share2 className="h-4 w-4" />} Generate {share.format === "square" ? "square" : "story"} image
+                </Button>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button onClick={() => share.nativeShare("I'm going to Shanghai with QuantumX! ✈️🇨🇳")} className="bg-gold-400 text-black hover:bg-gold-300"><Share2 className="h-4 w-4" /> Share</Button>
+                    <Button onClick={() => share.download(`quantumx-shanghai-${share.format}.png`)} variant="outline" className="border-gold-400/40 bg-white/5 text-gold-200 hover:bg-white/10"><Download className="h-4 w-4" /> Download</Button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button onClick={() => window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(refLink)}`, "_blank")} variant="outline" className="border-gold-400/40 bg-white/5 text-gold-200 hover:bg-white/10"><Facebook className="h-4 w-4" /> Facebook</Button>
+                    <Button onClick={copyLink} variant="outline" className="border-gold-400/40 bg-white/5 text-gold-200 hover:bg-white/10">{copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />} Copy link</Button>
+                  </div>
+                </>
+              )}
+              <button onClick={() => setMode("promo")} className="w-full py-1 text-center text-xs text-white/60 hover:text-white">← Back</button>
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Off-screen Shanghai share card — story (9:16) or square (1:1) */}
+      {(() => {
+        const sq = share.format === "square";
+        return (
+          <div ref={share.ref} aria-hidden style={{
+            position: "fixed", left: -99999, top: 0, width: 1080, height: sq ? 1080 : 1920,
+            background: "radial-gradient(130% 100% at 50% 0%, #2a2205 0%, #0d0d0d 60%, #000 100%)",
+            color: "#fff", fontFamily: "system-ui, sans-serif", padding: sq ? 64 : 96,
+            display: "flex", flexDirection: "column", alignItems: "center", boxSizing: "border-box",
+          }}>
+            <div style={{ fontSize: sq ? 40 : 48, fontWeight: 800, letterSpacing: 2, color: "#f5c542" }}>QuantumX Global</div>
+            <div style={{ marginTop: sq ? 30 : 120, fontSize: sq ? 46 : 56, fontWeight: 800, textAlign: "center", lineHeight: 1.12 }}>
+              I&apos;M GOING TO<br /><span style={{ color: "#f5c542" }}>SHANGHAI!</span> 🇨🇳✈️
+            </div>
+            <div style={{ marginTop: sq ? 24 : 64, fontSize: sq ? 34 : 40, fontWeight: 600, opacity: 0.95 }}>Oct 2026 · All-Expenses-Paid</div>
+            <div style={{ marginTop: sq ? 28 : 72, width: sq ? 860 : 820 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: sq ? 30 : 34, marginBottom: 16 }}>
+                <span style={{ opacity: 0.85 }}>My network sales</span>
+                <span style={{ fontWeight: 800, color: "#f5c542" }}>{formatUsd(networkSales)} / {formatUsd(GOAL)}</span>
+              </div>
+              <div style={{ height: sq ? 28 : 34, width: "100%", background: "rgba(255,255,255,0.12)", borderRadius: 999, overflow: "hidden" }}>
+                <div style={{ height: "100%", width: `${pct}%`, background: "linear-gradient(90deg,#d4a017,#f5c542)", borderRadius: 999 }} />
+              </div>
+            </div>
+            <div style={{ flex: 1 }} />
+            <div style={{ display: "flex", alignItems: "center", gap: sq ? 24 : 32, background: "rgba(245,197,66,0.12)", padding: sq ? 24 : 32, borderRadius: 28 }}>
+              <div style={{ background: "#fff", padding: sq ? 12 : 16, borderRadius: 16 }}>
+                <QRCodeCanvas value={refLink} size={sq ? 140 : 180} level="M" />
+              </div>
+              <div>
+                <div style={{ fontSize: sq ? 26 : 30, opacity: 0.9 }}>Join my team:</div>
+                <div style={{ fontSize: sq ? 30 : 34, fontWeight: 700, color: "#f5c542", wordBreak: "break-all" }}>{refLink.replace(/^https?:\/\//, "")}</div>
+              </div>
+            </div>
+            <div style={{ marginTop: sq ? 24 : 56, fontSize: sq ? 26 : 30, fontWeight: 700, letterSpacing: 1, color: "#f5c542" }}>BUILD TODAY · EARN TOMORROW · LIVE YOUR FREEDOM</div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
