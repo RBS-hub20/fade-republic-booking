@@ -138,8 +138,8 @@ export function ShanghaiPromo({
                 <Button onClick={copyLink} className="bg-gold-400 text-black hover:bg-gold-300">
                   {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />} {copied ? "Copied!" : "Copy my link"}
                 </Button>
-                <Button onClick={() => go("/dashboard")} variant="outline" className="border-gold-400/40 bg-white/5 text-gold-200 hover:bg-white/10">
-                  <Trophy className="h-4 w-4" /> My team
+                <Button onClick={() => go("/dashboard/leaderboard")} variant="outline" className="border-gold-400/40 bg-white/5 text-gold-200 hover:bg-white/10">
+                  <Trophy className="h-4 w-4" /> Leaderboard
                 </Button>
               </div>
             </div>

@@ -769,3 +769,72 @@ export async function getNetworkSalesForMonth(userId: string, monthYear: string)
     return 0;
   }
 }
+
+export interface LeaderboardEntry {
+  userId: string;
+  name: string;
+  sales: number;
+  rank: number;
+}
+export interface NetworkLeaderboard {
+  top: LeaderboardEntry[];
+  me: LeaderboardEntry | null;
+  totalRanked: number;
+}
+
+/**
+ * Network-sales leaderboard for a month. Computed in ONE pass: every APPROVED
+ * deposit in the month is attributed to each ancestor in the depositor's
+ * materialized referralPath, so each ancestor's total = their whole downline's
+ * sales (matches getNetworkSalesForMonth per user). Efficient regardless of
+ * network size — no per-user downline scan.
+ */
+export async function getNetworkSalesLeaderboard(
+  monthYear: string,
+  opts?: { limit?: number; meUserId?: string }
+): Promise<NetworkLeaderboard> {
+  const limit = opts?.limit ?? 20;
+  try {
+    const start = manilaMonthStartUTC(monthYear);
+    const end = manilaMonthEndUTC(monthYear);
+
+    const users = await prisma.user.findMany({
+      select: { id: true, name: true, clientId: true, referralPath: true },
+    });
+    const pathByClient = new Map<string, string | null>();
+    const nameById = new Map<string, string>();
+    for (const u of users) {
+      nameById.set(u.id, u.name);
+      if (u.clientId) pathByClient.set(u.clientId, u.referralPath);
+    }
+
+    const deposits = await prisma.transaction.findMany({
+      where: { type: "DEPOSIT", status: "APPROVED", createdAt: { gte: start, lt: end } },
+      select: { amount: true, clientId: true },
+    });
+
+    const totals = new Map<string, number>();
+    for (const d of deposits) {
+      const path = pathByClient.get(d.clientId);
+      if (!path) continue; // depositor has no upline → contributes to no network
+      for (const ancestorId of path.split("/")) {
+        if (!ancestorId) continue;
+        totals.set(ancestorId, (totals.get(ancestorId) ?? 0) + d.amount);
+      }
+    }
+
+    const withRank: LeaderboardEntry[] = Array.from(totals.entries())
+      .map(([userId, sales]) => ({ userId, name: nameById.get(userId) ?? "—", sales: round2b(sales) }))
+      .filter((e) => e.sales > 0)
+      .sort((a, b) => b.sales - a.sales)
+      .map((e, i) => ({ ...e, rank: i + 1 }));
+
+    return {
+      top: withRank.slice(0, limit),
+      me: opts?.meUserId ? withRank.find((e) => e.userId === opts.meUserId) ?? null : null,
+      totalRanked: withRank.length,
+    };
+  } catch {
+    return { top: [], me: null, totalRanked: 0 };
+  }
+}
