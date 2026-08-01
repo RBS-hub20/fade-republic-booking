@@ -8,10 +8,11 @@ import { getAdminDashboardData, getClientPerformance } from "@/lib/data";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { formatUsd } from "@/lib/utils";
-import { getReferralSummary, getLatestMonthlyBonus } from "@/lib/referrals";
+import { getReferralSummary, getLatestMonthlyBonus, getNetworkSalesForMonth } from "@/lib/referrals";
 import { REFERRALS_ENABLED } from "@/lib/referrals-config";
 import { tierForBalance } from "@/lib/tiers";
 import { MonthlyBonusCelebration } from "@/components/celebration/monthly-bonus-celebration";
+import { ShanghaiPromo } from "@/components/celebration/shanghai-promo";
 import { getCapitalSummary } from "@/lib/capital";
 import { getPayoutState, syncPayoutTracking, type PayoutState } from "@/lib/payout-cap";
 import { ensureFinanceSchemaOnce } from "@/lib/finance-schema";
@@ -67,7 +68,7 @@ export default async function DashboardPage() {
     // > 1. Each block self-guards and falls back to its prior default, so the
     // dashboard still renders fully if any piece is unavailable — behavior is
     // unchanged, only the concurrency differs.
-    const [perf, referral, capitalBundle, payout, celebrationBonus] = await Promise.all([
+    const [perf, referral, capitalBundle, payout, celebrationBonus, networkSales] = await Promise.all([
       getClientPerformance(session.clientId).catch((err) => {
         console.error("[dashboard] performance unavailable:", err);
         return null;
@@ -101,6 +102,7 @@ export default async function DashboardPage() {
         ? getPayoutState(session.userId, session.clientId).catch(() => null as PayoutState | null)
         : Promise.resolve(null as PayoutState | null),
       session.userId ? getLatestMonthlyBonus(session.userId).catch(() => null) : Promise.resolve(null),
+      session.userId ? getNetworkSalesForMonth(session.userId, "2026-08").catch(() => 0) : Promise.resolve(0),
     ]);
 
     const datasets: DashboardDataset[] = perf
@@ -138,6 +140,11 @@ export default async function DashboardPage() {
           firstName={session.name.split(" ")[0]}
           referralCode={me?.referralCode ?? null}
           tier={tierForBalance(perf?.kpis.currentBalance ?? 0)?.name ?? "Starter"}
+          origin={process.env.NEXT_PUBLIC_SITE_URL || "https://quantumxglobal.online"}
+        />
+        <ShanghaiPromo
+          networkSales={networkSales}
+          referralCode={me?.referralCode ?? null}
           origin={process.env.NEXT_PUBLIC_SITE_URL || "https://quantumxglobal.online"}
         />
         <PageHeader

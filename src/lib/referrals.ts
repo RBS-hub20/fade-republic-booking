@@ -739,3 +739,33 @@ export async function getLatestMonthlyBonus(userId: string): Promise<Celebration
     return null;
   }
 }
+
+/**
+ * Total network SALES for a month = sum of APPROVED deposits made in that month
+ * by everyone in the user's downline (all descendants via the materialized
+ * referralPath). Powers the Shanghai promo "Builders" progress bar. Best-effort.
+ */
+export async function getNetworkSalesForMonth(userId: string, monthYear: string): Promise<number> {
+  try {
+    const start = manilaMonthStartUTC(monthYear);
+    const end = manilaMonthEndUTC(monthYear);
+    const downline = await prisma.user.findMany({
+      where: { referralPath: { contains: userId } },
+      select: { clientId: true },
+    });
+    const clientIds = downline.map((d) => d.clientId).filter(Boolean) as string[];
+    if (clientIds.length === 0) return 0;
+    const agg = await prisma.transaction.aggregate({
+      where: {
+        clientId: { in: clientIds },
+        type: "DEPOSIT",
+        status: "APPROVED",
+        createdAt: { gte: start, lt: end },
+      },
+      _sum: { amount: true },
+    });
+    return round2b(agg._sum.amount ?? 0);
+  } catch {
+    return 0;
+  }
+}
