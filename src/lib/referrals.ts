@@ -650,12 +650,15 @@ export async function runMonthlyReferralBonus(opts?: { monthYear?: string }): Pr
       });
       if (done) continue;
 
-      // Requirement 1: earner had Active Capital ≥ $50 entering the payout month.
+      // Requirement 1: earner has Active Capital ≥ $50 (sponsor must be funded).
       const earnerCap = await approvedDepositsBefore(earner.clientId, monthEnd);
       if (earnerCap < BONUS_MIN_CAPITAL) continue;
 
-      // Qualifying directs: held ≥ $50 for the ENTIRE month (i.e. funded before
-      // month start) AND their client is ACTIVE.
+      // Owner rule: ALL directs count — no per-direct active-status, funding-date
+      // or capital filter. Any direct (referredById = earner) with Daily P/L in
+      // the month is summed, even if funded mid-month or since gone inactive.
+      // The only gates are the earner's own ≥$50 capital (above) and the 5x cap
+      // (below).
       const directs = await prisma.user.findMany({
         where: { referredById: earner.id },
         select: { clientId: true },
@@ -663,24 +666,9 @@ export async function runMonthlyReferralBonus(opts?: { monthYear?: string }): Pr
       const dClientIds = directs.map((d) => d.clientId).filter(Boolean) as string[];
       if (dClientIds.length === 0) continue;
 
-      const activeClients = await prisma.client.findMany({
-        where: { id: { in: dClientIds }, status: "ACTIVE" },
-        select: { id: true },
-      });
-      const activeSet = new Set(activeClients.map((c) => c.id));
-
-      const qualifying: string[] = [];
-      for (const cid of dClientIds) {
-        if (!activeSet.has(cid)) continue;
-        const capBeforeMonth = await approvedDepositsBefore(cid, monthStart);
-        if (capBeforeMonth >= BONUS_MIN_CAPITAL) qualifying.push(cid);
-      }
-      // Requirement 2: ≥ 1 qualifying active direct.
-      if (qualifying.length === 0) continue;
-
-      // Sum those directs' Daily P/L generated during the month.
+      // Sum EVERY direct's Daily P/L generated during the month.
       const rows = await prisma.dailyPerformance.findMany({
-        where: { clientId: { in: qualifying }, date: { gte: monthStart, lt: monthEnd } },
+        where: { clientId: { in: dClientIds }, date: { gte: monthStart, lt: monthEnd } },
         select: { pnlUsd: true },
       });
       const totalPl = round2b(rows.reduce((s, r) => s + r.pnlUsd, 0));
@@ -701,7 +689,7 @@ export async function runMonthlyReferralBonus(opts?: { monthYear?: string }): Pr
             totalDirectsPl: totalPl,
             bonusRate: MONTHLY_BONUS_RATE,
             bonusAmount: bonus,
-            directsCount: qualifying.length,
+            directsCount: dClientIds.length,
           },
         }),
         prisma.user.update({
