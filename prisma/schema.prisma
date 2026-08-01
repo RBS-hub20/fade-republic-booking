@@ -368,3 +368,11 @@ model DailyPerformance {
   // Operator-created (Neon): per-client, newest-day-first performance scans.
   @@index([clientId, date(sort: Desc)], map: "idx_daily_perf_client_date")
 }
+
+/// Simple key-value store for admin-toggleable feature flags (e.g. celebration
+/// pop-ups). Created additively by `prisma db push` at deploy.
+model Setting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}

@@ -28,13 +28,14 @@ function prevMonthKey(now = new Date()) {
  * > $0 for the previous month. `?celebrate=preview` force-shows it for QA.
  */
 export function MonthlyBonusCelebration({
-  bonus, firstName, referralCode, tier, origin,
+  bonus, firstName, referralCode, tier, origin, enabled = true,
 }: {
   bonus: CelebrationBonus | null;
   firstName: string;
   referralCode: string | null;
   tier: string;
   origin: string;
+  enabled?: boolean;
 }) {
   const router = useRouter();
   const params = useSearchParams();
@@ -46,6 +47,7 @@ export function MonthlyBonusCelebration({
   useEffect(() => {
     if (!bonus || bonus.bonusAmount <= 0) return;
     const force = params.get("celebrate") === "preview";
+    if (!enabled && !force) return; // admin-disabled (preview still overrides)
     if (!force) {
       const now = new Date();
       const day = now.getDate();
@@ -57,7 +59,7 @@ export function MonthlyBonusCelebration({
     }
     setOpen(true);
     requestAnimationFrame(() => setShown(true));
-  }, [bonus, params]);
+  }, [bonus, params, enabled]);
 
   // --- Confetti (lazy — only loads when the modal opens) ----------------------
   useEffect(() => {

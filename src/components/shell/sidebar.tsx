@@ -23,6 +23,7 @@ import {
   Mail,
   UserCog,
   X,
+  Settings,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/brand/logo";
@@ -56,6 +57,7 @@ function navForRole(role: string, clientId: string | null): NavItem[] {
       { href: "/charts", label: "Charts", icon: CandlestickChart },
       { href: "/reports", label: "Reports", icon: FileText },
       { href: "/admin/chats", label: "Support Logs", icon: MessageSquare },
+      { href: "/admin/settings", label: "Settings", icon: Settings },
       { href: "/settings/change-password", label: "Change Password", icon: KeyRound, divider: true },
     ];
   }

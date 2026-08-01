@@ -21,11 +21,12 @@ function todayKey(d = new Date()) {
  * `?shanghai=preview` force-shows it (bypasses date + daily gate) for QA.
  */
 export function ShanghaiPromo({
-  networkSales, referralCode, origin,
+  networkSales, referralCode, origin, enabled = true,
 }: {
   networkSales: number;
   referralCode: string | null;
   origin: string;
+  enabled?: boolean;
 }) {
   const router = useRouter();
   const params = useSearchParams();
@@ -37,6 +38,7 @@ export function ShanghaiPromo({
 
   useEffect(() => {
     const force = params.get("shanghai") === "preview";
+    if (!enabled && !force) return; // admin-disabled (preview still overrides)
     if (!force) {
       const now = new Date();
       if (now < PROMO_START || now >= PROMO_END_EXCL) return; // outside Aug 4–31
@@ -46,7 +48,7 @@ export function ShanghaiPromo({
     }
     setOpen(true);
     requestAnimationFrame(() => setShown(true));
-  }, [params]);
+  }, [params, enabled]);
 
   useEffect(() => {
     if (!open) return;
