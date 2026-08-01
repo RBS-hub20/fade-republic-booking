@@ -8,8 +8,10 @@ import { getAdminDashboardData, getClientPerformance } from "@/lib/data";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { formatUsd } from "@/lib/utils";
-import { getReferralSummary } from "@/lib/referrals";
+import { getReferralSummary, getLatestMonthlyBonus } from "@/lib/referrals";
 import { REFERRALS_ENABLED } from "@/lib/referrals-config";
+import { tierForBalance } from "@/lib/tiers";
+import { MonthlyBonusCelebration } from "@/components/celebration/monthly-bonus-celebration";
 import { getCapitalSummary } from "@/lib/capital";
 import { getPayoutState, syncPayoutTracking, type PayoutState } from "@/lib/payout-cap";
 import { ensureFinanceSchemaOnce } from "@/lib/finance-schema";
@@ -65,7 +67,7 @@ export default async function DashboardPage() {
     // > 1. Each block self-guards and falls back to its prior default, so the
     // dashboard still renders fully if any piece is unavailable — behavior is
     // unchanged, only the concurrency differs.
-    const [perf, referral, capitalBundle, payout] = await Promise.all([
+    const [perf, referral, capitalBundle, payout, celebrationBonus] = await Promise.all([
       getClientPerformance(session.clientId).catch((err) => {
         console.error("[dashboard] performance unavailable:", err);
         return null;
@@ -98,6 +100,7 @@ export default async function DashboardPage() {
       session.userId && session.clientId
         ? getPayoutState(session.userId, session.clientId).catch(() => null as PayoutState | null)
         : Promise.resolve(null as PayoutState | null),
+      session.userId ? getLatestMonthlyBonus(session.userId).catch(() => null) : Promise.resolve(null),
     ]);
 
     const datasets: DashboardDataset[] = perf
@@ -130,6 +133,13 @@ export default async function DashboardPage() {
 
     return (
       <>
+        <MonthlyBonusCelebration
+          bonus={celebrationBonus}
+          firstName={session.name.split(" ")[0]}
+          referralCode={me?.referralCode ?? null}
+          tier={tierForBalance(perf?.kpis.currentBalance ?? 0)?.name ?? "Starter"}
+          origin={process.env.NEXT_PUBLIC_SITE_URL || "https://quantumxglobal.online"}
+        />
         <PageHeader
           title={`Welcome, ${session.name.split(" ")[0]}`}
           subtitle="Your account performance · calculated daily, Mon–Sun (Asia/Manila)"

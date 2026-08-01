@@ -706,3 +706,36 @@ export async function runMonthlyReferralBonus(opts?: { monthYear?: string }): Pr
 
   return { month: monthYear, paid, totalPaid: round2b(totalPaid) };
 }
+
+export interface CelebrationBonus {
+  monthYear: string;
+  bonusAmount: number;
+  directsCount: number;
+  totalDirectsPl: number;
+  paidAt: string;
+}
+
+/**
+ * The user's most recent monthly bonus, with the fields the login celebration
+ * pop-up needs (amount, directs, their combined P/L, paid date). Returns null if
+ * they have none. Best-effort — a missing table just yields null.
+ */
+export async function getLatestMonthlyBonus(userId: string): Promise<CelebrationBonus | null> {
+  try {
+    await ensureReferralSchemaOnce(prisma);
+    const mb = await prisma.monthlyBonus.findFirst({
+      where: { userId },
+      orderBy: { monthYear: "desc" },
+    });
+    if (!mb) return null;
+    return {
+      monthYear: mb.monthYear,
+      bonusAmount: round2b(mb.bonusAmount),
+      directsCount: mb.directsCount,
+      totalDirectsPl: round2b(mb.totalDirectsPl),
+      paidAt: mb.paidAt.toISOString(),
+    };
+  } catch {
+    return null;
+  }
+}
