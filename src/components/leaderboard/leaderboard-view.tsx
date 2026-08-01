@@ -46,7 +46,16 @@ export function LeaderboardView({
         {e.name}
         {highlight && <span className="ml-1.5 rounded bg-gold-400/20 px-1.5 py-0.5 text-[10px] font-semibold text-gold-300">You</span>}
       </span>
-      <span className="tabular-nums text-sm font-bold text-gold-300">{formatUsd(e.sales)}</span>
+      {/* Privacy: only YOU see your own $ amount. Others show a Qualified badge
+          (goal reached) or a neutral "In the race" — never the amount, and never
+          a % (which would reverse-reveal the amount). */}
+      {highlight ? (
+        <span className="tabular-nums text-sm font-bold text-gold-300">{formatUsd(e.sales)}</span>
+      ) : e.sales >= GOAL ? (
+        <span className="shrink-0 rounded bg-profit/15 px-2 py-0.5 text-[11px] font-semibold text-profit">Qualified ✓</span>
+      ) : (
+        <span className="shrink-0 text-xs text-muted-foreground">In the race</span>
+      )}
     </div>
   );
 
