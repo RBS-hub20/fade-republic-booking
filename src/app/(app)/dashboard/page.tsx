@@ -155,6 +155,15 @@ export default async function DashboardPage() {
           title={`Welcome, ${session.name.split(" ")[0]}`}
           subtitle="Your account performance · calculated daily, Mon–Sun (Asia/Manila)"
         />
+        {flags[FLAG_SHANGHAI_MODAL] && (
+          <Link
+            href="/dashboard/leaderboard"
+            className="mb-6 flex items-center justify-between gap-3 rounded-lg border border-gold-400/40 bg-gradient-to-r from-gold-400/15 to-transparent px-4 py-3 text-sm text-gold-200 transition-colors hover:bg-gold-400/20"
+          >
+            <span className="font-medium">🏆 Shanghai Race — Top 20 network sales live this month</span>
+            <span className="shrink-0 font-semibold text-gold-300">View Leaderboard →</span>
+          </Link>
+        )}
         {isInactive && (
           <Link
             href="/qx-tiers"

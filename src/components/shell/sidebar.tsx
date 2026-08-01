@@ -24,6 +24,7 @@ import {
   UserCog,
   X,
   Settings,
+  Trophy,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/brand/logo";
@@ -64,6 +65,7 @@ function navForRole(role: string, clientId: string | null): NavItem[] {
   // Client
   return [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { href: "/dashboard/leaderboard", label: "Shanghai Race", icon: Trophy, badge: "HOT" },
     { href: "/qx-tiers", label: "QX Tiers", icon: Crown, badge: "NEW", divider: true },
     { href: "/wallet", label: "Deposit / Withdraw", icon: Wallet },
     { href: "/charts", label: "Charts", icon: CandlestickChart },
