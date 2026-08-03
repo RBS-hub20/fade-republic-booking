@@ -17,7 +17,6 @@ import {
   Coins,
   CalendarClock,
   Unlock,
-  Network,
   ShieldCheck,
   KeyRound,
   Mail,
@@ -52,7 +51,11 @@ function navForRole(role: string, clientId: string | null): NavItem[] {
       { href: "/admin/monthly-bonus", label: "Monthly Bonus", icon: CalendarClock },
       { href: "/admin/top-earners", label: "Top Earners 💰", icon: Trophy, badge: "ADMIN" },
       { href: "/admin/unlocks", label: "2nd-Level Unlocks", icon: Unlock },
-      { href: "/admin/genealogy", label: "Genealogy", icon: Network },
+      // Genealogy link hidden — the page hangs on large trees. Route + data are
+      // untouched (still reachable directly at /admin/genealogy); only the nav
+      // entry is removed. To restore: re-add the `Network` lucide import and
+      // uncomment the line below.
+      // { href: "/admin/genealogy", label: "Genealogy", icon: Network },
       { href: "/admin/audit/proofs", label: "Proof Audit", icon: ShieldCheck },
       { href: "/admin/emails", label: "Email Log", icon: Mail },
       { href: "/ledger", label: "Ledger", icon: ArrowLeftRight },
