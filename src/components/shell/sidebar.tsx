@@ -50,6 +50,7 @@ function navForRole(role: string, clientId: string | null): NavItem[] {
       { href: "/admin/withdrawals", label: "Withdrawals", icon: ArrowUpFromLine },
       { href: "/admin/commissions", label: "Commissions", icon: Coins },
       { href: "/admin/monthly-bonus", label: "Monthly Bonus", icon: CalendarClock },
+      { href: "/admin/top-earners", label: "Top Earners 💰", icon: Trophy, badge: "ADMIN" },
       { href: "/admin/unlocks", label: "2nd-Level Unlocks", icon: Unlock },
       { href: "/admin/genealogy", label: "Genealogy", icon: Network },
       { href: "/admin/audit/proofs", label: "Proof Audit", icon: ShieldCheck },

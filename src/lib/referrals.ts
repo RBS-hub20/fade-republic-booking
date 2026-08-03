@@ -770,6 +770,77 @@ export async function getNetworkSalesForMonth(userId: string, monthYear: string)
   }
 }
 
+export interface TopEarner {
+  userId: string;
+  name: string;
+  direct: number;
+  indirect: number;
+  bonus: number;
+  total: number;
+  rank: number;
+}
+
+/**
+ * Top earners for a month (admin). Sums each user's Direct (L1 PAID referral
+ * commissions), Indirect (L2 commissions), and Monthly Bonus — grouped by when
+ * they landed (createdAt/paidAt in the month) — and ranks by grand total.
+ */
+export async function getTopEarners(monthYear: string, limit = 20): Promise<TopEarner[]> {
+  try {
+    const start = manilaMonthStartUTC(monthYear);
+    const end = manilaMonthEndUTC(monthYear);
+    const inMonth = { gte: start, lt: end };
+
+    const [direct, indirect, bonus] = await Promise.all([
+      prisma.referralCommission.groupBy({
+        by: ["referrerId"],
+        where: { status: "PAID", createdAt: inMonth },
+        _sum: { commission: true },
+      }),
+      prisma.level2Commission.groupBy({
+        by: ["earnerId"],
+        where: { createdAt: inMonth },
+        _sum: { commissionAmount: true },
+      }),
+      prisma.monthlyBonus.groupBy({
+        by: ["userId"],
+        where: { paidAt: inMonth },
+        _sum: { bonusAmount: true },
+      }),
+    ]);
+
+    const acc = new Map<string, { direct: number; indirect: number; bonus: number }>();
+    const bump = (id: string, k: "direct" | "indirect" | "bonus", v: number) => {
+      const cur = acc.get(id) ?? { direct: 0, indirect: 0, bonus: 0 };
+      cur[k] += v;
+      acc.set(id, cur);
+    };
+    for (const r of direct) bump(r.referrerId, "direct", r._sum.commission ?? 0);
+    for (const r of indirect) bump(r.earnerId, "indirect", r._sum.commissionAmount ?? 0);
+    for (const r of bonus) bump(r.userId, "bonus", r._sum.bonusAmount ?? 0);
+
+    if (acc.size === 0) return [];
+    const users = await prisma.user.findMany({ where: { id: { in: Array.from(acc.keys()) } }, select: { id: true, name: true } });
+    const nameById = new Map(users.map((u) => [u.id, u.name]));
+
+    return Array.from(acc.entries())
+      .map(([userId, v]) => ({
+        userId,
+        name: nameById.get(userId) ?? "—",
+        direct: round2b(v.direct),
+        indirect: round2b(v.indirect),
+        bonus: round2b(v.bonus),
+        total: round2b(v.direct + v.indirect + v.bonus),
+      }))
+      .filter((e) => e.total > 0)
+      .sort((a, b) => b.total - a.total)
+      .slice(0, limit)
+      .map((e, i) => ({ ...e, rank: i + 1 }));
+  } catch {
+    return [];
+  }
+}
+
 export interface LeaderboardEntry {
   userId: string;
   name: string;
