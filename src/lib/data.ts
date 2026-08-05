@@ -2,6 +2,7 @@
  * Server-side data access + derived performance computations.
  * Pages call these to get fully-computed equity curves and KPIs.
  */
+import { cache } from "react";
 import { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
 import {
@@ -85,8 +86,14 @@ export async function getClientsWithBalance() {
   });
 }
 
-/** Full computed performance for a single client (dashboard / report). */
-export async function getClientPerformance(clientId: string): Promise<ClientPerformance | null> {
+/**
+ * Full computed performance for a single client (dashboard / report).
+ * Request-memoized (React cache): the app-shell layout AND the page both need
+ * this, so without memoization every page rebuilt the equity curve twice per
+ * request. cache() collapses same-request, same-clientId calls into one.
+ */
+export const getClientPerformance = cache(_getClientPerformance);
+async function _getClientPerformance(clientId: string): Promise<ClientPerformance | null> {
   await ensureClientColumns();
   const client = await prisma.client.findUnique({
     where: { id: clientId },

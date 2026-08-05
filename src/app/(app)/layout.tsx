@@ -32,19 +32,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // Username/avatar backfill for legacy users now runs in the daily cron
   // (see /api/cron/daily) — off the page-load path entirely.
 
-  // Verification status drives the "verify your email" banner.
-  let emailVerified = true;
-  try {
-    if (session.userId) {
-      const user = await prisma.user.findUnique({
-        where: { id: session.userId },
-        select: { emailVerified: true },
-      });
-      emailVerified = user?.emailVerified ?? true;
-    }
-  } catch {
-    emailVerified = true; // never block the app on this lookup
-  }
+  // Verification status drives the "verify your email" banner. Read it from the
+  // signed session instead of a per-page DB round trip — clients cannot log in
+  // unverified (the login route blocks them), so the session value is reliable.
+  const emailVerified = session.emailVerified ?? true;
 
   // Header tier chip (clients only) — derived from the account balance.
   let tier: HeaderTier | null = null;
