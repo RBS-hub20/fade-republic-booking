@@ -34,6 +34,9 @@ const PUBLIC_PATHS = new Set([
   // It has no accounts of its own and reads only mock agency data.
   "/egov",
   "/app",
+  // PWA offline fallback — must render without a session (the SW serves it when
+  // the network is down, and the user may be logged out).
+  "/offline",
 ]);
 
 export function middleware(req: NextRequest) {
@@ -68,6 +71,9 @@ export function middleware(req: NextRequest) {
     // Messenger calls this from Facebook's servers — it can never carry a session.
     pathname === "/api/webhook/messenger" ||
     pathname === "/favicon.ico" ||
+    // PWA service worker — must load at the root scope without a session, or the
+    // browser can't register it (it would be redirected to /login).
+    pathname === "/sw.js" ||
     // Static files in /public (logo, icons, OG image, manifest, fonts, …) must
     // be reachable without a session so the marketing pages render for visitors.
     /\.(png|jpe?g|gif|svg|ico|webp|avif|webmanifest|json|txt|xml|woff2?|ttf|otf|mp4)$/.test(

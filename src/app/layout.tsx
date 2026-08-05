@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { PublicXena } from "@/components/support/public-xena";
+import { ServiceWorkerRegister } from "@/components/pwa/service-worker-register";
 
 // NOTE: We intentionally use a system font stack (defined in globals.css) rather
 // than next/font/google, so the app never depends on fetching fonts from Google
@@ -17,6 +18,18 @@ export const metadata: Metadata = {
   description: DESCRIPTION,
   applicationName: "QuantumX Global Markets",
   manifest: "/site.webmanifest",
+  // iOS "Add to Home Screen" support (Safari has no manifest install prompt).
+  // Emits apple-mobile-web-app-capable, apple-mobile-web-app-title and
+  // apple-mobile-web-app-status-bar-style so the installed app runs full-screen
+  // (standalone) with a black status bar that blends into the brand chrome.
+  appleWebApp: {
+    capable: true,
+    title: "QuantumX",
+    // Opaque black status bar (matches the brand chrome). Not "black-translucent"
+    // — that slides content under the notch, and not every page carries
+    // safe-area padding yet, so "black" avoids any overlap.
+    statusBarStyle: "black",
+  },
   icons: {
     // Ordered small→large. Google/browsers pick the best-fit source; declaring
     // the 192px and 512px PNGs gives Google Search a crisp logo to render
@@ -54,6 +67,9 @@ export const metadata: Metadata = {
 // the manifest, so mobile browser chrome and PWA installs match the site.
 export const viewport: Viewport = {
   themeColor: "#0A0A0A",
+  // Extend content under the iPhone notch / home indicator in standalone PWA
+  // mode. Pages use env(safe-area-inset-*) so nothing is hidden behind them.
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -66,6 +82,7 @@ export default function RootLayout({
       <body className="font-sans antialiased">
         {children}
         <PublicXena />
+        <ServiceWorkerRegister />
       </body>
     </html>
   );
