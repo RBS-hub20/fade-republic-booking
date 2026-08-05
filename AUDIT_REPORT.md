@@ -18,7 +18,7 @@ Severity: **Critical** = exploitable now / data-at-risk · **High** = serious, v
 | S1 | ✅ Good | **Password hashing** = Node `scrypt`, per-password salt, `timingSafeEqual`. Strong, no external dep. | `src/lib/password.ts` | — |
 | S2 | ✅ Good | **Session cookie** = `base64url(json).HMAC-SHA256`; flags `httpOnly`, `sameSite=lax`, `secure` in prod, 7-day cookie with an **8h client / 4h admin hard cap** (`iat`). | `src/lib/session.ts`, `auth-config.ts`, `api/auth/login/route.ts:153` | — |
 | S3 | 🔴 **Critical (verify env)** | **SESSION_SECRET fallback.** If `SESSION_SECRET` is unset in prod, sessions are signed with a **hard-coded public dev secret** → anyone can forge an admin session. The login route already warns when unset. | `src/lib/session.ts:16` | **Action: confirm `SESSION_SECRET` is set in Vercel prod** (long random). |
-| S4 | 🟠 **High (verify)** | **Cron reachability + fail-open.** `/api/cron/*` is **not** exempt in middleware, so a Vercel Cron call (no session cookie) is redirected to `/login` → the **daily P&L, deposit verification, monthly bonus, and deposit-expiry jobs may not be running**. Separately, `cronAuthorized` **fails open** if `CRON_SECRET` is unset. | `src/middleware.ts` (no `/api/cron`), `src/lib/cron-auth.ts:13` | **Action: check Vercel → Cron logs.** If redirected: exempt `/api/cron/*` in middleware **and set `CRON_SECRET`** (required — the exemption without a secret would make crons public). Not auto-applied for that reason. |
+| S4 | 🟠 High → **Fixed (code) + verify env** | **Cron reachability + fail-open.** `/api/cron/*` was **not** exempt in middleware, so a Vercel Cron call (no session cookie) was redirected to `/login` → the **daily P&L, deposit verification, monthly bonus, and deposit-expiry jobs may not have been running**. Separately, `cronAuthorized` **fails open** if `CRON_SECRET` is unset. | `src/middleware.ts`, `src/lib/cron-auth.ts` | **Fixed** (branch `feat/cron-exempt`): `/api/cron/*` is now middleware-exempt so cron can reach it without a session; each route still enforces `cronAuthorized()`. Fail-open now logs a **one-time warning** when `CRON_SECRET` is unset (stays working, but visible). **Action: set `CRON_SECRET` in Vercel prod** so the crons require `Authorization: Bearer <CRON_SECRET>`, then confirm the daily job in Vercel → Cron logs. |
 | S5 | ✅ Good | **Admin authZ.** All 11 `/api/admin/*` routes check `role==='admin'` (or cron auth); all admin **pages** redirect non-admins; middleware also requires a valid session for any non-public path (double gate). | `api/admin/**`, `(app)/admin/**` | — |
 | S6 | ✅ Good | **SQL injection.** Prisma is parameterized throughout. The only `*Unsafe` raw calls are **static** DDL / an index-existence check with **no user input**. | `api/health/route.ts:133`, `lib/schema-ddl.ts`, `lib/{avatar,username}.ts` | — |
 | S7 | ✅ Good | **XSS.** No `dangerouslySetInnerHTML`; React auto-escapes all rendered values. | (repo-wide) | — |
@@ -52,6 +52,12 @@ Severity: **Critical** = exploitable now / data-at-risk · **High** = serious, v
 3. **`next.config.mjs`** — add HSTS, `X-Frame-Options: DENY` + `CSP: frame-ancestors 'none'`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `Permissions-Policy`.
 
 All three are **additive / behavior-preserving** — no data touched, no auth logic changed. Login (client + admin) is unchanged.
+
+### Follow-up applied — cron fix (branch `feat/cron-exempt`)
+4. **`src/middleware.ts`** — exempt `/api/cron/*` from the session-cookie gate so Vercel Cron (which carries no session) can reach the daily jobs instead of being redirected to `/login`. Each cron route still enforces its own `cronAuthorized()` (Bearer `CRON_SECRET` / admin session), so exempting the middleware does **not** make them public.
+5. **`src/lib/cron-auth.ts`** — when `CRON_SECRET` is unset, `cronAuthorized()` still allows the call (so prod keeps working) but now emits a **one-time `console.warn`** flagging that the endpoints are public — removes the silent fail-open. No change to behavior when `CRON_SECRET` is set (Bearer / admin required).
+
+**Ops action:** set `CRON_SECRET` in Vercel production (`openssl rand -base64 32`) to close the fail-open, then verify the daily job runs in **Vercel → Cron logs**.
 
 ## Needs your action (env / ops — cannot be safely fixed from code here)
 

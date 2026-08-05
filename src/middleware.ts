@@ -54,6 +54,11 @@ export function middleware(req: NextRequest) {
     pathname === "/api/proofs/upload" ||
     // The verify route enforces its own CRON_SECRET / admin check.
     pathname.startsWith("/api/deposits/verify") ||
+    // Vercel Cron calls carry NO session cookie — without this they'd be
+    // redirected to /login and the daily jobs (P&L, deposit verify/expiry,
+    // monthly bonus) would silently stop running. Each /api/cron/* route
+    // enforces its own auth via cronAuthorized() (Bearer CRON_SECRET / admin).
+    pathname.startsWith("/api/cron") ||
     pathname === "/api/health" ||
     // Emergency "unstick me" route — must be reachable without a session so a
     // stuck user can clear their stale cookie. Enforces nothing; only clears.
