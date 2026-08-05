@@ -11,6 +11,7 @@ import { formatUsd } from "@/lib/utils";
 import { getReferralSummary, getLatestMonthlyBonus, getNetworkSalesForMonth } from "@/lib/referrals";
 import { REFERRALS_ENABLED } from "@/lib/referrals-config";
 import { tierForBalance } from "@/lib/tiers";
+import { InstallAppButton } from "@/components/pwa/install-app-button";
 import { MonthlyBonusCelebration } from "@/components/celebration/monthly-bonus-celebration";
 import { ShanghaiPromo } from "@/components/celebration/shanghai-promo";
 import { getBoolFlags, FLAG_BONUS_MODAL, FLAG_SHANGHAI_MODAL } from "@/lib/settings";
@@ -155,6 +156,7 @@ export default async function DashboardPage() {
           title={`Welcome, ${session.name.split(" ")[0]}`}
           subtitle="Your account performance · calculated daily, Mon–Sun (Asia/Manila)"
         />
+        <InstallAppButton />
         {flags[FLAG_SHANGHAI_MODAL] && (
           <Link
             href="/dashboard/leaderboard"
@@ -294,6 +296,7 @@ export default async function DashboardPage() {
         title="Performance Dashboard"
         subtitle="Admin monitoring · PAMM-style compounded equity across all clients (Asia/Manila)"
       />
+      <InstallAppButton />
 
       {/* Pending-request KPIs */}
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
