@@ -272,3 +272,26 @@
     animation: none !important;
   }
 }
+
+/* XENA support widget — premium gold glow pulse on the floating button. */
+@keyframes xena-gold-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 20px rgba(255, 215, 0, 0.6), 0 0 0 0 rgba(255, 215, 0, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(255, 215, 0, 0.85), 0 0 0 9px rgba(255, 215, 0, 0);
+  }
+}
+.xena-pulse {
+  animation: xena-gold-pulse 2.2s ease-in-out infinite;
+}
+.xena-pulse:hover {
+  animation: none;
+  box-shadow: 0 0 36px rgba(255, 215, 0, 0.95);
+}
+@media (prefers-reduced-motion: reduce) {
+  .xena-pulse {
+    animation: none !important;
+  }
+}

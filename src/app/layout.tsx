@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
-import { PublicXena } from "@/components/support/public-xena";
+import { XenaWidget } from "@/components/XenaWidget";
 import { ServiceWorkerRegister } from "@/components/pwa/service-worker-register";
 
 // NOTE: We intentionally use a system font stack (defined in globals.css) rather
@@ -81,7 +81,7 @@ export default function RootLayout({
     <html lang="en" className="dark">
       <body className="font-sans antialiased">
         {children}
-        <PublicXena />
+        <XenaWidget />
         <ServiceWorkerRegister />
       </body>
     </html>
