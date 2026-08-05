@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Loader2, ArrowLeft, ShieldAlert } from "lucide-react";
 import { LogoMark } from "@/components/brand/logo";
+import { InstallAppButton } from "@/components/pwa/install-app-button";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
@@ -75,6 +76,9 @@ export default function LoginPage() {
             <ShieldAlert className="h-4 w-4 shrink-0" /> {notice}
           </div>
         )}
+
+        {/* Capture PWA installs from visitors before they even log in. */}
+        <InstallAppButton />
 
         <Card>
           <CardContent className="pt-6">
