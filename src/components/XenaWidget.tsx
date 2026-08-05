@@ -113,6 +113,26 @@ function TypingIndicator() {
   );
 }
 
+/** Gold sparkle burst — 5 gold stars that pop around a bubble's corners once,
+ *  played when a reply finishes streaming. Absolutely positioned inside a
+ *  position:relative bubble; purely decorative (pointer-events: none). */
+function SparkleBurst() {
+  const stars: React.CSSProperties[] = [
+    { top: "-8px", right: "-6px", animationDelay: "0s" },
+    { top: "-10px", left: "22%", animationDelay: "0.1s" },
+    { bottom: "-8px", left: "-6px", animationDelay: "0.2s" },
+    { bottom: "-6px", right: "12%", animationDelay: "0.3s" },
+    { top: "38%", right: "-10px", animationDelay: "0.15s" },
+  ];
+  return (
+    <span aria-hidden className="pointer-events-none absolute inset-0">
+      {stars.map((s, i) => (
+        <span key={i} className="xena-sparkle" style={s} />
+      ))}
+    </span>
+  );
+}
+
 /** Small green "online" presence dot with a soft ping. */
 function OnlineDot({ size = 12 }: { size?: number }) {
   return (
@@ -143,6 +163,11 @@ export function XenaWidget() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showHint, setShowHint] = useState(false);
+  // Finish flourish: index of the bubble that just finished streaming (sparkle +
+  // glow), plus a nonce so re-finishing the same index still re-triggers.
+  const [finishIdx, setFinishIdx] = useState<number | null>(null);
+  const [burstKey, setBurstKey] = useState(0);
+  const prevStreaming = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -248,6 +273,27 @@ export function XenaWidget() {
   // Once the streamed assistant bubble exists → show its text with a gold cursor.
   const awaitingReply = loading && messages[messages.length - 1]?.role === "user";
   const isStreaming = loading && messages[messages.length - 1]?.role === "assistant";
+
+  // Detect the streaming → finished transition and fire the sparkle burst on the
+  // completed assistant bubble.
+  useEffect(() => {
+    if (prevStreaming.current && !isStreaming) {
+      const idx = messages.length - 1;
+      if (messages[idx]?.role === "assistant" && messages[idx].content.trim()) {
+        setFinishIdx(idx);
+        setBurstKey((k) => k + 1);
+      }
+    }
+    prevStreaming.current = isStreaming;
+  }, [isStreaming, messages]);
+
+  // Clear the flourish after it plays (sparkle 0.8s + delays ≈ 1.1s).
+  useEffect(() => {
+    if (finishIdx === null) return;
+    const t = setTimeout(() => setFinishIdx(null), 1100);
+    return () => clearTimeout(t);
+  }, [finishIdx, burstKey]);
+
   const openChat = () => {
     dismissHint();
     setOpen(true);
@@ -353,10 +399,17 @@ export function XenaWidget() {
                 m.role === "assistant" ? (
                   <div key={i} className="flex items-end gap-2">
                     <XenaAvatar size={30} />
-                    <div className="max-w-[80%] whitespace-pre-wrap rounded-2xl rounded-bl-sm border border-white/5 bg-white/5 px-3.5 py-2 text-sm text-gray-100">
+                    <div
+                      className={cn(
+                        "relative max-w-[80%] whitespace-pre-wrap rounded-2xl rounded-bl-sm border border-white/5 bg-white/5 px-3.5 py-2 text-sm text-gray-100",
+                        finishIdx === i && "xena-finish-glow"
+                      )}
+                    >
                       {m.content}
                       {/* Blinking gold cursor while this bubble is still streaming. */}
                       {isStreaming && i === messages.length - 1 && <span className="xena-cursor" />}
+                      {/* One-shot gold sparkle burst when this reply finishes. */}
+                      {finishIdx === i && <SparkleBurst key={burstKey} />}
                     </div>
                   </div>
                 ) : (
