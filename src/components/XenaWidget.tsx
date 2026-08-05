@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
-import { X, Send, Loader2 } from "lucide-react";
+import { X, Send } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -91,6 +91,25 @@ function XenaAvatar({ size, ring = true }: { size: number; ring?: boolean }) {
       style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover" }}
       className={cn("shrink-0 bg-black", ring && "border border-gold-400/50")}
     />
+  );
+}
+
+/** Gold "XENA is typing…" indicator — a shimmering black/gold bubble with three
+ *  glowing gold dots bouncing in sequence. Shown while we wait for the first
+ *  chunk from /api/support/chat (before any streamed text arrives). */
+function TypingIndicator() {
+  return (
+    <div className="flex items-end gap-2">
+      <XenaAvatar size={30} />
+      <div className="xena-typing-bubble rounded-2xl rounded-bl-sm border bg-black/60 px-3.5 py-2">
+        <p className="mb-1 text-[11px] italic text-gold-300">XENA is typing…</p>
+        <div className="flex items-center gap-1.5">
+          <span className="xena-dot" style={{ animationDelay: "0s" }} />
+          <span className="xena-dot" style={{ animationDelay: "0.2s" }} />
+          <span className="xena-dot" style={{ animationDelay: "0.4s" }} />
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -225,7 +244,10 @@ export function XenaWidget() {
     }
   }
 
+  // Waiting for the first chunk (user just sent) → show the gold typing dots.
+  // Once the streamed assistant bubble exists → show its text with a gold cursor.
   const awaitingReply = loading && messages[messages.length - 1]?.role === "user";
+  const isStreaming = loading && messages[messages.length - 1]?.role === "assistant";
   const openChat = () => {
     dismissHint();
     setOpen(true);
@@ -332,7 +354,9 @@ export function XenaWidget() {
                   <div key={i} className="flex items-end gap-2">
                     <XenaAvatar size={30} />
                     <div className="max-w-[80%] whitespace-pre-wrap rounded-2xl rounded-bl-sm border border-white/5 bg-white/5 px-3.5 py-2 text-sm text-gray-100">
-                      {m.content || (awaitingReply && i === messages.length - 1 ? "…" : "")}
+                      {m.content}
+                      {/* Blinking gold cursor while this bubble is still streaming. */}
+                      {isStreaming && i === messages.length - 1 && <span className="xena-cursor" />}
                     </div>
                   </div>
                 ) : (
@@ -343,14 +367,7 @@ export function XenaWidget() {
                   </div>
                 )
               )}
-              {awaitingReply && (
-                <div className="flex items-end gap-2">
-                  <XenaAvatar size={30} />
-                  <div className="flex items-center gap-2 rounded-2xl rounded-bl-sm border border-white/5 bg-white/5 px-3.5 py-2 text-sm text-gray-400">
-                    <Loader2 className="h-3.5 w-3.5 animate-spin text-gold-300" /> XENA is typing…
-                  </div>
-                </div>
-              )}
+              {awaitingReply && <TypingIndicator />}
               {error && (
                 <p className="rounded-md bg-red-500/10 px-3 py-2 text-xs text-red-400">{error}</p>
               )}
