@@ -1,0 +1,17 @@
+node_modules/
+dist/
+.env
+.env.local
+*.tsbuildinfo
+
+# Local file-backed session store (dev)
+.data/
+
+# Expo / RN
+.expo/
+.expo-shared/
+web-build/
+*.log
+
+# OS
+.DS_Store
