@@ -133,7 +133,14 @@ export default async function DashboardPage() {
     // Sync the 5x payout-cap tracking cache in the background (unchanged;
     // fire-and-forget, never blocks the render).
     if (payout && session.userId) void syncPayoutTracking(session.userId, payout);
-    const showCapWarning = payout != null && !payout.capped && payout.status === "ACTIVE" && payout.pct >= 80;
+    // NETWORK_ONLY accounts can't lift the cap by adding capital, so the
+    // "add capital to continue" nudge doesn't apply to them.
+    const showCapWarning =
+      payout != null &&
+      !payout.capped &&
+      payout.status === "ACTIVE" &&
+      payout.pct >= 80 &&
+      me?.activationType !== "NETWORK_ONLY";
 
     const showUsernameBanner = me ? !me.usernameSet : false;
 
@@ -158,18 +165,36 @@ export default async function DashboardPage() {
           subtitle="Your account performance · calculated daily, Mon–Sun (Asia/Manila)"
         />
         <InstallAppButton />
-        {me?.activationType === "NETWORK_ONLY" && (
-          <div className="mb-6 rounded-xl border border-gold-400/50 bg-gradient-to-r from-gold-400/15 to-transparent px-4 py-3.5">
-            <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-bold text-gold-200">
-              <Trophy className="h-4 w-4 text-gold-400" />
-              EXCLUSIVE {(me.exclusivePackage ?? "").toUpperCase() || "MEMBER"} — No Daily %
-            </p>
-            <p className="mt-1.5 text-xs text-gold-100/80">
-              Active Earnings: Direct Referral ✓ · Indirect Referral ✓ · Monthly Bonus ✓ · 2nd-Level Unlock ✓
-              <span className="ml-1 font-semibold text-gold-300">— Daily 0%</span>
-            </p>
-          </div>
-        )}
+        {me?.activationType === "NETWORK_ONLY" &&
+          (payout?.capped ? (
+            // EXCLUSIVE capping — no unlock — no real capital — cap cannot be lifted.
+            <div className="mb-6 rounded-xl border border-loss/50 bg-loss/10 px-4 py-3.5">
+              <p className="flex flex-wrap items-center gap-x-2 text-sm font-bold text-loss">
+                🔴 CAPPED — No Unlock — No Real Capital
+              </p>
+              <p className="mt-1.5 text-xs text-loss/90">
+                Max earnings reached ({formatUsd(payout.totalEarnedAll)} / {formatUsd(payout.maxPayoutCap)}).
+                Your package cap can&apos;t be unlocked. Contact admin if you want to convert to a STANDARD
+                account with a real deposit.
+              </p>
+            </div>
+          ) : (
+            <div className="mb-6 rounded-xl border border-gold-400/50 bg-gradient-to-r from-gold-400/15 to-transparent px-4 py-3.5">
+              <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-bold text-gold-200">
+                <Trophy className="h-4 w-4 text-gold-400" />
+                EXCLUSIVE {(me.exclusivePackage ?? "").toUpperCase() || "MEMBER"} — No Daily %
+              </p>
+              <p className="mt-1.5 text-xs text-gold-100/80">
+                Active Earnings: Direct Referral ✓ · Indirect Referral ✓ · Monthly Bonus ✓ · 2nd-Level Unlock ✓
+                <span className="ml-1 font-semibold text-gold-300">— Daily 0%</span>
+                {payout && payout.maxPayoutCap > 0 && (
+                  <span className="ml-1 text-gold-100/70">
+                    · Cap {formatUsd(payout.totalEarnedAll)}/{formatUsd(payout.maxPayoutCap)} ({payout.pct}%)
+                  </span>
+                )}
+              </p>
+            </div>
+          ))}
         {flags[FLAG_SHANGHAI_MODAL] && (
           <Link
             href="/dashboard/leaderboard"

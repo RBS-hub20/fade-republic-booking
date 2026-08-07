@@ -91,6 +91,7 @@ export function ExclusiveView({
                 <TableHead>Upline</TableHead>
                 <TableHead>Package</TableHead>
                 <TableHead>Type</TableHead>
+                <TableHead>Earnings / Cap</TableHead>
                 <TableHead>Note</TableHead>
                 <TableHead className="text-right">Action</TableHead>
               </TableRow>
@@ -98,7 +99,7 @@ export function ExclusiveView({
             <TableBody>
               {rows.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">
+                  <TableCell colSpan={8} className="py-8 text-center text-sm text-muted-foreground">
                     No members found. Try a different email or username.
                   </TableCell>
                 </TableRow>
@@ -110,6 +111,17 @@ export function ExclusiveView({
                     <TableCell>{r.uplineName ?? <span className="text-muted-foreground">—</span>}</TableCell>
                     <TableCell>{r.package ?? <span className="text-muted-foreground">—</span>}</TableCell>
                     <TableCell><TypeBadge type={r.activationType} /></TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      {r.cap > 0 ? (
+                        <span className={cn("text-sm", r.capped ? "font-semibold text-loss" : "text-foreground")}>
+                          {formatUsd(r.earned)} / {formatUsd(r.cap)}{" "}
+                          <span className="text-xs text-muted-foreground">({r.capPct}%)</span>
+                          {r.capped && <span className="ml-1 text-xs font-bold text-loss">CAPPED</span>}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
                     <TableCell className="max-w-[220px] truncate text-muted-foreground">{r.note ?? "—"}</TableCell>
                     <TableCell className="text-right">
                       <Button variant="outline" size="sm" onClick={() => setModalUser(r)}>
@@ -237,6 +249,14 @@ function ActivateModal({
           <span className="text-sm font-medium">NETWORK_ONLY (no daily %)</span>
         </label>
 
+        {/* Convert-to-STANDARD hint (currently exclusive, unchecking the box). */}
+        {!networkOnly && user.activationType === "NETWORK_ONLY" && (
+          <div className="mb-4 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2.5 text-xs text-emerald-200">
+            Converting to <b>STANDARD</b> restores the real-deposit × 5 cap and re-enables unlocking.
+            Only do this once the user has funded a real deposit.
+          </div>
+        )}
+
         {/* Warning */}
         {networkOnly && (
           <div className="mb-4 flex items-start gap-2 rounded-lg border border-gold-400/40 bg-gold-400/10 px-3 py-2.5 text-xs text-gold-200">
@@ -266,7 +286,15 @@ function ActivateModal({
         <div className="flex justify-end gap-2">
           <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
           <Button onClick={save} disabled={saving}>
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : networkOnly ? "Activate NETWORK_ONLY" : "Set STANDARD"}
+            {saving ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : networkOnly ? (
+              "Activate NETWORK_ONLY"
+            ) : user.activationType === "NETWORK_ONLY" ? (
+              "Convert to STANDARD"
+            ) : (
+              "Set STANDARD"
+            )}
           </Button>
         </div>
       </div>

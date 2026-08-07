@@ -19,7 +19,21 @@ import { getRemainingPrincipal } from "./capital";
 import { runDdlBatch } from "./schema-ddl";
 
 export const PAYOUT_MULTIPLIER = 5;
+// EXCLUSIVE capping — no unlock — no real capital — prevents infinite free
+// earnings. NETWORK_ONLY accounts are capped at their PACKAGE price × 2 (a
+// frozen, nominal cap). Because it's derived from the package tier and NOT from
+// real deposits, adding/renewing capital can never lift it — the cap can only
+// be "unlocked" by an admin converting the account to STANDARD (real deposit).
+export const EXCLUSIVE_PAYOUT_MULTIPLIER = 2;
+
 const round2 = (n: number) => Math.round(n * 100) / 100;
+
+/** Parse the nominal package price from an exclusive package label ("Platinum $500" → 500). */
+export function exclusivePackagePrice(label: string | null | undefined): number {
+  if (!label) return 0;
+  const m = label.match(/\$(\d+(?:\.\d+)?)/);
+  return m ? Number(m[1]) : 0;
+}
 
 export type PayoutStatus = "ACTIVE" | "CAPPED" | "INACTIVE";
 
@@ -91,11 +105,25 @@ async function computeEarned(userId: string, clientId: string | null): Promise<n
 
 /** Derive the live payout state for a user (does not touch the cache table). */
 export async function getPayoutState(userId: string, clientId: string | null): Promise<PayoutState> {
-  const [activeCapital, totalEarnedAll] = await Promise.all([
+  const [realPrincipal, totalEarnedAll, user] = await Promise.all([
     getRemainingPrincipal(clientId),
     computeEarned(userId, clientId),
+    prisma.user
+      .findUnique({ where: { id: userId }, select: { activationType: true, exclusivePackage: true } })
+      .catch(() => null),
   ]);
-  const maxPayoutCap = round2(activeCapital * PAYOUT_MULTIPLIER);
+
+  // EXCLUSIVE capping — no unlock — no real capital — prevents infinite free
+  // earnings. A NETWORK_ONLY account's cap is its PACKAGE price × 2, FROZEN:
+  // derived from the package tier, not real deposits, so adding capital can't
+  // lift it. (Converting to STANDARD reverts to real-principal × 5.)
+  const isNetworkOnly = user?.activationType === "NETWORK_ONLY";
+  const activeCapital = isNetworkOnly
+    ? exclusivePackagePrice(user?.exclusivePackage)
+    : realPrincipal;
+  const multiplier = isNetworkOnly ? EXCLUSIVE_PAYOUT_MULTIPLIER : PAYOUT_MULTIPLIER;
+
+  const maxPayoutCap = round2(activeCapital * multiplier);
   const remaining = round2(Math.max(0, maxPayoutCap - totalEarnedAll));
   const status: PayoutStatus =
     activeCapital <= 0 ? "INACTIVE" : maxPayoutCap > 0 && totalEarnedAll >= maxPayoutCap ? "CAPPED" : "ACTIVE";

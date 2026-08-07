@@ -17,6 +17,7 @@ import { ensureReferralSchemaOnce } from "./referral-schema";
 import { getClientPerformance } from "./data";
 import { TIERS, tierById, tierForBalance, type TierId } from "./tiers";
 import { COMMISSION_RATES } from "./referrals";
+import { getPayoutState } from "./payout-cap";
 
 export type ActivationType = "STANDARD" | "NETWORK_ONLY";
 
@@ -32,6 +33,11 @@ export interface ExclusiveRow {
   saved: number;
   funded: boolean;
   activatedAt: string | null;
+  // Capping status (earned / cap) so admins see who's near their package limit.
+  earned: number;
+  cap: number;
+  capPct: number;
+  capped: boolean;
 }
 
 export interface ExclusiveStats {
@@ -105,19 +111,32 @@ export async function searchExclusiveUsers(query?: string, limit = 50): Promise<
 
   const funded = await fundedClientIds(users.map((u) => u.clientId).filter(Boolean) as string[]);
 
-  return users.map((u) => ({
-    userId: u.id,
-    email: u.email,
-    username: u.username ?? null,
-    name: u.name,
-    uplineName: u.referredBy?.username ?? u.referredBy?.name ?? null,
-    package: u.exclusivePackage ?? null,
-    activationType: (u.activationType as ActivationType) ?? "STANDARD",
-    note: u.exclusiveNote ?? null,
-    saved: u.exclusiveSaved ?? 0,
-    funded: u.clientId ? funded.has(u.clientId) : false,
-    activatedAt: u.exclusiveActivatedAt ? u.exclusiveActivatedAt.toISOString() : null,
-  }));
+  // Per-row capping status (earned / cap). NETWORK_ONLY rows reflect the frozen
+  // package × 2 cap; STANDARD rows the usual real-principal × 5.
+  const states = await Promise.all(
+    users.map((u) => getPayoutState(u.id, u.clientId).catch(() => null))
+  );
+
+  return users.map((u, i) => {
+    const st = states[i];
+    return {
+      userId: u.id,
+      email: u.email,
+      username: u.username ?? null,
+      name: u.name,
+      uplineName: u.referredBy?.username ?? u.referredBy?.name ?? null,
+      package: u.exclusivePackage ?? null,
+      activationType: (u.activationType as ActivationType) ?? "STANDARD",
+      note: u.exclusiveNote ?? null,
+      saved: u.exclusiveSaved ?? 0,
+      funded: u.clientId ? funded.has(u.clientId) : false,
+      activatedAt: u.exclusiveActivatedAt ? u.exclusiveActivatedAt.toISOString() : null,
+      earned: st?.totalEarnedAll ?? 0,
+      cap: st?.maxPayoutCap ?? 0,
+      capPct: st?.pct ?? 0,
+      capped: st?.capped ?? false,
+    };
+  });
 }
 
 /** Dashboard stats card figures. */
