@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowDownToLine, ArrowUpFromLine, Trophy } from "lucide-react";
+import { ArrowDownToLine, ArrowUpFromLine, Trophy, Users } from "lucide-react";
 import { PageHeader } from "@/components/shell/page-header";
 import { DashboardView, type DashboardDataset } from "@/components/dashboard/dashboard-view";
 import { KpiCard } from "@/components/dashboard/kpi-card";
@@ -9,6 +9,7 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { formatUsd } from "@/lib/utils";
 import { getReferralSummary, getLatestMonthlyBonus, getNetworkSalesForMonth } from "@/lib/referrals";
+import { getTeamStats } from "@/lib/team";
 import { REFERRALS_ENABLED } from "@/lib/referrals-config";
 import { tierForBalance } from "@/lib/tiers";
 import { InstallAppButton } from "@/components/pwa/install-app-button";
@@ -71,7 +72,7 @@ export default async function DashboardPage() {
     // > 1. Each block self-guards and falls back to its prior default, so the
     // dashboard still renders fully if any piece is unavailable — behavior is
     // unchanged, only the concurrency differs.
-    const [perf, referral, capitalBundle, payout, celebrationBonus, networkSales, flags] = await Promise.all([
+    const [perf, referral, capitalBundle, payout, celebrationBonus, networkSales, flags, teamStats] = await Promise.all([
       getClientPerformance(session.clientId).catch((err) => {
         console.error("[dashboard] performance unavailable:", err);
         return null;
@@ -107,6 +108,7 @@ export default async function DashboardPage() {
       session.userId ? getLatestMonthlyBonus(session.userId).catch(() => null) : Promise.resolve(null),
       session.userId ? getNetworkSalesForMonth(session.userId, "2026-08").catch(() => 0) : Promise.resolve(0),
       getBoolFlags([FLAG_BONUS_MODAL, FLAG_SHANGHAI_MODAL]).catch(() => ({ [FLAG_BONUS_MODAL]: true, [FLAG_SHANGHAI_MODAL]: true })),
+      session.userId ? getTeamStats(session.userId).catch(() => null) : Promise.resolve(null),
     ]);
 
     const datasets: DashboardDataset[] = perf
@@ -202,6 +204,21 @@ export default async function DashboardPage() {
           >
             <span className="font-medium">🏆 Shanghai Race — Top 20 network sales live this month</span>
             <span className="shrink-0 font-semibold text-gold-300">View Leaderboard →</span>
+          </Link>
+        )}
+        {teamStats && teamStats.total > 0 && (
+          <Link
+            href="/team"
+            className="mb-6 flex items-center justify-between gap-3 rounded-lg border border-border bg-secondary/40 px-4 py-3 text-sm transition-colors hover:bg-secondary/70"
+          >
+            <span className="flex items-center gap-2 font-medium">
+              <Users className="h-4 w-4 text-gold-400" />
+              My Team: {teamStats.total} total
+              {teamStats.pending > 0 && (
+                <span className="text-amber-400">— {teamStats.pending} pending need follow-up</span>
+              )}
+            </span>
+            <span className="shrink-0 font-semibold text-gold-300">View Team →</span>
           </Link>
         )}
         {isInactive && (

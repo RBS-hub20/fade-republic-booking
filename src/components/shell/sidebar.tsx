@@ -71,6 +71,7 @@ function navForRole(role: string, clientId: string | null): NavItem[] {
   return [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { href: "/dashboard/leaderboard", label: "Shanghai Race", icon: Trophy, badge: "HOT" },
+    { href: "/team", label: "My Team", icon: Users, badge: "NEW" },
     { href: "/qx-tiers", label: "QX Tiers", icon: Crown, badge: "NEW", divider: true },
     { href: "/wallet", label: "Deposit / Withdraw", icon: Wallet },
     { href: "/charts", label: "Charts", icon: CandlestickChart },

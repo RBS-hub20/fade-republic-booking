@@ -53,6 +53,7 @@ const CLIENT_PREFIXES = [
   "/qx-tiers",
   "/deposit",
   "/settings",
+  "/team",
 ];
 
 function matchPrefix(pathname: string, prefixes: string[]) {
