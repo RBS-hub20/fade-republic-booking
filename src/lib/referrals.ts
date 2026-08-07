@@ -70,9 +70,14 @@ export async function recomputeUnlock(userId: string): Promise<boolean> {
   await ensureReferralSchemaOnce(prisma);
   const directs = await prisma.user.findMany({
     where: { referredById: userId },
-    select: { clientId: true },
+    select: { clientId: true, activationType: true },
   });
-  const clientIds = directs.map((d) => d.clientId).filter(Boolean) as string[];
+  // EXCLUSIVE NETWORK: NETWORK_ONLY directs give the upline ZERO benefit, so they
+  // do not count toward the 3-active-directs 2nd-level unlock.
+  const clientIds = directs
+    .filter((d) => d.activationType !== "NETWORK_ONLY")
+    .map((d) => d.clientId)
+    .filter(Boolean) as string[];
 
   let count = 0;
   if (clientIds.length) {
@@ -289,6 +294,15 @@ export async function creditPackageCommission(opts: {
 
     const referred = await prisma.user.findUnique({ where: { clientId: opts.clientId } });
     if (!referred || !referred.referredById) return; // not referred
+
+    // EXCLUSIVE NETWORK — company save. A NETWORK_ONLY user generates NO upline
+    // income from their OWN activation: no direct (L1), no indirect (L2), no
+    // unlock credit. (Their own downline earnings later are unaffected — those
+    // run when THEY are the referrer, not the referred.)
+    if (referred.activationType === "NETWORK_ONLY") {
+      console.log(`[exclusive] skip upline commission for NETWORK_ONLY user ${referred.id} (company save)`);
+      return;
+    }
 
     // Referrer's rate is based on THEIR tier at purchase time.
     const referrer = await prisma.user.findUnique({ where: { id: referred.referredById } });

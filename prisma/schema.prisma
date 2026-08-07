@@ -76,6 +76,21 @@ model User {
   country           String?
   countryName       String?
   timezone          String?
+  // --- Exclusive Network (admin activation) ---------------------------------
+  // STANDARD = normal member (daily ROI + all bonuses). NETWORK_ONLY = exclusive
+  // activation: this user earns NO daily ROI and generates NO upline income from
+  // their own activation (company save), but still earns their OWN network
+  // income (direct/indirect/monthly bonus/binary) when they invite others.
+  activationType       String    @default("STANDARD")
+  // The package label chosen at exclusive activation (e.g. "Platinum $500").
+  exclusivePackage     String?
+  // Admin note (required at activation) — why this user is NETWORK_ONLY.
+  exclusiveNote        String?
+  // Estimated upline commission the company saved by skipping this activation.
+  exclusiveSaved       Float     @default(0)
+  // When the exclusive activation was applied (null = never/standard).
+  exclusiveActivatedAt DateTime?
+
   // Withdrawable, settled referral commission (separate from trading balance).
   commissionBalance Float    @default(0)
   commissionsEarned    ReferralCommission[]   @relation("CommissionEarner")
@@ -89,6 +104,7 @@ model User {
   @@index([rootSponsorId])
   // Sponsor/parent index powering the genealogy downline queries.
   @@index([referredById])
+  @@index([activationType])
 }
 
 // One commission per referred user (first QX Tier activation only).

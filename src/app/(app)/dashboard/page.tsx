@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowDownToLine, ArrowUpFromLine } from "lucide-react";
+import { ArrowDownToLine, ArrowUpFromLine, Trophy } from "lucide-react";
 import { PageHeader } from "@/components/shell/page-header";
 import { DashboardView, type DashboardDataset } from "@/components/dashboard/dashboard-view";
 import { KpiCard } from "@/components/dashboard/kpi-card";
@@ -58,6 +58,8 @@ export default async function DashboardPage() {
               commissionBalance: true,
               clientId: true,
               usernameSet: true,
+              activationType: true,
+              exclusivePackage: true,
             },
           })
           .catch(() => null)
@@ -156,6 +158,18 @@ export default async function DashboardPage() {
           subtitle="Your account performance · calculated daily, Mon–Sun (Asia/Manila)"
         />
         <InstallAppButton />
+        {me?.activationType === "NETWORK_ONLY" && (
+          <div className="mb-6 rounded-xl border border-gold-400/50 bg-gradient-to-r from-gold-400/15 to-transparent px-4 py-3.5">
+            <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-bold text-gold-200">
+              <Trophy className="h-4 w-4 text-gold-400" />
+              EXCLUSIVE {(me.exclusivePackage ?? "").toUpperCase() || "MEMBER"} — No Daily %
+            </p>
+            <p className="mt-1.5 text-xs text-gold-100/80">
+              Active Earnings: Direct Referral ✓ · Indirect Referral ✓ · Monthly Bonus ✓ · Binary ✓
+              <span className="ml-1 font-semibold text-gold-300">— Daily 0%</span>
+            </p>
+          </div>
+        )}
         {flags[FLAG_SHANGHAI_MODAL] && (
           <Link
             href="/dashboard/leaderboard"

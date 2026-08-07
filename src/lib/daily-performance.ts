@@ -62,9 +62,17 @@ export async function runDailyPerformance(opts?: { upToKey?: string }): Promise<
   // user's lifetime commission earnings, so we can stop ROI for CAPPED accounts
   // (earned across ALL income ≥ remaining capital × 5).
   const clientUsers = await prisma.user
-    .findMany({ where: { clientId: { in: clients.map((c) => c.id) } }, select: { id: true, clientId: true } })
-    .catch(() => [] as { id: string; clientId: string | null }[]);
+    .findMany({
+      where: { clientId: { in: clients.map((c) => c.id) } },
+      select: { id: true, clientId: true, activationType: true },
+    })
+    .catch(() => [] as { id: string; clientId: string | null; activationType: string }[]);
   const userByClient = new Map(clientUsers.map((u) => [u.clientId, u.id]));
+  // EXCLUSIVE NETWORK: NETWORK_ONLY users earn 0% daily ROI. Principal stays
+  // flat; they still earn their own network income when they invite others.
+  const networkOnlyClientIds = new Set(
+    clientUsers.filter((u) => u.activationType === "NETWORK_ONLY").map((u) => u.clientId)
+  );
   const userIds = clientUsers.map((u) => u.id);
   const [l1g, l2g, mbg] = await Promise.all([
     userIds.length
@@ -125,11 +133,14 @@ export async function runDailyPerformance(opts?: { upToKey?: string }): Promise<
       date: toManilaDateKey(p.date),
       dailyPercent: p.dailyPercent,
     }));
+    const isNetworkOnly = networkOnlyClientIds.has(c.id);
     const newDays: { key: string; clientPct: number; serverPct: number }[] = [];
     for (let cur = startKey; cur <= today; cur = addDays(cur, 1)) {
       if (existingKeys.has(cur)) continue;
-      const clientPct = randPct(CLIENT_MIN_PCT, CLIENT_MAX_PCT);
-      newDays.push({ key: cur, clientPct, serverPct: randPct(SERVER_MIN_PCT, SERVER_MAX_PCT) });
+      // NETWORK_ONLY: post a 0% day (no daily income; principal preserved).
+      const clientPct = isNetworkOnly ? 0 : randPct(CLIENT_MIN_PCT, CLIENT_MAX_PCT);
+      const serverPct = isNetworkOnly ? 0 : randPct(SERVER_MIN_PCT, SERVER_MAX_PCT);
+      newDays.push({ key: cur, clientPct, serverPct });
       perfs.push({ date: cur, dailyPercent: clientPct });
     }
     if (newDays.length === 0) continue;

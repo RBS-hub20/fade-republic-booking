@@ -15,6 +15,13 @@ export const REFERRAL_DDL: string[] = [
   `CREATE UNIQUE INDEX IF NOT EXISTS "User_referralCode_key" ON "User"("referralCode")`,
   // Genealogy / lineage (materialized-path). text_pattern_ops lets the btree
   // serve fast prefix scans for downline queries (referralPath LIKE 'a/b/%').
+  // Exclusive Network (admin activation) columns.
+  `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "activationType" TEXT NOT NULL DEFAULT 'STANDARD'`,
+  `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "exclusivePackage" TEXT`,
+  `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "exclusiveNote" TEXT`,
+  `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "exclusiveSaved" DOUBLE PRECISION NOT NULL DEFAULT 0`,
+  `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "exclusiveActivatedAt" TIMESTAMP(3)`,
+  `CREATE INDEX IF NOT EXISTS "User_activationType_idx" ON "User"("activationType")`,
   `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "referralPath" TEXT`,
   `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "referralDepth" INTEGER NOT NULL DEFAULT 0`,
   `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "rootSponsorId" TEXT`,
