@@ -80,7 +80,7 @@ model User {
   // STANDARD = normal member (daily ROI + all bonuses). NETWORK_ONLY = exclusive
   // activation: this user earns NO daily ROI and generates NO upline income from
   // their own activation (company save), but still earns their OWN network
-  // income (direct/indirect/monthly bonus/binary) when they invite others.
+  // income (direct/indirect/monthly bonus/2nd-level unlock) when they invite others.
   activationType       String    @default("STANDARD")
   // The package label chosen at exclusive activation (e.g. "Platinum $500").
   exclusivePackage     String?

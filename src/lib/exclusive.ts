@@ -6,7 +6,7 @@
  *   - generates NO upline income from their own activation — direct, indirect,
  *     unlock credit are all skipped (gated in referrals.ts) → company save,
  *   - but keeps ALL of their OWN network earnings (direct / indirect / monthly
- *     bonus / binary) when they later invite others,
+ *     bonus / 2nd-level unlock) when they later invite others,
  *   - is still placed in the genealogy (referredById is set at signup).
  *
  * This module is the admin control surface: search candidates, read stats, and

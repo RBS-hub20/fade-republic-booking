@@ -243,8 +243,8 @@ function ActivateModal({
             <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-gold-400" />
             <span>
               <b>NETWORK_ONLY</b> = This user gets <b>NO daily %</b>, but KEEPS Direct Referral,
-              Indirect Referral, Monthly Bonus &amp; Binary. The upline gets <b>ZERO</b> from this
-              activation — company save.
+              Indirect Referral, Monthly Bonus &amp; 2nd-Level Unlock. The upline gets <b>ZERO</b> from
+              this activation — company save.
             </span>
           </div>
         )}

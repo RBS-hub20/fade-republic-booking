@@ -165,7 +165,7 @@ export default async function DashboardPage() {
               EXCLUSIVE {(me.exclusivePackage ?? "").toUpperCase() || "MEMBER"} — No Daily %
             </p>
             <p className="mt-1.5 text-xs text-gold-100/80">
-              Active Earnings: Direct Referral ✓ · Indirect Referral ✓ · Monthly Bonus ✓ · Binary ✓
+              Active Earnings: Direct Referral ✓ · Indirect Referral ✓ · Monthly Bonus ✓ · 2nd-Level Unlock ✓
               <span className="ml-1 font-semibold text-gold-300">— Daily 0%</span>
             </p>
           </div>
