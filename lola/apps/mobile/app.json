@@ -1,0 +1,28 @@
+{
+  "expo": {
+    "name": "Lola",
+    "slug": "lola",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "lola",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#FBF5EA",
+    "splash": {
+      "backgroundColor": "#1A2236",
+      "resizeMode": "contain"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": false,
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "Lola listens so you can practise speaking with real conversation feedback."
+      }
+    },
+    "android": {
+      "permissions": ["RECORD_AUDIO"]
+    },
+    "web": {
+      "bundler": "metro"
+    }
+  }
+}
