@@ -7,7 +7,10 @@
 
 export const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 // Overridable so a decommissioned model can be swapped via env without a deploy.
-export const GROQ_MODEL = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
+// Default is the fast, always-current "instant" model so XENA keeps working even
+// if GROQ_MODEL isn't set (the previous default, llama-3.3-70b-versatile, can be
+// retired by Groq and then every request 400s).
+export const GROQ_MODEL = process.env.GROQ_MODEL || "llama-3.1-8b-instant";
 
 export interface ChatTurn {
   role: "system" | "user" | "assistant";
@@ -24,6 +27,7 @@ export function groqConfigured(): boolean {
  */
 export async function groqStream(messages: ChatTurn[], signal: AbortSignal): Promise<Response> {
   const apiKey = process.env.GROQ_API_KEY;
+  console.log("[XENA] Groq model:", GROQ_MODEL, "key exists:", !!apiKey);
   if (!apiKey) throw new Error("GROQ_API_KEY not set");
 
   return fetch(GROQ_URL, {

@@ -6,7 +6,8 @@ import { getReferralSummary } from "@/lib/referrals";
 import { getCapitalSummary } from "@/lib/capital";
 import { getPayoutState, getLegacyEarnings } from "@/lib/payout-cap";
 import { tierForBalance } from "@/lib/tiers";
-import { groqStream, groqConfigured, parseSseDelta, type ChatTurn } from "@/lib/groq";
+import { parseSseDelta, type ChatTurn } from "@/lib/groq";
+import { llmStream, llmConfigured } from "@/lib/llm";
 import { ensureChatSchemaOnce } from "@/lib/chat-schema";
 import { formatUsd, formatDate } from "@/lib/utils";
 import { manilaToday } from "@/lib/performance";
@@ -39,7 +40,7 @@ function hashIp(req: Request): string {
  * client-supplied id — so one user can never see another's information.
  */
 export async function POST(req: Request) {
-  if (!groqConfigured()) {
+  if (!llmConfigured()) {
     return NextResponse.json({ error: NO_KEY_MSG }, { status: 503 });
   }
 
@@ -115,10 +116,10 @@ export async function POST(req: Request) {
 
     let upstream: Response;
     try {
-      upstream = await groqStream(messages, controller.signal);
+      upstream = await llmStream(messages, controller.signal);
     } catch (err: any) {
       clearTimeout(timer);
-      console.error("[support/chat] groq request failed:", err?.message || err);
+      console.error("[support/chat] LLM request failed:", err?.message || err);
       return NextResponse.json({ error: FAIL_MSG }, { status: 502 });
     }
 
@@ -126,7 +127,14 @@ export async function POST(req: Request) {
       const errBody = await upstream.text().catch(() => "");
       clearTimeout(timer);
       // Full upstream response logged to Vercel for debugging.
-      console.error(`[support/chat] Groq HTTP ${upstream.status}:`, errBody);
+      console.error(`[support/chat] LLM HTTP ${upstream.status}:`, errBody);
+      // Surface a provider rate-limit distinctly so the user knows to retry.
+      if (upstream.status === 429) {
+        return NextResponse.json(
+          { error: "XENA is busy right now — please try again in a few seconds, or email support@quantumxglobal.online" },
+          { status: 429 }
+        );
+      }
       return NextResponse.json({ error: FAIL_MSG }, { status: 502 });
     }
 
