@@ -11,6 +11,7 @@ import { llmStream, llmConfigured } from "@/lib/llm";
 import { ensureChatSchemaOnce } from "@/lib/chat-schema";
 import { formatUsd, formatDate } from "@/lib/utils";
 import { manilaToday } from "@/lib/performance";
+import { isTradingDayKey } from "@/lib/trading-days";
 import { createHash } from "node:crypto";
 
 export const runtime = "nodejs";
@@ -219,8 +220,9 @@ KNOWLEDGE BASE — QuantumX is an AI-powered automated Forex + Crypto trading pl
 - Every approved deposit is locked for 6 MONTHS from its approval date (a time deposit).
 - Active Capital = sum of your approved deposits, locked. It cannot be withdrawn early under any circumstances.
 - Available Withdrawal = daily P/L + referral commissions − completed withdrawals. This is what you can withdraw anytime.
-- Daily P/L is a FLAT calculation on Active Capital (0.3%–0.5% per day, NOT compounded), credited Mon–Sun at 23:59 PHT.
-- POSTING SCHEDULE: Daily P/L posts every night at 11:59 PM PHT. If you don't see today's entry yet, please wait about 1 hour or contact support. We post a 0.00% entry even on non-trading days for full transparency — so your log never has gaps.
+- Daily P/L is a FLAT calculation on Active Capital (0.0%–0.5% per day, NOT compounded), credited MONDAY–FRIDAY ONLY at 23:59 PHT. Saturday & Sunday are "No Trading — Market Offline" — NO P/L is posted on weekends (like real markets). Earnings resume Monday.
+- POSTING SCHEDULE: Daily P/L posts every trading night (Mon–Fri) at 11:59 PM PHT, starting ~24h after your deposit is approved. Weekends show "—" (no entry), not 0%. If you don't see a weekday entry yet, please wait about 1 hour or contact support.
+- MAX PAYOUT CAP: total earnings are capped at 5× your real Active Capital (STANDARD accounts) or 2× the package price (NETWORK_ONLY exclusive accounts).
 
 2) TIERS (set by your FIRST deposit amount; upgrading requires a new deposit):
 - Bronze $50 · Silver $100 · Gold $250 · Platinum $500.
@@ -341,7 +343,7 @@ GOAL: Answer their questions clearly, build trust, and convert them to sign up.
 
 WHAT YOU CAN DISCUSS:
 - What is QuantumX: a real multi-asset trading platform (crypto, Forex, commodities, indices) combined with a sustainable referral/MLM ecosystem.
-- How to earn (3 ways): (1) Trade & Profit — flat daily P/L of 0.3–0.5% on your active capital; (2) Refer & Earn — INSTANT direct commission based on your tier, paid EVERY time a downline buys or renews a package (unlimited, not one-time); (3) Build & Unlock — 2nd-level indirect commission plus a 5% monthly bonus on your directs' profit. (Don't quote exact commission %; rates scale with tier and are shown on the dashboard after signup.)
+- How to earn (3 ways): (1) Trade & Profit — flat daily P/L of 0.0–0.5% on your active capital, Monday–Friday only (Sat & Sun: No Trading — Market Offline, resumes Monday); (2) Refer & Earn — INSTANT direct commission based on your tier, paid EVERY time a downline buys or renews a package (unlimited, not one-time); (3) Build & Unlock — 2nd-level indirect commission plus a 5% monthly bonus on your directs' profit. (Don't quote exact commission %; rates scale with tier and are shown on the dashboard after signup.)
 - Tiers by first deposit: Bronze $50, Silver $100, Gold $250, Platinum $500 (higher tier = higher commission rates). The minimum to start is $50 (Bronze).
 - Unlimited referral commissions: you earn on every purchase AND every renewal of your downline — not just their first deposit.
 - Max Payout Cap: your maximum lifetime payout is Total Active Capital × 5 (e.g. $500 → $2,500). All income counts toward it; add or renew capital to raise the cap. This keeps the model sustainable.
@@ -416,7 +418,9 @@ async function buildUserContext(userId: string, clientId: string, name: string):
         ? `Today's earnings (${todayKey}): ${todayPoint.dailyPercent.toFixed(2)}% = ${formatUsd(
             todayPoint.pnl
           )}; end-of-day balance ${formatUsd(todayPoint.balance)}.`
-        : `Today's performance (${todayKey}) has not been credited yet (runs 23:59 PHT).`
+        : isTradingDayKey(todayKey)
+        ? `Today's performance (${todayKey}) has not been credited yet (runs 23:59 PHT).`
+        : `Today (${todayKey}) is a weekend — No Trading — Market Offline. No P/L posts on Sat/Sun; earnings resume Monday.`
     );
     const recent = tradingPoints.slice(-5).reverse();
     if (recent.length) {

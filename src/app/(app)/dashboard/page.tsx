@@ -10,6 +10,7 @@ import { prisma } from "@/lib/prisma";
 import { formatUsd } from "@/lib/utils";
 import { getReferralSummary, getLatestMonthlyBonus, getNetworkSalesForMonth } from "@/lib/referrals";
 import { getTeamStats } from "@/lib/team";
+import { isTradingNow, MARKET_OFFLINE_MESSAGE, MARKET_OFFLINE_SUBTEXT } from "@/lib/trading-days";
 import { REFERRALS_ENABLED } from "@/lib/referrals-config";
 import { tierForBalance } from "@/lib/tiers";
 import { InstallAppButton } from "@/components/pwa/install-app-button";
@@ -164,9 +165,17 @@ export default async function DashboardPage() {
         />
         <PageHeader
           title={`Welcome, ${session.name.split(" ")[0]}`}
-          subtitle="Your account performance · calculated daily, Mon–Sun (Asia/Manila)"
+          subtitle="Your account performance · calculated daily, Mon–Fri (Asia/Manila)"
         />
         <InstallAppButton />
+        {!isTradingNow() && (
+          <div className="mb-6 rounded-xl border border-loss/50 bg-loss/10 px-4 py-3.5">
+            <p className="flex items-center gap-2 text-sm font-bold text-loss">
+              🔴 {MARKET_OFFLINE_MESSAGE}
+            </p>
+            <p className="mt-1 text-xs text-loss/80">{MARKET_OFFLINE_SUBTEXT}</p>
+          </div>
+        )}
         {me?.activationType === "NETWORK_ONLY" &&
           (payout?.capped ? (
             // EXCLUSIVE capping — no unlock — no real capital — cap cannot be lifted.

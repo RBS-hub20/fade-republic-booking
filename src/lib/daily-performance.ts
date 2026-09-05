@@ -14,6 +14,7 @@
  */
 import { prisma } from "./prisma";
 import { computeEquityCurve, toManilaDateKey, manilaToday, addDays } from "./performance";
+import { isTradingDayKey, previousTradingDayKey } from "./trading-days";
 
 export const CLIENT_MIN_PCT = 0.3;
 export const CLIENT_MAX_PCT = 0.5;
@@ -30,6 +31,8 @@ export interface DailyPerfResult {
   daysCreated: number;
   clients: { name: string; added: number }[];
   at: string;
+  // Weekend/holiday days skipped across the backfill window (no P/L posted).
+  marketOfflineDays?: number;
 }
 
 /**
@@ -97,6 +100,7 @@ export async function runDailyPerformance(opts?: { upToKey?: string }): Promise<
   for (const g of mbg) commByUser.set(g.userId, (commByUser.get(g.userId) ?? 0) + (g._sum.bonusAmount ?? 0));
 
   let daysCreated = 0;
+  let marketOfflineDays = 0;
   const report: { name: string; added: number }[] = [];
 
   for (const c of clients) {
@@ -137,6 +141,13 @@ export async function runDailyPerformance(opts?: { upToKey?: string }): Promise<
     const newDays: { key: string; clientPct: number; serverPct: number }[] = [];
     for (let cur = startKey; cur <= today; cur = addDays(cur, 1)) {
       if (existingKeys.has(cur)) continue;
+      // WEEKEND / non-trading day: No Trading — Market Offline. Post NOTHING (no
+      // row, no 0%) so the log simply has no entry for Sat/Sun. This also stops a
+      // Monday run from back-posting the weekend.
+      if (!isTradingDayKey(cur)) {
+        marketOfflineDays += 1;
+        continue;
+      }
       // NETWORK_ONLY: post a 0% day (no daily income; principal preserved).
       const clientPct = isNetworkOnly ? 0 : randPct(CLIENT_MIN_PCT, CLIENT_MAX_PCT);
       const serverPct = isNetworkOnly ? 0 : randPct(SERVER_MIN_PCT, SERVER_MAX_PCT);
@@ -176,7 +187,7 @@ export async function runDailyPerformance(opts?: { upToKey?: string }): Promise<
     report.push({ name: c.name, added: newDays.length });
   }
 
-  return { ok: true, upTo: today, daysCreated, clients: report, at: new Date().toISOString() };
+  return { ok: true, upTo: today, daysCreated, marketOfflineDays, clients: report, at: new Date().toISOString() };
 }
 
 // ---------------------------------------------------------------------------
@@ -440,7 +451,9 @@ export interface DailyPerfHealth {
  */
 export async function getDailyPerfHealth(): Promise<DailyPerfHealth> {
   const today = manilaToday();
-  const yesterday = addDays(today, -1);
+  // "Yesterday that should already be posted" = the most recent TRADING day
+  // before today. On a Monday this is Friday, so a weekend never looks "stale".
+  const yesterday = previousTradingDayKey(addDays(today, -1));
 
   const clients = await prisma.client.findMany({
     where: { status: "ACTIVE" },

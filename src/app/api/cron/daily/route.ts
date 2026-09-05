@@ -10,6 +10,7 @@ import { notifyDailyPerfIssue } from "@/lib/mailers";
 import { backfillUsernames } from "@/lib/username";
 import { backfillAvatars } from "@/lib/genealogy-tree";
 import { expireStaleDeposits } from "@/lib/deposit-expiry";
+import { manilaDayOfWeek, isTradingNow, MARKET_OFFLINE_MESSAGE } from "@/lib/trading-days";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -28,6 +29,19 @@ async function handle(req: Request) {
   }
 
   const result: Record<string, unknown> = { at: new Date().toISOString() };
+
+  // TRADING DAYS ONLY (Mon–Fri, Asia/Manila). On weekends the market is offline:
+  // no daily P/L is accrued. We still run runDailyPerformance (it self-skips
+  // non-trading days AND backfills any missing weekday) plus all other
+  // maintenance below (deposit verification, expiry, monthly bonus) — those are
+  // NOT P/L and must keep working on weekends.
+  const trading = isTradingNow();
+  result.trading = trading;
+  if (!trading) {
+    console.log("[PnL] No Trading — Market Offline — day:", manilaDayOfWeek());
+    result.market = { trading: false, reason: MARKET_OFFLINE_MESSAGE, message: `${MARKET_OFFLINE_MESSAGE} — resumes Monday` };
+  }
+
   let perfFailed = false;
   try {
     // Retries within the invocation; any residual gap self-heals next run.
