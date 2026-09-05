@@ -12,7 +12,8 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn, formatUsd, formatDateKey } from "@/lib/utils";
-import { addDays, manilaToday, type EquityPoint } from "@/lib/performance";
+import { addDays, manilaToday, isTradingDay, type EquityPoint } from "@/lib/performance";
+import { MARKET_OFFLINE_MESSAGE, MARKET_OFFLINE_NOTE } from "@/lib/trading-days";
 
 const PAGE = 15;
 
@@ -23,6 +24,8 @@ interface LogRow {
   balance: number;
   placeholder: boolean;
   noTrading: boolean;
+  // Weekend gap → display-only "No Trading — Market Offline" row.
+  marketOffline: boolean;
 }
 
 // Guard against runaway placeholder insertion on very sparse histories.
@@ -57,10 +60,12 @@ function buildRows(curve: EquityPoint[]): LogRow[] {
   for (let k = start; k <= end; k = addDays(k, 1)) {
     const rec = byDate.get(k);
     if (rec) {
-      filled.push({ date: k, dailyPercent: rec.dailyPercent, pnl: rec.pnl, balance: rec.balance, placeholder: false, noTrading: false });
+      filled.push({ date: k, dailyPercent: rec.dailyPercent, pnl: rec.pnl, balance: rec.balance, placeholder: false, noTrading: false, marketOffline: false });
       prevBalance = rec.balance;
     } else {
-      filled.push({ date: k, dailyPercent: 0, pnl: 0, balance: prevBalance, placeholder: true, noTrading: noTradingSet.has(k) });
+      // A missing day is either a weekend (Market Offline) or a missed/holiday
+      // weekday placeholder. Balance carries over unchanged either way.
+      filled.push({ date: k, dailyPercent: 0, pnl: 0, balance: prevBalance, placeholder: true, noTrading: noTradingSet.has(k), marketOffline: !isTradingDay(k) });
     }
   }
   return filled.reverse(); // newest first
@@ -77,7 +82,7 @@ export function DailyPerformanceTable({ curve }: { curve: EquityPoint[] }) {
       <CardHeader>
         <CardTitle>Daily Performance Log</CardTitle>
         <p className="text-xs text-muted-foreground">
-          P/L posts nightly at 11:59 PM PHT. Non-trading days show 0.00% for transparency.
+          P/L posts nightly (Mon–Fri) at 11:59 PM PHT. Weekends show 🔴 No Trading — Market Offline.
         </p>
       </CardHeader>
       <CardContent>
@@ -92,21 +97,30 @@ export function DailyPerformanceTable({ curve }: { curve: EquityPoint[] }) {
           </TableHeader>
           <TableBody>
             {shown.map((p) => (
-              <TableRow key={p.date}>
+              <TableRow key={p.date} className={cn(p.marketOffline && "opacity-60")}>
                 <TableCell className="font-medium">
                   {formatDateKey(p.date)}
-                  {p.placeholder && (
+                  {p.marketOffline ? (
                     <span
-                      className="ml-2 text-xs font-normal text-muted-foreground"
-                      title={
-                        p.noTrading ? "No trading activity - Market closed for holiday" : undefined
-                      }
+                      className="ml-2 text-xs font-medium text-loss"
+                      title={MARKET_OFFLINE_NOTE}
                     >
-                      No trading activity
-                      {p.noTrading && (
-                        <span className="text-amber-500/90"> · Market closed for holiday</span>
-                      )}
+                      🔴 {MARKET_OFFLINE_MESSAGE}
                     </span>
+                  ) : (
+                    p.placeholder && (
+                      <span
+                        className="ml-2 text-xs font-normal text-muted-foreground"
+                        title={
+                          p.noTrading ? "No trading activity - Market closed for holiday" : undefined
+                        }
+                      >
+                        No trading activity
+                        {p.noTrading && (
+                          <span className="text-amber-500/90"> · Market closed for holiday</span>
+                        )}
+                      </span>
+                    )
                   )}
                 </TableCell>
                 <TableCell
@@ -119,7 +133,7 @@ export function DailyPerformanceTable({ curve }: { curve: EquityPoint[] }) {
                       : "text-loss"
                   )}
                 >
-                  {p.dailyPercent.toFixed(2)}%
+                  {p.marketOffline ? "—" : `${p.dailyPercent.toFixed(2)}%`}
                 </TableCell>
                 <TableCell
                   className={cn(
@@ -127,8 +141,7 @@ export function DailyPerformanceTable({ curve }: { curve: EquityPoint[] }) {
                     p.placeholder ? "text-muted-foreground" : p.pnl >= 0 ? "text-profit" : "text-loss"
                   )}
                 >
-                  {p.placeholder ? "" : p.pnl >= 0 ? "+" : ""}
-                  {formatUsd(p.pnl)}
+                  {p.marketOffline ? "—" : `${p.pnl >= 0 ? "+" : ""}${formatUsd(p.pnl)}`}
                 </TableCell>
                 <TableCell className="tnum text-right font-medium">
                   {formatUsd(p.balance)}

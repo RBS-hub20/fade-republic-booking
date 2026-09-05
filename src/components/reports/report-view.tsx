@@ -25,6 +25,7 @@ import { generateClientStatement, type ReportTxn } from "@/lib/pdf";
 import type { EquityPoint, PerformanceKpis } from "@/lib/performance";
 import type { PackageRow } from "@/lib/packages";
 import type { ReferralBonusEvent } from "@/lib/referrals";
+import { marketOfflineKeysBetween, MARKET_OFFLINE_MESSAGE, MARKET_OFFLINE_NOTE } from "@/lib/trading-days";
 import { countryFlag } from "@/lib/countries";
 import { Modal } from "@/components/ui/modal";
 import { Lock, Loader2, RefreshCw, ArrowDownToLine, CheckCircle2, Users } from "lucide-react";
@@ -86,11 +87,31 @@ export function ReportView({
     .slice()
     .reverse();
 
+  // Display-only "No Trading — Market Offline" rows for weekend gaps between the
+  // first and last recorded trading day. NOT written to the DB and NOT part of
+  // any KPI/cap/balance math — purely for transparency in the log.
+  const dailyAsc = [...dailyRows].reverse();
+  const dailyDates = new Set(dailyRows.map((p) => p.date));
+  const offlineEntries: Array<{ kind: "offline"; sortKey: string; date: string; balance: number }> = [];
+  if (dailyAsc.length >= 2) {
+    const keys = marketOfflineKeysBetween(dailyAsc[0].date, dailyAsc[dailyAsc.length - 1].date, dailyDates);
+    for (const k of keys) {
+      // Balance is unchanged over the weekend: carry the last trading day's EOD.
+      let bal = dailyAsc[0].balance;
+      for (const p of dailyAsc) {
+        if (p.date < k) bal = p.balance;
+        else break;
+      }
+      offlineEntries.push({ kind: "offline", sortKey: k, date: k, balance: bal });
+    }
+  }
+
   // Merge the daily P/L rows with referral-bonus events into one newest-first
   // log, so "+$X.XX Referral Bonus from @user" appears on the day it landed.
   const logEntries: Array<
     | { kind: "daily"; sortKey: string; point: EquityPoint }
     | { kind: "bonus"; sortKey: string; id: string; bonus: ReferralBonusEvent }
+    | { kind: "offline"; sortKey: string; date: string; balance: number }
   > = [
     ...dailyRows.map((p) => ({ kind: "daily" as const, sortKey: p.date, point: p })),
     ...referralBonuses.map((b, i) => ({
@@ -99,6 +120,7 @@ export function ReportView({
       id: `bonus-${b.date}-${i}`,
       bonus: b,
     })),
+    ...offlineEntries,
   ].sort((a, b) => (a.sortKey < b.sortKey ? 1 : a.sortKey > b.sortKey ? -1 : 0));
 
   return (
@@ -258,6 +280,8 @@ export function ReportView({
                     isAdmin={isAdmin}
                     onSaved={() => router.refresh()}
                   />
+                ) : e.kind === "offline" ? (
+                  <OfflineRow key={`off-${e.date}`} date={e.date} balance={e.balance} isAdmin={isAdmin} />
                 ) : (
                   <BonusRow key={e.id} bonus={e.bonus} isAdmin={isAdmin} />
                 )
@@ -379,6 +403,23 @@ function BonusRow({ bonus, isAdmin }: { bonus: ReferralBonusEvent; isAdmin: bool
         +{formatUsd(bonus.amount)}
       </TableCell>
       <TableCell className="text-right text-muted-foreground">—</TableCell>
+      {isAdmin && <TableCell />}
+    </TableRow>
+  );
+}
+
+/** Display-only weekend "No Trading — Market Offline" row (grayed, red badge).
+ *  No earnings, no balance change — pure transparency. */
+function OfflineRow({ date, balance, isAdmin }: { date: string; balance: number; isAdmin: boolean }) {
+  return (
+    <TableRow className="bg-loss/5 opacity-70" title={MARKET_OFFLINE_NOTE}>
+      <TableCell className="font-medium">
+        {formatDateKey(date)}
+        <span className="ml-2 text-xs font-medium text-loss">🔴 {MARKET_OFFLINE_MESSAGE}</span>
+      </TableCell>
+      <TableCell className="text-right text-muted-foreground">—</TableCell>
+      <TableCell className="text-right text-muted-foreground">—</TableCell>
+      <TableCell className="tnum text-right font-medium">{formatUsd(balance)}</TableCell>
       {isAdmin && <TableCell />}
     </TableRow>
   );
