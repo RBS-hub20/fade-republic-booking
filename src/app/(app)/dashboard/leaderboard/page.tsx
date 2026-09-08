@@ -27,7 +27,7 @@ export default async function LeaderboardPage() {
 
   return (
     <>
-      <PageHeader title="🏆 Shanghai Leaderboard" subtitle={`Top network sales · ${MONTH_LABEL} · Goal $5,000`}>
+      <PageHeader title="🏆 Shanghai Leaderboard" subtitle={`Top network sales · Aug 1 – Sept 30 EXTENDED · Goal $6,000`}>
         <Button asChild variant="outline" size="sm">
           <Link href="/dashboard"><ArrowLeft className="h-4 w-4" /> Dashboard</Link>
         </Button>

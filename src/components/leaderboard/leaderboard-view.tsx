@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { cn, formatUsd } from "@/lib/utils";
 import type { LeaderboardEntry } from "@/lib/referrals";
 
-const GOAL = 5000;
+const GOAL = 6000;
 
 function rankBadge(rank: number) {
   if (rank === 1) return <Crown className="h-4 w-4 text-gold-300" />;

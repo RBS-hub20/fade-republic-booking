@@ -9,19 +9,26 @@ import { formatUsd } from "@/lib/utils";
 import { useShareImage } from "@/lib/use-share-image";
 import { ShareFormatToggle } from "@/components/celebration/share-format-toggle";
 
-// The promo runs Aug 4–31, 2026 (local). Bonus modal owns Aug 1–3; Sept 1+ it
+// EXTENDED! The promo now runs Aug 1 – Sept 30, 2026 (local). Oct 1+ it
 // auto-disables — no code removal needed.
-const PROMO_START = new Date(2026, 7, 4, 0, 0, 0); // Aug 4 2026 00:00 local
-const PROMO_END_EXCL = new Date(2026, 8, 1, 0, 0, 0); // Sep 1 2026 00:00 local (exclusive)
-const GOAL = 5000;
+const PROMO_START = new Date(2026, 7, 1, 0, 0, 0); // Aug 1 2026 00:00 local
+const PROMO_END_EXCL = new Date(2026, 9, 1, 0, 0, 0); // Oct 1 2026 00:00 local (exclusive) → runs through Sept 30
+const GOAL = 6000;
+// Qualification deadline: Sept 30 2026 23:59:59 Asia/Manila (UTC+8) → 15:59:59 UTC.
+const DEADLINE_MS = Date.UTC(2026, 8, 30, 15, 59, 59);
+const GREEN = "#00FF66";
+
+function daysLeftToDeadline(): number {
+  return Math.max(0, Math.ceil((DEADLINE_MS - Date.now()) / 86_400_000));
+}
 
 function todayKey(d = new Date()) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 /**
- * Shanghai Travel Incentives promo — once per day during Aug 4–31, 2026.
- * `?shanghai=preview` force-shows it (bypasses date + daily gate) for QA.
+ * Shanghai Travel Incentives promo — once per day during Aug 1 – Sept 30, 2026
+ * (EXTENDED). `?shanghai=preview` force-shows it (bypasses date + daily gate).
  */
 export function ShanghaiPromo({
   networkSales, referralCode, origin, enabled = true,
@@ -46,7 +53,7 @@ export function ShanghaiPromo({
     if (!enabled && !force) return; // admin-disabled (preview still overrides)
     if (!force) {
       const now = new Date();
-      if (now < PROMO_START || now >= PROMO_END_EXCL) return; // outside Aug 4–31
+      if (now < PROMO_START || now >= PROMO_END_EXCL) return; // outside Aug 1 – Sept 30
       const key = `qx_shanghai_seen_${todayKey(now)}`;
       if (localStorage.getItem(key)) return; // once per day
       localStorage.setItem(key, "1");
@@ -103,8 +110,40 @@ export function ShanghaiPromo({
         </h2>
         <p className="text-center text-sm font-semibold text-white/90">Oct 2026 · All-Expenses-Paid</p>
 
+        {/* EXTENDED qualification-period bar */}
+        <div className="relative mx-auto mt-3 flex max-w-[320px] items-center justify-center rounded-lg border border-gold-400/30 bg-black/40 px-3 py-1.5">
+          <p className="text-center text-[11px] font-bold uppercase tracking-wide text-white/90">
+            Qualification Period Aug 1 – <span style={{ color: GREEN }}>Sept 30</span>
+          </p>
+          {/* Green "brush" EXTENDED badge, top-right of the date bar (matches poster). */}
+          <span
+            className="absolute -right-2 -top-2 -rotate-6 rounded-md px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-black shadow-lg"
+            style={{ backgroundColor: GREEN }}
+          >
+            Extended!
+          </span>
+        </div>
+        <p className="mt-1.5 text-center text-[11px] font-semibold text-gold-300">
+          ⏳ {daysLeftToDeadline()} days left to qualify
+        </p>
+
         {mode === "promo" ? (
         <>
+        {/* Reward tiers — match poster: $6k all-paid / $3k 50%-paid. "Bigger Goals, More Opportunities." */}
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <div className="rounded-xl border border-gold-400/40 bg-gold-400/10 p-3 text-center">
+            <p className="text-lg font-extrabold text-gold-200">$6,000</p>
+            <p className="text-[10px] font-semibold uppercase leading-tight text-white/80">All-Expenses-Paid<br />100% by Company</p>
+          </div>
+          <div className="rounded-xl border border-white/15 bg-black/40 p-3 text-center">
+            <p className="text-lg font-extrabold text-white/90">$3,000</p>
+            <p className="text-[10px] font-semibold uppercase leading-tight text-white/70">50% Paid<br />by Company</p>
+          </div>
+        </div>
+        <p className="mt-2 text-center text-[10px] font-bold uppercase tracking-wider" style={{ color: GREEN }}>
+          Bigger Goals · More Opportunities
+        </p>
+
         {/* Tabs */}
         <div className="mt-5 grid grid-cols-2 gap-2">
           {(["builders", "investors"] as const).map((t) => (
@@ -126,7 +165,7 @@ export function ShanghaiPromo({
           {tab === "builders" ? (
             <div>
               <p className="text-sm text-white/90">
-                Hit <b className="text-gold-300">{formatUsd(GOAL)}</b> in network sales from <b>Aug 1–31</b> to earn the trip.
+                Hit <b className="text-gold-300">{formatUsd(GOAL)}</b> in network sales from <b>Aug 1 – Sept 30</b> to earn the trip.
               </p>
               <p className="mt-1 text-[11px] text-white/60">At least 3 active lines · 40-40-20 · {formatUsd(GOAL)} total.</p>
 

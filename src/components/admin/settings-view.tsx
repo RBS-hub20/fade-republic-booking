@@ -98,7 +98,7 @@ export function SettingsView({ initial }: { initial: Record<string, boolean> }) 
         FLAG_SHANGHAI_MODAL,
         <Plane className="h-4 w-4" />,
         "Shanghai promo pop-up",
-        "The Aug 4–31 travel-incentive pop-up (once per day) with the $5,000 progress bar.",
+        "The Aug 1 - Sept 30 EXTENDED travel-incentive pop-up (once per day) with the $5,000 / $6,000 progress bar.",
         "/dashboard?shanghai=preview",
         "Test Shanghai",
       )}
