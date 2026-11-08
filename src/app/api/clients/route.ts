@@ -12,7 +12,7 @@ export async function GET() {
 
 /**
  * Create a client. Admin only. Auto-generates a backfilled 60-day performance
- * history (random 0.3–0.6%/day) so the new client shows a meaningful curve.
+ * history (random 0.2–0.3%/day) so the new client shows a meaningful curve.
  */
 export async function POST(req: Request) {
   const session = getSession();

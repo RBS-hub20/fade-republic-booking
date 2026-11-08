@@ -5,7 +5,7 @@ import { randomDailyPercent, toManilaDateKey } from "@/lib/performance";
 
 /**
  * Upsert a single day's actual performance percentage for a client.
- * Admin only. If `dailyPercent` is omitted/blank, a random 0.3–0.6% estimate
+ * Admin only. If `dailyPercent` is omitted/blank, a random 0.2–0.3% estimate
  * is used (the portal's default behaviour).
  *
  * balanceEOD is recomputed lazily by the data layer from the full curve, so we

@@ -6,8 +6,9 @@
  * (Mon–Sun) that isn't already logged — automatically backfilling any gap from
  * the last recorded day (or the client's first funding day) up to today.
  *
- *   - CLIENT return (shown on the dashboard + performance log): random 0.3–0.5%
- *     per day, compounded into the Current Balance.
+ *   - CLIENT return (shown on the dashboard + performance log): random 0.2–0.3%
+ *     per TRADING day (Mon–Fri; Sat/Sun = No Trading — Market Offline). Lowered
+ *     on 2026-11-08 — applies to NEW rows only; past rows are never recalculated.
  *   - SERVER return (internal gross Forex/Crypto, admin-only): random 1.0–2.0%,
  *     stored in DailyPerformance.notes ("server:1.73") so no schema migration is
  *     needed — kept separate from the client-facing percent.
@@ -16,8 +17,8 @@ import { prisma } from "./prisma";
 import { computeEquityCurve, toManilaDateKey, manilaToday, addDays } from "./performance";
 import { isTradingDayKey, previousTradingDayKey } from "./trading-days";
 
-export const CLIENT_MIN_PCT = 0.3;
-export const CLIENT_MAX_PCT = 0.5;
+export const CLIENT_MIN_PCT = 0.2;
+export const CLIENT_MAX_PCT = 0.3;
 export const SERVER_MIN_PCT = 1.0;
 export const SERVER_MAX_PCT = 2.0;
 

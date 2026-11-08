@@ -18,8 +18,8 @@
 export const MANILA_TZ = "Asia/Manila";
 
 /** Default estimated daily performance band when no actual value is provided. */
-export const DEFAULT_MIN_DAILY_PCT = 0.3;
-export const DEFAULT_MAX_DAILY_PCT = 0.6;
+export const DEFAULT_MIN_DAILY_PCT = 0.2;
+export const DEFAULT_MAX_DAILY_PCT = 0.3;
 
 /** A single calendar day in the equity curve. */
 export interface EquityPoint {

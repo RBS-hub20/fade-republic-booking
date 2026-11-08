@@ -63,7 +63,7 @@ export default async function AdminPerformancePage() {
     <>
       <PageHeader
         title="Fund Performance"
-        subtitle="Internal server gross (1–2%/day) vs. client payout (0.3–0.5%/day) — actual vs. paid out (Asia/Manila)."
+        subtitle="Internal server gross (1–2%/day) vs. client payout (0.2–0.3%/day, Mon–Fri) — actual vs. paid out (Asia/Manila)."
       />
 
       {todayStatus && (

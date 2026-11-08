@@ -1,7 +1,7 @@
 /**
  * Admin-only "fund performance" aggregation: the internal SERVER gross return
  * (1–2%/day, stored in DailyPerformance.notes as "server:1.73") versus the
- * CLIENT payout (0.3–0.5%/day, the dailyPercent shown to clients), and the
+ * CLIENT payout (0.2–0.3%/day, Mon–Fri, the dailyPercent shown to clients), and the
  * margin the fund keeps.
  *
  * Server gross on a client's capital that day = opening balance * serverPct%,

@@ -255,7 +255,7 @@ export function ReportView({
           )}
           {isAdmin && (
             <p className="text-xs text-muted-foreground">
-              Admin: click the pencil to enter an actual daily % (blank = random 0.3–0.6% estimate).
+              Admin: click the pencil to enter an actual daily % (blank = random 0.2–0.3% estimate).
             </p>
           )}
         </CardHeader>
